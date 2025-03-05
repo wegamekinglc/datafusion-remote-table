@@ -1,11 +1,10 @@
 mod postgres;
 
 use crate::connection::postgres::connect_postgres;
-use crate::{DFResult, RemoteDataType, Transform};
+use crate::{DFResult, RemoteDataType, RemoteSchema};
 use datafusion::execution::SendableRecordBatchStream;
 use std::fmt::Debug;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
@@ -13,10 +12,10 @@ pub trait Connection: Debug + Send + Sync {
         &self,
         sql: String,
         projection: Option<Vec<usize>>,
-    ) -> DFResult<(SendableRecordBatchStream, Vec<RemoteDataType>)>;
+    ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)>;
 }
 
-pub async fn connect(args: &ConnectionArgs) -> DFResult<Arc<dyn Connection>> {
+pub async fn connect(args: &ConnectionArgs) -> DFResult<Box<dyn Connection>> {
     match args {
         ConnectionArgs::Postgresql {
             host,
@@ -25,8 +24,9 @@ pub async fn connect(args: &ConnectionArgs) -> DFResult<Arc<dyn Connection>> {
             password,
             database,
         } => {
-            let conn = connect_postgres(host, *port, username, password, database.as_deref()).await?;
-            Ok(Arc::new(conn))
+            let conn =
+                connect_postgres(host, *port, username, password, database.as_deref()).await?;
+            Ok(Box::new(conn))
         }
         ConnectionArgs::Oracle { .. } => {
             todo!()

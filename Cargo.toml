@@ -7,10 +7,7 @@ edition = "2021"
 datafusion = "45"
 async-trait = "0.1"
 futures = "0.3"
-sqlx = { version = "0.8.3", default-features = false, features = [
-    "mysql",
-    "postgres",
-    "runtime-tokio",
-    "time",
-    "chrono",
-] }
+async-stream = { version = "0.3" }
+bb8 = { version = "0.9" }
+bb8-postgres = { version = "0.9" }
+postgres-native-tls = { version = "0.5.0" }

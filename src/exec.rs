@@ -1,5 +1,7 @@
 use crate::transform::transform_batch;
-use crate::{connect, Connection, ConnectionArgs, DFResult, RemoteDataType, Transform};
+use crate::{
+    connect, Connection, ConnectionArgs, DFResult, RemoteDataType, RemoteSchema, Transform,
+};
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
@@ -20,7 +22,6 @@ pub struct RemoteTableExec {
     projection: Option<Vec<usize>>,
     transform: Arc<dyn Transform>,
     plan_properties: PlanProperties,
-    conn: Arc<dyn Connection>,
 }
 
 impl RemoteTableExec {
@@ -37,14 +38,12 @@ impl RemoteTableExec {
             EmissionType::Incremental,
             Boundedness::Bounded,
         );
-        let conn = connect(&conn_args).await?;
         Ok(Self {
             conn_args,
             sql,
             projection,
             transform,
             plan_properties,
-            conn,
         })
     }
 }
@@ -80,7 +79,7 @@ impl ExecutionPlan for RemoteTableExec {
     ) -> DFResult<SendableRecordBatchStream> {
         let schema = self.schema();
         let fut = transform_stream(
-            self.conn.clone(),
+            self.conn_args.clone(),
             self.sql.clone(),
             self.projection.clone(),
             self.transform.clone(),
@@ -92,14 +91,15 @@ impl ExecutionPlan for RemoteTableExec {
 }
 
 pub async fn transform_stream(
-    conn: Arc<dyn Connection>,
+    conn_args: ConnectionArgs,
     sql: String,
     projection: Option<Vec<usize>>,
     transform: Arc<dyn Transform>,
     schema: SchemaRef,
 ) -> DFResult<SendableRecordBatchStream> {
+    let mut conn = connect(&conn_args).await?;
     let (stream, remote_schema) = conn.query(sql, projection).await?;
-    assert_eq!(schema.fields().len(), remote_schema.len());
+    assert_eq!(schema.fields().len(), remote_schema.fields.len());
     Ok(Box::pin(RemoteTableExecStream {
         input: stream,
         transform,
@@ -112,7 +112,7 @@ pub struct RemoteTableExecStream {
     input: SendableRecordBatchStream,
     transform: Arc<dyn Transform>,
     schema: SchemaRef,
-    remote_schema: Vec<RemoteDataType>,
+    remote_schema: RemoteSchema,
 }
 
 impl Stream for RemoteTableExecStream {

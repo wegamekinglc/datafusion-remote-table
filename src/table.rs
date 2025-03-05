@@ -49,12 +49,15 @@ impl TableProvider for RemoteTable {
         _limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let projected_schema = project_schema(&self.schema, projection)?;
-        Ok(Arc::new(RemoteTableExec::try_new(
-            self.conn_args.clone(),
-            projected_schema,
-            self.sql.clone(),
-            projection.cloned(),
-            self.transform.clone(),
-        ).await?))
+        Ok(Arc::new(
+            RemoteTableExec::try_new(
+                self.conn_args.clone(),
+                projected_schema,
+                self.sql.clone(),
+                projection.cloned(),
+                self.transform.clone(),
+            )
+            .await?,
+        ))
     }
 }

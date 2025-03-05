@@ -1,4 +1,4 @@
-use crate::{DFResult, RemoteDataType};
+use crate::{DFResult, RemoteDataType, RemoteSchema};
 use datafusion::arrow::array::{ArrayRef, BooleanArray, RecordBatch};
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use std::fmt::Debug;
@@ -23,12 +23,12 @@ impl Transform for DefaultTransform {}
 pub(crate) fn transform_batch(
     batch: RecordBatch,
     transform: &dyn Transform,
-    remote_schema: &[RemoteDataType],
+    remote_schema: &RemoteSchema,
     target_schema: SchemaRef,
 ) -> DFResult<RecordBatch> {
-    let mut new_arrays: Vec<ArrayRef> = Vec::with_capacity(remote_schema.len());
-    for (idx, remote_type) in remote_schema.iter().enumerate() {
-        match remote_type {
+    let mut new_arrays: Vec<ArrayRef> = Vec::with_capacity(remote_schema.fields.len());
+    for (idx, remote_field) in remote_schema.fields.iter().enumerate() {
+        match remote_field.data_type {
             RemoteDataType::Boolean => {
                 let array = batch
                     .column(idx)
@@ -37,7 +37,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to BooleanArray");
                 let new_array = transform.transform_boolean(
                     array,
-                    remote_type,
+                    &remote_field.data_type,
                     target_schema.field(idx).data_type(),
                 )?;
                 new_arrays.push(new_array);
