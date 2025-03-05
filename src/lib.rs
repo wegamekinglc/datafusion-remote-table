@@ -5,7 +5,6 @@ mod table;
 mod transform;
 
 pub use connection::*;
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
 pub use exec::*;
 pub use schema::*;
 pub use table::*;

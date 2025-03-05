@@ -1,7 +1,7 @@
 mod postgres;
 
 use crate::connection::postgres::connect_postgres;
-use crate::{DFResult, RemoteDataType, RemoteSchema};
+use crate::{DFResult, RemoteSchema};
 use datafusion::execution::SendableRecordBatchStream;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -64,4 +64,11 @@ pub enum ConnectionArgs {
         database: Option<String>,
     },
     Sqlite(PathBuf),
+}
+
+pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usize) -> bool {
+    match projection {
+        Some(p) => p.contains(&col_idx),
+        None => true,
+    }
 }

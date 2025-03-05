@@ -1,7 +1,5 @@
 use crate::transform::transform_batch;
-use crate::{
-    connect, Connection, ConnectionArgs, DFResult, RemoteDataType, RemoteSchema, Transform,
-};
+use crate::{connect, ConnectionArgs, DFResult, RemoteSchema, Transform};
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
@@ -97,7 +95,7 @@ pub async fn transform_stream(
     transform: Arc<dyn Transform>,
     schema: SchemaRef,
 ) -> DFResult<SendableRecordBatchStream> {
-    let mut conn = connect(&conn_args).await?;
+    let conn = connect(&conn_args).await?;
     let (stream, remote_schema) = conn.query(sql, projection).await?;
     assert_eq!(schema.fields().len(), remote_schema.fields.len());
     Ok(Box::pin(RemoteTableExecStream {

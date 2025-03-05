@@ -1,13 +1,15 @@
+use crate::connection::projections_contains;
 use crate::{Connection, DFResult, RemoteDataType, RemoteField, RemoteSchema};
 use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
-use datafusion::arrow::array::RecordBatch;
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::array::{make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, RecordBatch};
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{stream, StreamExt};
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -64,7 +66,8 @@ impl Connection for PostgresConnection {
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Failed to execute query on postgres due to {}",
+                    "Failed to execute query {} on postgres due to {}",
+                    sql,
                     e.to_string()
                 ))
             })?
@@ -94,8 +97,14 @@ impl Connection for PostgresConnection {
                 "No data returned from postgres".to_string(),
             ));
         };
-        let remote_schema = build_remote_schema(first_row)?;
-        let first_chunk = rows_to_batch(first_chunk.as_slice(), projection.as_ref())?;
+        let (remote_schema, pg_types) = build_remote_schema(first_row)?;
+        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
+        let first_chunk = rows_to_batch(
+            first_chunk.as_slice(),
+            &pg_types,
+            arrow_schema.clone(),
+            projection.as_ref(),
+        )?;
         let schema = first_chunk.schema();
 
         let mut stream = stream.map(move |rows| {
@@ -108,7 +117,12 @@ impl Connection for PostgresConnection {
                         e.to_string()
                     ))
                 })?;
-            let batch = rows_to_batch(rows.as_slice(), projection.as_ref())?;
+            let batch = rows_to_batch(
+                rows.as_slice(),
+                &pg_types,
+                arrow_schema.clone(),
+                projection.as_ref(),
+            )?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
@@ -133,10 +147,12 @@ impl Connection for PostgresConnection {
     }
 }
 
-fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
+fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
     let mut remote_fields = vec![];
+    let mut pg_types = vec![];
     for col in row.columns() {
         let col_type = col.type_();
+        pg_types.push(col_type.clone());
         if *col_type == Type::BOOL {
             remote_fields.push(RemoteField::new(
                 col.name().to_string(),
@@ -149,9 +165,59 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
             )));
         }
     }
-    Ok(RemoteSchema::new(remote_fields))
+    Ok((RemoteSchema::new(remote_fields), pg_types))
 }
 
-fn rows_to_batch(rows: &[Row], projection: Option<&Vec<usize>>) -> DFResult<RecordBatch> {
-    todo!()
+fn rows_to_batch(
+    rows: &[Row],
+    pg_types: &Vec<Type>,
+    arrow_schema: SchemaRef,
+    projection: Option<&Vec<usize>>,
+) -> DFResult<RecordBatch> {
+    let projected_schema = project_schema(&arrow_schema, projection)?;
+    let mut array_builders = vec![];
+    for field in arrow_schema.fields() {
+        let builder = make_builder(&field.data_type(), rows.len());
+        array_builders.push(builder);
+    }
+    for row in rows {
+        for (idx, pg_type) in pg_types.iter().enumerate() {
+            if !projections_contains(projection, idx) {
+                continue;
+            }
+            let array_builder = &mut array_builders[idx];
+            match *pg_type {
+                Type::BOOL => {
+                    let value: Option<bool> = row.try_get(idx).expect(&format!(
+                        "Failed to get bool value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<BooleanBuilder>()
+                        .expect(&format!(
+                            "Failed to downcast builder to BooleanBuilder for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                _ => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Unsupported type {:?} in postgres",
+                        pg_type
+                    )));
+                }
+            }
+        }
+    }
+    let projected_columns = array_builders
+        .into_iter()
+        .enumerate()
+        .filter(|(idx, _)| projections_contains(projection, *idx))
+        .map(|(_, mut builder)| builder.finish())
+        .collect::<Vec<ArrayRef>>();
+    Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
 }
