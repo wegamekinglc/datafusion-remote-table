@@ -3,6 +3,7 @@ mod exec;
 mod schema;
 mod table;
 mod transform;
+mod codec;
 
 pub use connection::*;
 pub use exec::*;

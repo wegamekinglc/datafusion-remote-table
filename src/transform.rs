@@ -15,11 +15,6 @@ pub trait Transform: Debug + Send + Sync {
     }
 }
 
-#[derive(Debug)]
-pub struct DefaultTransform;
-
-impl Transform for DefaultTransform {}
-
 pub(crate) fn transform_batch(
     batch: RecordBatch,
     transform: &dyn Transform,

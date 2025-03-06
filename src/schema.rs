@@ -17,11 +17,24 @@ impl RemoteDataType {
 pub struct RemoteField {
     pub name: String,
     pub data_type: RemoteDataType,
+    pub nullable: bool,
 }
 
 impl RemoteField {
-    pub fn new(name: String, data_type: RemoteDataType) -> Self {
-        RemoteField { name, data_type }
+    pub fn new(name: String, data_type: RemoteDataType, nullable: bool) -> Self {
+        RemoteField {
+            name,
+            data_type,
+            nullable,
+        }
+    }
+
+    pub fn to_arrow_field(&self) -> Field {
+        Field::new(
+            self.name.clone(),
+            self.data_type.to_arrow_type(),
+            self.nullable,
+        )
     }
 }
 
@@ -41,11 +54,7 @@ impl RemoteSchema {
     pub fn to_arrow_schema(&self) -> Schema {
         let mut fields = vec![];
         for remote_field in self.fields.iter() {
-            fields.push(Field::new(
-                remote_field.name.clone(),
-                remote_field.data_type.to_arrow_type(),
-                true,
-            ));
+            fields.push(remote_field.to_arrow_field());
         }
         Schema::new(fields)
     }

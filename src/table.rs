@@ -1,4 +1,4 @@
-use crate::{ConnectionArgs, DFResult, DefaultTransform, RemoteTableExec, Transform};
+use crate::{ConnectionArgs, DFResult, RemoteTableExec, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::project_schema;
@@ -13,7 +13,7 @@ pub struct RemoteTable {
     pub(crate) conn_args: ConnectionArgs,
     pub(crate) sql: String,
     pub(crate) schema: SchemaRef,
-    pub(crate) transform: Arc<dyn Transform>,
+    pub(crate) transform: Option<Arc<dyn Transform>>,
 }
 
 impl RemoteTable {
@@ -22,7 +22,7 @@ impl RemoteTable {
             conn_args,
             sql,
             schema,
-            transform: Arc::new(DefaultTransform {}),
+            transform: None,
         }
     }
 }

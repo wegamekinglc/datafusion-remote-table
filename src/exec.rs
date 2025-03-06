@@ -18,7 +18,7 @@ pub struct RemoteTableExec {
     conn_args: ConnectionArgs,
     sql: String,
     projection: Option<Vec<usize>>,
-    transform: Arc<dyn Transform>,
+    transform: Option<Arc<dyn Transform>>,
     plan_properties: PlanProperties,
 }
 
@@ -28,7 +28,7 @@ impl RemoteTableExec {
         projected_schema: SchemaRef,
         sql: String,
         projection: Option<Vec<usize>>,
-        transform: Arc<dyn Transform>,
+        transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<Self> {
         let plan_properties = PlanProperties::new(
             EquivalenceProperties::new(projected_schema),
@@ -72,11 +72,12 @@ impl ExecutionPlan for RemoteTableExec {
 
     fn execute(
         &self,
-        _partition: usize,
+        partition: usize,
         _context: Arc<TaskContext>,
     ) -> DFResult<SendableRecordBatchStream> {
+        assert_eq!(partition, 0);
         let schema = self.schema();
-        let fut = transform_stream(
+        let fut = build_and_transform_stream(
             self.conn_args.clone(),
             self.sql.clone(),
             self.projection.clone(),
@@ -88,32 +89,36 @@ impl ExecutionPlan for RemoteTableExec {
     }
 }
 
-pub async fn transform_stream(
+pub async fn build_and_transform_stream(
     conn_args: ConnectionArgs,
     sql: String,
     projection: Option<Vec<usize>>,
-    transform: Arc<dyn Transform>,
+    transform: Option<Arc<dyn Transform>>,
     schema: SchemaRef,
 ) -> DFResult<SendableRecordBatchStream> {
     let conn = connect(&conn_args).await?;
     let (stream, remote_schema) = conn.query(sql, projection).await?;
     assert_eq!(schema.fields().len(), remote_schema.fields.len());
-    Ok(Box::pin(RemoteTableExecStream {
-        input: stream,
-        transform,
-        schema,
-        remote_schema,
-    }))
+    if let Some(transform) = transform.as_ref() {
+        Ok(Box::pin(TransformStream {
+            input: stream,
+            transform: transform.clone(),
+            schema,
+            remote_schema,
+        }))
+    } else {
+        Ok(stream)
+    }
 }
 
-pub struct RemoteTableExecStream {
+pub(crate) struct TransformStream {
     input: SendableRecordBatchStream,
     transform: Arc<dyn Transform>,
     schema: SchemaRef,
     remote_schema: RemoteSchema,
 }
 
-impl Stream for RemoteTableExecStream {
+impl Stream for TransformStream {
     type Item = DFResult<RecordBatch>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.input.poll_next_unpin(cx) {
@@ -135,7 +140,7 @@ impl Stream for RemoteTableExecStream {
     }
 }
 
-impl RecordBatchStream for RemoteTableExecStream {
+impl RecordBatchStream for TransformStream {
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }

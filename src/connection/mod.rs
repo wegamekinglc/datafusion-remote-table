@@ -8,6 +8,7 @@ use std::path::PathBuf;
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchema>;
     async fn query(
         &self,
         sql: String,

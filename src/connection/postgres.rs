@@ -50,6 +50,49 @@ pub(crate) async fn connect_postgres(
 
 #[async_trait::async_trait]
 impl Connection for PostgresConnection {
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchema> {
+        let conn = self.pool.get().await.map_err(|e| {
+            DataFusionError::Execution(format!(
+                "Failed to get connection from postgres connection pool due to {}",
+                e.to_string()
+            ))
+        })?;
+        let mut stream = conn
+            .query_raw(sql, Vec::<String>::new())
+            .await
+            .map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Failed to execute query {} on postgres due to {}",
+                    sql,
+                    e.to_string()
+                ))
+            })?
+            .chunks(1)
+            .boxed();
+
+        let Some(first_chunk) = stream.next().await else {
+            return Err(DataFusionError::Execution(
+                "No data returned from postgres".to_string(),
+            ));
+        };
+        let first_chunk: Vec<Row> = first_chunk
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Failed to collect rows from postgres due to {}",
+                    e.to_string()
+                ))
+            })?;
+        let Some(first_row) = first_chunk.first() else {
+            return Err(DataFusionError::Execution(
+                "No data returned from postgres".to_string(),
+            ));
+        };
+        let (remote_schema, _pg_types) = build_remote_schema(first_row)?;
+        Ok(remote_schema)
+    }
+
     async fn query(
         &self,
         sql: String,
@@ -62,7 +105,7 @@ impl Connection for PostgresConnection {
             ))
         })?;
         let mut stream = conn
-            .query_raw(&sql, &[""])
+            .query_raw(&sql, Vec::<String>::new())
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
@@ -157,6 +200,7 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
             remote_fields.push(RemoteField::new(
                 col.name().to_string(),
                 RemoteDataType::Boolean,
+                true,
             ));
         } else {
             return Err(DataFusionError::Execution(format!(
