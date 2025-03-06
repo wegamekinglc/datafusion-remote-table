@@ -44,8 +44,7 @@ pub(crate) async fn connect_postgres(
         .await
         .map_err(|e| {
             DataFusionError::Execution(format!(
-                "Failed to create postgres connection pool due to {}",
-                e.to_string()
+                "Failed to create postgres connection pool due to {e}",
             ))
         })?;
 
@@ -61,8 +60,7 @@ impl Connection for PostgresConnection {
     ) -> DFResult<(RemoteSchema, SchemaRef)> {
         let conn = self.pool.get().await.map_err(|e| {
             DataFusionError::Execution(format!(
-                "Failed to get connection from postgres connection pool due to {}",
-                e.to_string()
+                "Failed to get connection from postgres connection pool due to {e}",
             ))
         })?;
         let mut stream = conn
@@ -70,9 +68,7 @@ impl Connection for PostgresConnection {
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Failed to execute query {} on postgres due to {}",
-                    sql,
-                    e.to_string()
+                    "Failed to execute query {sql} on postgres due to {e}",
                 ))
             })?
             .chunks(1)
@@ -88,8 +84,7 @@ impl Connection for PostgresConnection {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Failed to collect rows from postgres due to {}",
-                    e.to_string()
+                    "Failed to collect rows from postgres due to {e}",
                 ))
             })?;
         let Some(first_row) = first_chunk.first() else {
@@ -120,8 +115,7 @@ impl Connection for PostgresConnection {
     ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)> {
         let conn = self.pool.get().await.map_err(|e| {
             DataFusionError::Execution(format!(
-                "Failed to get connection from postgres connection pool due to {}",
-                e.to_string()
+                "Failed to get connection from postgres connection pool due to {e}",
             ))
         })?;
         let mut stream = conn
@@ -129,9 +123,7 @@ impl Connection for PostgresConnection {
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Failed to execute query {} on postgres due to {}",
-                    sql,
-                    e.to_string()
+                    "Failed to execute query {sql} on postgres due to {e}",
                 ))
             })?
             .chunks(2048)
@@ -151,8 +143,7 @@ impl Connection for PostgresConnection {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Failed to collect rows from postgres due to {}",
-                    e.to_string()
+                    "Failed to collect rows from postgres due to {e}",
                 ))
             })?;
         let Some(first_row) = first_chunk.first() else {
@@ -176,8 +167,7 @@ impl Connection for PostgresConnection {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| {
                     DataFusionError::Execution(format!(
-                        "Failed to collect rows from postgres due to {}",
-                        e.to_string()
+                        "Failed to collect rows from postgres due to {e}",
                     ))
                 })?;
             let batch = rows_to_batch(
@@ -274,8 +264,7 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
             }
             _ => {
                 return Err(DataFusionError::Execution(format!(
-                    "Unsupported type {:?} in postgres",
-                    col_type
+                    "Unsupported postgres type {col_type:?}",
                 )));
             }
         }
@@ -305,16 +294,12 @@ fn rows_to_batch(
                 // TODO use macro to simplify
                 Type::BOOL => {
                     let value: Option<bool> = row.try_get(idx).expect(&format!(
-                        "Failed to get bool value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get bool value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<BooleanBuilder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to BooleanBuilder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to BooleanBuilder for BOOL");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -322,16 +307,12 @@ fn rows_to_batch(
                 }
                 Type::CHAR => {
                     let value: Option<i8> = row.try_get(idx).expect(&format!(
-                        "Failed to get i8 value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i8 value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<Int8Builder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Int8Builder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to Int8Builder for CHAR");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -339,16 +320,12 @@ fn rows_to_batch(
                 }
                 Type::INT2 => {
                     let value: Option<i16> = row.try_get(idx).expect(&format!(
-                        "Failed to get i16 value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i16 value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<Int16Builder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Int16Builder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to Int16Builder for INT2");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -356,16 +333,12 @@ fn rows_to_batch(
                 }
                 Type::INT4 => {
                     let value: Option<i32> = row.try_get(idx).expect(&format!(
-                        "Failed to get i32 value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i32 value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<Int32Builder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Int32Builder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to Int32Builder for INT4");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -373,16 +346,12 @@ fn rows_to_batch(
                 }
                 Type::INT8 => {
                     let value: Option<i64> = row.try_get(idx).expect(&format!(
-                        "Failed to get i64 value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i64 value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<Int64Builder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Int64Builder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to Int64Builder for INT8");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -390,16 +359,12 @@ fn rows_to_batch(
                 }
                 Type::FLOAT4 => {
                     let value: Option<f32> = row.try_get(idx).expect(&format!(
-                        "Failed to get f32 value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get f32 value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<Float32Builder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Float32Builder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to Float32Builder for FLOAT4");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -407,16 +372,12 @@ fn rows_to_batch(
                 }
                 Type::FLOAT8 => {
                     let value: Option<f64> = row.try_get(idx).expect(&format!(
-                        "Failed to get f64 value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get f64 value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
                         .downcast_mut::<Float64Builder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Float64Builder for column {}",
-                            idx
-                        ));
+                        .expect("Failed to downcast builder to Float64Builder for FLOAT8");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
@@ -424,8 +385,7 @@ fn rows_to_batch(
                 }
                 Type::INT2_ARRAY => {
                     let value: Option<Vec<i16>> = row.try_get(idx).expect(&format!(
-                        "Failed to get i16 array value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i16 array value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
@@ -447,8 +407,7 @@ fn rows_to_batch(
                 }
                 Type::INT4_ARRAY => {
                     let value: Option<Vec<i32>> = row.try_get(idx).expect(&format!(
-                        "Failed to get i32 array value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i32 array value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
@@ -470,8 +429,7 @@ fn rows_to_batch(
                 }
                 Type::INT8_ARRAY => {
                     let value: Option<Vec<i64>> = row.try_get(idx).expect(&format!(
-                        "Failed to get i64 array value for column {} from row: {:?}",
-                        idx, row
+                        "Failed to get i64 array value for column {idx} from row: {row:?}",
                     ));
                     let builder = array_builder
                         .as_any_mut()
@@ -493,8 +451,7 @@ fn rows_to_batch(
                 }
                 _ => {
                     return Err(DataFusionError::Execution(format!(
-                        "Unsupported type {:?} in postgres",
-                        pg_type
+                        "Unsupported postgres type {pg_type:?}",
                     )));
                 }
             }
