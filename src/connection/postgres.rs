@@ -6,7 +6,7 @@ use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, Float32Builder, Float64Builder,
-    Int16Builder, Int32Builder, Int64Builder, RecordBatch,
+    Int16Builder, Int32Builder, Int64Builder, Int8Builder, RecordBatch,
 };
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::common::project_schema;
@@ -225,6 +225,13 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
                     true,
                 ));
             }
+            Type::CHAR => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Int8,
+                    true,
+                ));
+            }
             Type::INT2 => {
                 remote_fields.push(RemoteField::new(
                     col.name().to_string(),
@@ -301,6 +308,23 @@ fn rows_to_batch(
                         .downcast_mut::<BooleanBuilder>()
                         .expect(&format!(
                             "Failed to downcast builder to BooleanBuilder for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::CHAR => {
+                    let value: Option<i8> = row.try_get(idx).expect(&format!(
+                        "Failed to get i8 value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<Int8Builder>()
+                        .expect(&format!(
+                            "Failed to downcast builder to Int8Builder for column {}",
                             idx
                         ));
                     match value {
