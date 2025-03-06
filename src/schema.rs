@@ -3,16 +3,34 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 #[derive(Debug, Clone)]
 pub enum RemoteDataType {
     Boolean,
+    Int8,
     Int16,
     Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float16,
+    Float32,
+    Float64,
 }
 
 impl RemoteDataType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
             RemoteDataType::Boolean => DataType::Boolean,
+            RemoteDataType::Int8 => DataType::Int8,
             RemoteDataType::Int16 => DataType::Int16,
             RemoteDataType::Int32 => DataType::Int32,
+            RemoteDataType::Int64 => DataType::Int64,
+            RemoteDataType::UInt8 => DataType::UInt8,
+            RemoteDataType::UInt16 => DataType::UInt16,
+            RemoteDataType::UInt32 => DataType::UInt32,
+            RemoteDataType::UInt64 => DataType::UInt64,
+            RemoteDataType::Float16 => DataType::Float16,
+            RemoteDataType::Float32 => DataType::Float32,
+            RemoteDataType::Float64 => DataType::Float64,
         }
     }
 }

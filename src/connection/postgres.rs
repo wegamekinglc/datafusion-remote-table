@@ -5,9 +5,10 @@ use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use datafusion::arrow::array::{
-    make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, PrimitiveBuilder, RecordBatch,
+    make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, Float32Builder, Float64Builder,
+    Int16Builder, Int32Builder, Int64Builder, RecordBatch,
 };
-use datafusion::arrow::datatypes::{Int16Type, Int32Type, Schema, SchemaRef};
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -238,6 +239,27 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
                     true,
                 ));
             }
+            Type::INT8 => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Int64,
+                    true,
+                ));
+            }
+            Type::FLOAT4 => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Float32,
+                    true,
+                ));
+            }
+            Type::FLOAT8 => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Float64,
+                    true,
+                ));
+            }
             _ => {
                 return Err(DataFusionError::Execution(format!(
                     "Unsupported type {:?} in postgres",
@@ -293,9 +315,9 @@ fn rows_to_batch(
                     ));
                     let builder = array_builder
                         .as_any_mut()
-                        .downcast_mut::<PrimitiveBuilder<Int16Type>>()
+                        .downcast_mut::<Int16Builder>()
                         .expect(&format!(
-                            "Failed to downcast builder to PrimitiveBuilder<Int16Type> for column {}",
+                            "Failed to downcast builder to Int16Builder for column {}",
                             idx
                         ));
                     match value {
@@ -310,9 +332,60 @@ fn rows_to_batch(
                     ));
                     let builder = array_builder
                         .as_any_mut()
-                        .downcast_mut::<PrimitiveBuilder<Int32Type>>()
+                        .downcast_mut::<Int32Builder>()
                         .expect(&format!(
-                            "Failed to downcast builder to PrimitiveBuilder<Int32Type> for column {}",
+                            "Failed to downcast builder to Int32Builder for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::INT8 => {
+                    let value: Option<i64> = row.try_get(idx).expect(&format!(
+                        "Failed to get i64 value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<Int64Builder>()
+                        .expect(&format!(
+                            "Failed to downcast builder to Int64Builder for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::FLOAT4 => {
+                    let value: Option<f32> = row.try_get(idx).expect(&format!(
+                        "Failed to get f32 value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<Float32Builder>()
+                        .expect(&format!(
+                            "Failed to downcast builder to Float32Builder for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::FLOAT8 => {
+                    let value: Option<f64> = row.try_get(idx).expect(&format!(
+                        "Failed to get f64 value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<Float64Builder>()
+                        .expect(&format!(
+                            "Failed to downcast builder to Float64Builder for column {}",
                             idx
                         ));
                     match value {
