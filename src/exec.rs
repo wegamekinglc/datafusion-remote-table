@@ -18,7 +18,7 @@ pub struct RemoteTableExec {
     conn_args: ConnectionArgs,
     sql: String,
     projection: Option<Vec<usize>>,
-    transform: Option<Arc<dyn Transform>>,
+    pub(crate) transform: Option<Arc<dyn Transform>>,
     plan_properties: PlanProperties,
 }
 

@@ -1,6 +1,6 @@
-use crate::{DFResult, RemoteDataType, RemoteSchema};
+use crate::{DFResult, RemoteDataType, RemoteField, RemoteSchema};
 use datafusion::arrow::array::{ArrayRef, BooleanArray, RecordBatch};
-use datafusion::arrow::datatypes::{DataType, SchemaRef};
+use datafusion::arrow::datatypes::{Field, SchemaRef};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -8,8 +8,8 @@ pub trait Transform: Debug + Send + Sync {
     fn transform_boolean(
         &self,
         array: &BooleanArray,
-        _remote_type: &RemoteDataType,
-        _target_type: &DataType,
+        _remote_field: &RemoteField,
+        _target_field: &Field,
     ) -> DFResult<ArrayRef> {
         Ok(Arc::new(array.clone()))
     }
@@ -30,11 +30,8 @@ pub(crate) fn transform_batch(
                     .as_any()
                     .downcast_ref::<BooleanArray>()
                     .expect("Failed to downcast to BooleanArray");
-                let new_array = transform.transform_boolean(
-                    array,
-                    &remote_field.data_type,
-                    target_schema.field(idx).data_type(),
-                )?;
+                let new_array =
+                    transform.transform_boolean(array, &remote_field, target_schema.field(idx))?;
                 new_arrays.push(new_array);
             }
         }

@@ -1,4 +1,4 @@
-use crate::{ConnectionArgs, DFResult, RemoteTableExec, Transform};
+use crate::{connect, ConnectionArgs, DFResult, RemoteTableExec, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::project_schema;
@@ -17,13 +17,25 @@ pub struct RemoteTable {
 }
 
 impl RemoteTable {
-    pub fn new(conn_args: ConnectionArgs, sql: String, schema: SchemaRef) -> Self {
-        RemoteTable {
+    pub async fn try_new(
+        conn_args: ConnectionArgs,
+        sql: String,
+        schema: Option<SchemaRef>,
+    ) -> DFResult<Self> {
+        let schema = match schema {
+            None => {
+                let conn = connect(&conn_args).await?;
+                let remote_schema = conn.infer_schema(&sql).await?;
+                Arc::new(remote_schema.to_arrow_schema())
+            }
+            Some(schema) => schema,
+        };
+        Ok(RemoteTable {
             conn_args,
             sql,
             schema,
             transform: None,
-        }
+        })
     }
 }
 

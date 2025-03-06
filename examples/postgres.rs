@@ -1,18 +1,29 @@
-use datafusion_remote_table::{connect, ConnectionArgs};
+use datafusion::prelude::SessionContext;
+use datafusion_remote_table::{ConnectionArgs, RemoteTable};
+use std::sync::Arc;
 
 #[tokio::main]
 pub async fn main() {
     let conn_args = ConnectionArgs::Postgresql {
-        host: "127.0.0.1".to_string(),
+        host: "192.168.0.227".to_string(),
         port: 33448,
         username: "postgres".to_string(),
-        password: "".to_string(),
+        password: "bjsh".to_string(),
         database: None,
     };
-    let conn = connect(&conn_args).await.unwrap();
-    let schema = conn
-        .infer_schema("SELECT * from lwz_remote_test ")
+    let remote_table =
+        RemoteTable::try_new(conn_args, "SELECT * from lwz_remote_test".to_string(), None)
+            .await
+            .unwrap();
+
+    let ctx = SessionContext::new();
+    ctx.register_table("remote_table", Arc::new(remote_table))
+        .unwrap();
+
+    ctx.sql("SELECT * from remote_table")
+        .await
+        .unwrap()
+        .show()
         .await
         .unwrap();
-    println!("{:?}", schema);
 }
