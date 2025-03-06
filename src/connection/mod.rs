@@ -2,14 +2,18 @@ mod postgres;
 
 use crate::connection::postgres::connect_postgres;
 use crate::{DFResult, RemoteSchema, Transform};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
 use std::fmt::Debug;
 use std::path::PathBuf;
-use datafusion::arrow::datatypes::SchemaRef;
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
-    async fn infer_schema(&self, sql: &str, transform: Option<&dyn Transform>) -> DFResult<(RemoteSchema, SchemaRef)>;
+    async fn infer_schema(
+        &self,
+        sql: &str,
+        transform: Option<&dyn Transform>,
+    ) -> DFResult<(RemoteSchema, SchemaRef)>;
     async fn query(
         &self,
         sql: String,

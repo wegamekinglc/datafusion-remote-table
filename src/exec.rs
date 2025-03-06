@@ -123,11 +123,7 @@ impl Stream for TransformStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.input.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(batch))) => {
-                match transform_batch(
-                    batch,
-                    self.transform.as_ref(),
-                    &self.remote_schema,
-                ) {
+                match transform_batch(batch, self.transform.as_ref(), &self.remote_schema) {
                     Ok(result) => Poll::Ready(Some(Ok(result))),
                     Err(e) => Poll::Ready(Some(Err(e))),
                 }

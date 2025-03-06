@@ -11,10 +11,13 @@ pub async fn main() {
         password: "bjsh".to_string(),
         database: None,
     };
-    let remote_table =
-        RemoteTable::try_new(conn_args, "SELECT * from lwz_remote_test".to_string(), None)
-            .await
-            .unwrap();
+    let remote_table = RemoteTable::try_new(
+        conn_args,
+        "SELECT * from lwz_remote_test2".to_string(),
+        None,
+    )
+    .await
+    .unwrap();
 
     let ctx = SessionContext::new();
     ctx.register_table("remote_table", Arc::new(remote_table))

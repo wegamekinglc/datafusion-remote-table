@@ -1,17 +1,19 @@
 use crate::connection::projections_contains;
+use crate::transform::transform_batch;
 use crate::{Connection, DFResult, RemoteDataType, RemoteField, RemoteSchema, Transform};
 use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
-use datafusion::arrow::array::{make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, RecordBatch};
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::array::{
+    make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, PrimitiveBuilder, RecordBatch,
+};
+use datafusion::arrow::datatypes::{Int16Type, Int32Type, Schema, SchemaRef};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::{stream, StreamExt};
 use std::sync::Arc;
-use crate::transform::transform_batch;
 
 #[derive(Debug)]
 pub struct PostgresConnection {
@@ -51,7 +53,11 @@ pub(crate) async fn connect_postgres(
 
 #[async_trait::async_trait]
 impl Connection for PostgresConnection {
-    async fn infer_schema(&self, sql: &str, transform: Option<&dyn Transform>) -> DFResult<(RemoteSchema, SchemaRef)> {
+    async fn infer_schema(
+        &self,
+        sql: &str,
+        transform: Option<&dyn Transform>,
+    ) -> DFResult<(RemoteSchema, SchemaRef)> {
         let conn = self.pool.get().await.map_err(|e| {
             DataFusionError::Execution(format!(
                 "Failed to get connection from postgres connection pool due to {}",
@@ -92,7 +98,12 @@ impl Connection for PostgresConnection {
         };
         let (remote_schema, pg_types) = build_remote_schema(first_row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        let batch = rows_to_batch(std::slice::from_ref(first_row), &pg_types, arrow_schema, None)?;
+        let batch = rows_to_batch(
+            std::slice::from_ref(first_row),
+            &pg_types,
+            arrow_schema,
+            None,
+        )?;
         if let Some(transform) = transform {
             let transformed_batch = transform_batch(batch, transform, &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
@@ -204,17 +215,35 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
     for col in row.columns() {
         let col_type = col.type_();
         pg_types.push(col_type.clone());
-        if *col_type == Type::BOOL {
-            remote_fields.push(RemoteField::new(
-                col.name().to_string(),
-                RemoteDataType::Boolean,
-                true,
-            ));
-        } else {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported type {:?} in postgres",
-                col_type
-            )));
+        match *col_type {
+            // TODO use macro to simplify
+            Type::BOOL => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Boolean,
+                    true,
+                ));
+            }
+            Type::INT2 => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Int16,
+                    true,
+                ));
+            }
+            Type::INT4 => {
+                remote_fields.push(RemoteField::new(
+                    col.name().to_string(),
+                    RemoteDataType::Int32,
+                    true,
+                ));
+            }
+            _ => {
+                return Err(DataFusionError::Execution(format!(
+                    "Unsupported type {:?} in postgres",
+                    col_type
+                )));
+            }
         }
     }
     Ok((RemoteSchema::new(remote_fields), pg_types))
@@ -239,6 +268,7 @@ fn rows_to_batch(
             }
             let array_builder = &mut array_builders[idx];
             match *pg_type {
+                // TODO use macro to simplify
                 Type::BOOL => {
                     let value: Option<bool> = row.try_get(idx).expect(&format!(
                         "Failed to get bool value for column {} from row: {:?}",
@@ -249,6 +279,40 @@ fn rows_to_batch(
                         .downcast_mut::<BooleanBuilder>()
                         .expect(&format!(
                             "Failed to downcast builder to BooleanBuilder for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::INT2 => {
+                    let value: Option<i16> = row.try_get(idx).expect(&format!(
+                        "Failed to get i16 value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<PrimitiveBuilder<Int16Type>>()
+                        .expect(&format!(
+                            "Failed to downcast builder to PrimitiveBuilder<Int16Type> for column {}",
+                            idx
+                        ));
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::INT4 => {
+                    let value: Option<i32> = row.try_get(idx).expect(&format!(
+                        "Failed to get i32 value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<PrimitiveBuilder<Int32Type>>()
+                        .expect(&format!(
+                            "Failed to downcast builder to PrimitiveBuilder<Int32Type> for column {}",
                             idx
                         ));
                     match value {
