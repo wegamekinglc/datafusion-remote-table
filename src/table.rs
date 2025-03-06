@@ -20,21 +20,15 @@ impl RemoteTable {
     pub async fn try_new(
         conn_args: ConnectionArgs,
         sql: String,
-        schema: Option<SchemaRef>,
+        transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<Self> {
-        let schema = match schema {
-            None => {
-                let conn = connect(&conn_args).await?;
-                let remote_schema = conn.infer_schema(&sql).await?;
-                Arc::new(remote_schema.to_arrow_schema())
-            }
-            Some(schema) => schema,
-        };
+        let conn = connect(&conn_args).await?;
+        let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.as_deref()).await?;
         Ok(RemoteTable {
             conn_args,
             sql,
-            schema,
-            transform: None,
+            schema: arrow_schema,
+            transform,
         })
     }
 }

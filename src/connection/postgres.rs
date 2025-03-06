@@ -1,5 +1,5 @@
 use crate::connection::projections_contains;
-use crate::{Connection, DFResult, RemoteDataType, RemoteField, RemoteSchema};
+use crate::{Connection, DFResult, RemoteDataType, RemoteField, RemoteSchema, Transform};
 use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
@@ -11,6 +11,7 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::{stream, StreamExt};
 use std::sync::Arc;
+use crate::transform::transform_batch;
 
 #[derive(Debug)]
 pub struct PostgresConnection {
@@ -50,7 +51,7 @@ pub(crate) async fn connect_postgres(
 
 #[async_trait::async_trait]
 impl Connection for PostgresConnection {
-    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchema> {
+    async fn infer_schema(&self, sql: &str, transform: Option<&dyn Transform>) -> DFResult<(RemoteSchema, SchemaRef)> {
         let conn = self.pool.get().await.map_err(|e| {
             DataFusionError::Execution(format!(
                 "Failed to get connection from postgres connection pool due to {}",
@@ -89,8 +90,15 @@ impl Connection for PostgresConnection {
                 "No data returned from postgres".to_string(),
             ));
         };
-        let (remote_schema, _pg_types) = build_remote_schema(first_row)?;
-        Ok(remote_schema)
+        let (remote_schema, pg_types) = build_remote_schema(first_row)?;
+        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
+        let batch = rows_to_batch(std::slice::from_ref(first_row), &pg_types, arrow_schema, None)?;
+        if let Some(transform) = transform {
+            let transformed_batch = transform_batch(batch, transform, &remote_schema)?;
+            Ok((remote_schema, transformed_batch.schema()))
+        } else {
+            Ok((remote_schema, batch.schema()))
+        }
     }
 
     async fn query(

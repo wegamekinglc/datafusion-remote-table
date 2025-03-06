@@ -127,7 +127,6 @@ impl Stream for TransformStream {
                     batch,
                     self.transform.as_ref(),
                     &self.remote_schema,
-                    self.schema.clone(),
                 ) {
                     Ok(result) => Poll::Ready(Some(Ok(result))),
                     Err(e) => Poll::Ready(Some(Err(e))),
