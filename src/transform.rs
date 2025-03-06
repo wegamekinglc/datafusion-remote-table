@@ -1,7 +1,8 @@
 use crate::{DFResult, RemoteDataType, RemoteField, RemoteSchema};
 use datafusion::arrow::array::{
     ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int8Array, RecordBatch, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+    Int64Array, Int8Array, ListArray, RecordBatch, UInt16Array, UInt32Array, UInt64Array,
+    UInt8Array,
 };
 use datafusion::arrow::datatypes::{Field, Schema};
 use std::fmt::Debug;
@@ -103,6 +104,14 @@ pub trait Transform: Debug + Send + Sync {
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), remote_field.to_arrow_field()))
     }
+
+    fn transform_list(
+        &self,
+        array: &ListArray,
+        remote_field: &RemoteField,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), remote_field.to_arrow_field()))
+    }
 }
 
 pub(crate) fn transform_batch(
@@ -113,7 +122,7 @@ pub(crate) fn transform_batch(
     let mut new_arrays: Vec<ArrayRef> = Vec::with_capacity(remote_schema.fields.len());
     let mut new_fields: Vec<Field> = Vec::with_capacity(remote_schema.fields.len());
     for (idx, remote_field) in remote_schema.fields.iter().enumerate() {
-        let (new_array, new_field) = match remote_field.data_type {
+        let (new_array, new_field) = match &remote_field.data_type {
             // TODO use a macro to reduce boilerplate
             RemoteDataType::Boolean => {
                 let array = batch
@@ -210,6 +219,14 @@ pub(crate) fn transform_batch(
                     .downcast_ref::<Float64Array>()
                     .expect("Failed to downcast to Float64Array");
                 transform.transform_float64(array, &remote_field)?
+            }
+            RemoteDataType::List(_field) => {
+                let array = batch
+                    .column(idx)
+                    .as_any()
+                    .downcast_ref::<ListArray>()
+                    .expect("Failed to downcast to ListArray");
+                transform.transform_list(array, &remote_field)?
             }
         };
         new_arrays.push(new_array);

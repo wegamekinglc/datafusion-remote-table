@@ -6,7 +6,7 @@ use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, Float32Builder, Float64Builder,
-    Int16Builder, Int32Builder, Int64Builder, Int8Builder, RecordBatch,
+    Int16Builder, Int32Builder, Int64Builder, Int8Builder, ListBuilder, RecordBatch,
 };
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::common::project_schema;
@@ -219,51 +219,56 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
         match *col_type {
             // TODO use macro to simplify
             Type::BOOL => {
-                remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Boolean,
-                    true,
-                ));
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Boolean, true));
             }
             Type::CHAR => {
-                remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Int8,
-                    true,
-                ));
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int8, true));
             }
             Type::INT2 => {
-                remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Int16,
-                    true,
-                ));
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int16, true));
             }
             Type::INT4 => {
-                remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Int32,
-                    true,
-                ));
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int32, true));
             }
             Type::INT8 => {
-                remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Int64,
-                    true,
-                ));
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int64, true));
             }
             Type::FLOAT4 => {
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Float32, true));
+            }
+            Type::FLOAT8 => {
+                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Float64, true));
+            }
+            Type::INT2_ARRAY => {
                 remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Float32,
+                    col.name(),
+                    RemoteDataType::List(Box::new(RemoteField::new(
+                        "",
+                        RemoteDataType::Int16,
+                        true,
+                    ))),
                     true,
                 ));
             }
-            Type::FLOAT8 => {
+            Type::INT4_ARRAY => {
                 remote_fields.push(RemoteField::new(
-                    col.name().to_string(),
-                    RemoteDataType::Float64,
+                    col.name(),
+                    RemoteDataType::List(Box::new(RemoteField::new(
+                        "",
+                        RemoteDataType::Int32,
+                        true,
+                    ))),
+                    true,
+                ));
+            }
+            Type::INT8_ARRAY => {
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteDataType::List(Box::new(RemoteField::new(
+                        "",
+                        RemoteDataType::Int64,
+                        true,
+                    ))),
                     true,
                 ));
             }
@@ -415,6 +420,75 @@ fn rows_to_batch(
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::INT2_ARRAY => {
+                    let value: Option<Vec<i16>> = row.try_get(idx).expect(&format!(
+                        "Failed to get i16 array value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
+                        .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT2_ARRAY");
+                    let values_builder = builder
+                        .values()
+                        .as_any_mut()
+                        .downcast_mut::<Int16Builder>()
+                        .expect("Failed to downcast values builder to Int16Builder for INT2_ARRAY");
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => {
+                            let v = v.into_iter().map(Some);
+                            values_builder.extend(v);
+                            builder.append(true);
+                        }
+                    }
+                }
+                Type::INT4_ARRAY => {
+                    let value: Option<Vec<i32>> = row.try_get(idx).expect(&format!(
+                        "Failed to get i32 array value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
+                        .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT4_ARRAY");
+                    let values_builder = builder
+                        .values()
+                        .as_any_mut()
+                        .downcast_mut::<Int32Builder>()
+                        .expect("Failed to downcast values builder to Int32Builder for INT4_ARRAY");
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => {
+                            let v = v.into_iter().map(Some);
+                            values_builder.extend(v);
+                            builder.append(true);
+                        }
+                    }
+                }
+                Type::INT8_ARRAY => {
+                    let value: Option<Vec<i64>> = row.try_get(idx).expect(&format!(
+                        "Failed to get i64 array value for column {} from row: {:?}",
+                        idx, row
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
+                        .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT8_ARRAY");
+                    let values_builder = builder
+                        .values()
+                        .as_any_mut()
+                        .downcast_mut::<Int64Builder>()
+                        .expect("Failed to downcast values builder to Int64Builder for INT8_ARRAY");
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => {
+                            let v = v.into_iter().map(Some);
+                            values_builder.extend(v);
+                            builder.append(true);
+                        }
                     }
                 }
                 _ => {

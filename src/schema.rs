@@ -1,4 +1,5 @@
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum RemoteDataType {
@@ -14,6 +15,7 @@ pub enum RemoteDataType {
     Float16,
     Float32,
     Float64,
+    List(Box<RemoteField>),
 }
 
 impl RemoteDataType {
@@ -31,6 +33,7 @@ impl RemoteDataType {
             RemoteDataType::Float16 => DataType::Float16,
             RemoteDataType::Float32 => DataType::Float32,
             RemoteDataType::Float64 => DataType::Float64,
+            RemoteDataType::List(field) => DataType::List(Arc::new(field.to_arrow_field())),
         }
     }
 }
@@ -43,9 +46,9 @@ pub struct RemoteField {
 }
 
 impl RemoteField {
-    pub fn new(name: String, data_type: RemoteDataType, nullable: bool) -> Self {
+    pub fn new(name: impl Into<String>, data_type: RemoteDataType, nullable: bool) -> Self {
         RemoteField {
-            name,
+            name: name.into(),
             data_type,
             nullable,
         }

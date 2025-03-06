@@ -13,7 +13,7 @@ pub async fn main() {
     };
     let remote_table = RemoteTable::try_new(
         conn_args,
-        "SELECT success, code from lwz_remote_test3".to_string(),
+        "SELECT * from lwz_remote_test4".to_string(),
         None,
     )
     .await
