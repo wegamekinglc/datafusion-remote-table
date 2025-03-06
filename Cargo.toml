@@ -2,6 +2,10 @@
 name = "datafusion-remote-table"
 version = "0.1.0"
 edition = "2021"
+authors = ["lewiszlw <lewiszlw520@gmail.com>"]
+description = "Execute SQL queries on remote databases and make results as datafusion table provider"
+license = "MIT"
+repository = "https://github.com/systemxlabs/datafusion-remote-table"
 
 [dependencies]
 datafusion = "45"
