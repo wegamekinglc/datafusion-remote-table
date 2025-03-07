@@ -1,6 +1,12 @@
+mod mysql;
+mod oracle;
 mod postgres;
+mod sqlite;
 
-use crate::connection::postgres::connect_postgres;
+pub use mysql::*;
+pub use oracle::*;
+pub use postgres::*;
+
 use crate::{DFResult, RemoteSchema, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
@@ -22,54 +28,29 @@ pub trait Connection: Debug + Send + Sync {
     ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)>;
 }
 
-pub async fn connect(args: &ConnectionArgs) -> DFResult<Box<dyn Connection>> {
-    match args {
-        ConnectionArgs::Postgresql {
-            host,
-            port,
-            username,
-            password,
-            database,
-        } => {
-            let conn =
-                connect_postgres(host, *port, username, password, database.as_deref()).await?;
+pub async fn connect(options: &ConnectionOptions) -> DFResult<Box<dyn Connection>> {
+    match options {
+        ConnectionOptions::Postgres(options) => {
+            let conn = connect_postgres(options).await?;
             Ok(Box::new(conn))
         }
-        ConnectionArgs::Oracle { .. } => {
+        ConnectionOptions::Oracle(_options) => {
             todo!()
         }
-        ConnectionArgs::Mysql { .. } => {
+        ConnectionOptions::Mysql(_options) => {
             todo!()
         }
-        ConnectionArgs::Sqlite(_) => {
+        ConnectionOptions::Sqlite(_) => {
             todo!()
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ConnectionArgs {
-    Postgresql {
-        host: String,
-        port: u16,
-        username: String,
-        password: String,
-        database: Option<String>,
-    },
-    Oracle {
-        host: String,
-        port: u16,
-        username: String,
-        password: String,
-        database: Option<String>,
-    },
-    Mysql {
-        host: String,
-        port: u16,
-        username: String,
-        password: String,
-        database: Option<String>,
-    },
+pub enum ConnectionOptions {
+    Postgres(PostgresConnectionOptions),
+    Oracle(OracleConnectionOptions),
+    Mysql(MysqlConnectionOptions),
     Sqlite(PathBuf),
 }
 

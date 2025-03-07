@@ -20,25 +20,30 @@ use std::string::ToString;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Debug, Clone)]
+pub struct PostgresConnectionOptions {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+    pub database: Option<String>,
+}
+
 #[derive(Debug)]
-pub struct PostgresConnection {
+pub(crate) struct PostgresConnection {
     pool: bb8::Pool<PostgresConnectionManager<NoTls>>,
 }
 
 pub(crate) async fn connect_postgres(
-    host: &str,
-    port: u16,
-    username: &str,
-    password: &str,
-    database: Option<&str>,
+    options: &PostgresConnectionOptions,
 ) -> DFResult<PostgresConnection> {
     let mut config = bb8_postgres::tokio_postgres::config::Config::new();
     config
-        .host(host)
-        .port(port)
-        .user(username)
-        .password(password);
-    if let Some(database) = database {
+        .host(&options.host)
+        .port(options.port)
+        .user(&options.username)
+        .password(&options.password);
+    if let Some(database) = &options.database {
         config.dbname(database);
     }
     let manager = PostgresConnectionManager::new(config, NoTls);

@@ -1,4 +1,4 @@
-use crate::{connect, ConnectionArgs, DFResult, RemoteTableExec, Transform};
+use crate::{connect, ConnectionOptions, DFResult, RemoteTableExec, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::project_schema;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct RemoteTable {
-    pub(crate) conn_args: ConnectionArgs,
+    pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
     pub(crate) schema: SchemaRef,
     pub(crate) transform: Option<Arc<dyn Transform>>,
@@ -18,14 +18,14 @@ pub struct RemoteTable {
 
 impl RemoteTable {
     pub async fn try_new(
-        conn_args: ConnectionArgs,
+        conn_options: ConnectionOptions,
         sql: String,
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<Self> {
-        let conn = connect(&conn_args).await?;
+        let conn = connect(&conn_options).await?;
         let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.as_deref()).await?;
         Ok(RemoteTable {
-            conn_args,
+            conn_options,
             sql,
             schema: arrow_schema,
             transform,
@@ -57,7 +57,7 @@ impl TableProvider for RemoteTable {
         let projected_schema = project_schema(&self.schema, projection)?;
         Ok(Arc::new(
             RemoteTableExec::try_new(
-                self.conn_args.clone(),
+                self.conn_options.clone(),
                 projected_schema,
                 self.sql.clone(),
                 projection.cloned(),
