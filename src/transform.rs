@@ -1,8 +1,8 @@
 use crate::{DFResult, RemoteField, RemoteSchema};
 use datafusion::arrow::array::{
-    ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
-    Int64Array, Int8Array, ListArray, RecordBatch, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
+    ArrayRef, BinaryArray, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array,
+    Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray, UInt16Array,
+    UInt32Array, UInt64Array, UInt8Array,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::common::DataFusionError;
@@ -101,6 +101,22 @@ pub trait Transform: Debug + Send + Sync {
     fn transform_float64(
         &self,
         array: &Float64Array,
+        remote_field: &RemoteField,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), remote_field.to_arrow_field()))
+    }
+
+    fn transform_utf8(
+        &self,
+        array: &StringArray,
+        remote_field: &RemoteField,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), remote_field.to_arrow_field()))
+    }
+
+    fn transform_binary(
+        &self,
+        array: &BinaryArray,
         remote_field: &RemoteField,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), remote_field.to_arrow_field()))
@@ -220,6 +236,22 @@ pub(crate) fn transform_batch(
                     .downcast_ref::<Float64Array>()
                     .expect("Failed to downcast to Float64Array");
                 transform.transform_float64(array, &remote_field)?
+            }
+            DataType::Utf8 => {
+                let array = batch
+                    .column(idx)
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .expect("Failed to downcast to StringArray");
+                transform.transform_utf8(array, &remote_field)?
+            }
+            DataType::Binary => {
+                let array = batch
+                    .column(idx)
+                    .as_any()
+                    .downcast_ref::<BinaryArray>()
+                    .expect("Failed to downcast to BinaryArray");
+                transform.transform_binary(array, &remote_field)?
             }
             DataType::List(_field) => {
                 let array = batch

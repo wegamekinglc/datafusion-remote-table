@@ -14,6 +14,7 @@ pub trait Connection: Debug + Send + Sync {
         sql: &str,
         transform: Option<&dyn Transform>,
     ) -> DFResult<(RemoteSchema, SchemaRef)>;
+
     async fn query(
         &self,
         sql: String,

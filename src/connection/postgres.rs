@@ -5,8 +5,9 @@ use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use datafusion::arrow::array::{
-    make_builder, ArrayBuilder, ArrayRef, BooleanBuilder, Float32Builder, Float64Builder,
-    Int16Builder, Int32Builder, Int64Builder, Int8Builder, ListBuilder, RecordBatch,
+    make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Float32Builder,
+    Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, ListBuilder,
+    RecordBatch, StringBuilder,
 };
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::common::project_schema;
@@ -200,90 +201,38 @@ impl Connection for PostgresConnection {
     }
 }
 
+fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
+    match *pg_type {
+        Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
+        Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
+        Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),
+        Type::INT4 => Ok(RemoteType::Postgres(PostgresType::Int4)),
+        Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
+        Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
+        Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
+        Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
+        Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
+        Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
+        Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
+        Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
+        Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
+        _ => Err(DataFusionError::NotImplemented(format!(
+            "Unsupported postgres type {pg_type:?}",
+        ))),
+    }
+}
+
 fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
     let mut remote_fields = vec![];
     let mut pg_types = vec![];
     for col in row.columns() {
         let col_type = col.type_();
         pg_types.push(col_type.clone());
-        match *col_type {
-            // TODO use macro to simplify
-            Type::BOOL => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Bool),
-                    true,
-                ));
-            }
-            Type::CHAR => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Char),
-                    true,
-                ));
-            }
-            Type::INT2 => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Int2),
-                    true,
-                ));
-            }
-            Type::INT4 => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Int4),
-                    true,
-                ));
-            }
-            Type::INT8 => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Int8),
-                    true,
-                ));
-            }
-            Type::FLOAT4 => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Float4),
-                    true,
-                ));
-            }
-            Type::FLOAT8 => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Float8),
-                    true,
-                ));
-            }
-            Type::INT2_ARRAY => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Int2Array),
-                    true,
-                ));
-            }
-            Type::INT4_ARRAY => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Int4Array),
-                    true,
-                ));
-            }
-            Type::INT8_ARRAY => {
-                remote_fields.push(RemoteField::new(
-                    col.name(),
-                    RemoteType::Postgres(PostgresType::Int8Array),
-                    true,
-                ));
-            }
-            _ => {
-                return Err(DataFusionError::Execution(format!(
-                    "Unsupported postgres type {col_type:?}",
-                )));
-            }
-        }
+        remote_fields.push(RemoteField::new(
+            col.name(),
+            pg_type_to_remote_type(col_type)?,
+            true,
+        ));
     }
     Ok((RemoteSchema::new(remote_fields), pg_types))
 }
@@ -394,6 +343,45 @@ fn rows_to_batch(
                         .as_any_mut()
                         .downcast_mut::<Float64Builder>()
                         .expect("Failed to downcast builder to Float64Builder for FLOAT8");
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::TEXT => {
+                    let value: Option<&str> = row.try_get(idx).expect(&format!(
+                        "Failed to get &str value for column {idx} from row: {row:?}",
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .expect("Failed to downcast builder to StringBuilder for TEXT");
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(&v),
+                    }
+                }
+                Type::VARCHAR => {
+                    let value: Option<&str> = row.try_get(idx).expect(&format!(
+                        "Failed to get &str value for column {idx} from row: {row:?}",
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .expect("Failed to downcast builder to StringBuilder for VARCHAR");
+                    match value {
+                        None => builder.append_null(),
+                        Some(v) => builder.append_value(v),
+                    }
+                }
+                Type::BYTEA => {
+                    let value: Option<&[u8]> = row.try_get(idx).expect(&format!(
+                        "Failed to get &[u8] value for column {idx} from row: {row:?}",
+                    ));
+                    let builder = array_builder
+                        .as_any_mut()
+                        .downcast_mut::<BinaryBuilder>()
+                        .expect("Failed to downcast builder to BinaryBuilder for BYTEA");
                     match value {
                         None => builder.append_null(),
                         Some(v) => builder.append_value(v),
