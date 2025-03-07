@@ -262,6 +262,43 @@ macro_rules! handle_primitive_type {
     }};
 }
 
+macro_rules! handle_primitive_array_type {
+    ($builder:expr, $pg_type:expr, $values_builder_ty:ty, $primitive_value_ty:ty, $row:expr, $index:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
+            .expect(concat!(
+                "Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for ",
+                stringify!($pg_type)
+            ));
+        let values_builder = builder
+            .values()
+            .as_any_mut()
+            .downcast_mut::<$values_builder_ty>()
+            .expect(concat!(
+                "Failed to downcast values builder to ",
+                stringify!($values_builder_ty),
+                " for ",
+                stringify!($pg_type)
+            ));
+        let v: Option<Vec<$primitive_value_ty>> = $row.try_get($index).expect(concat!(
+            "Failed to get ",
+            stringify!($primitive_value_ty),
+            " array value for column ",
+            stringify!($pg_type)
+        ));
+
+        match v {
+            Some(v) => {
+                let v = v.into_iter().map(Some);
+                values_builder.extend(v);
+                builder.append(true);
+            }
+            None => builder.append_null(),
+        }
+    }};
+}
+
 fn rows_to_batch(
     rows: &[Row],
     pg_types: &Vec<Type>,
@@ -312,70 +349,34 @@ fn rows_to_batch(
                     handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, &[u8], row, idx);
                 }
                 Type::INT2_ARRAY => {
-                    let value: Option<Vec<i16>> = row.try_get(idx).expect(&format!(
-                        "Failed to get i16 array value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
-                        .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT2_ARRAY");
-                    let values_builder = builder
-                        .values()
-                        .as_any_mut()
-                        .downcast_mut::<Int16Builder>()
-                        .expect("Failed to downcast values builder to Int16Builder for INT2_ARRAY");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => {
-                            let v = v.into_iter().map(Some);
-                            values_builder.extend(v);
-                            builder.append(true);
-                        }
-                    }
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::INT2_ARRAY,
+                        Int16Builder,
+                        i16,
+                        row,
+                        idx
+                    );
                 }
                 Type::INT4_ARRAY => {
-                    let value: Option<Vec<i32>> = row.try_get(idx).expect(&format!(
-                        "Failed to get i32 array value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
-                        .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT4_ARRAY");
-                    let values_builder = builder
-                        .values()
-                        .as_any_mut()
-                        .downcast_mut::<Int32Builder>()
-                        .expect("Failed to downcast values builder to Int32Builder for INT4_ARRAY");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => {
-                            let v = v.into_iter().map(Some);
-                            values_builder.extend(v);
-                            builder.append(true);
-                        }
-                    }
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::INT4_ARRAY,
+                        Int32Builder,
+                        i32,
+                        row,
+                        idx
+                    );
                 }
                 Type::INT8_ARRAY => {
-                    let value: Option<Vec<i64>> = row.try_get(idx).expect(&format!(
-                        "Failed to get i64 array value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
-                        .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT8_ARRAY");
-                    let values_builder = builder
-                        .values()
-                        .as_any_mut()
-                        .downcast_mut::<Int64Builder>()
-                        .expect("Failed to downcast values builder to Int64Builder for INT8_ARRAY");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => {
-                            let v = v.into_iter().map(Some);
-                            values_builder.extend(v);
-                            builder.append(true);
-                        }
-                    }
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::INT8_ARRAY,
+                        Int64Builder,
+                        i64,
+                        row,
+                        idx
+                    );
                 }
                 _ => {
                     return Err(DataFusionError::Execution(format!(
