@@ -4,18 +4,20 @@ use crate::{Connection, DFResult, PostgresType, RemoteField, RemoteSchema, Remot
 use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
+use chrono::Timelike;
 use datafusion::arrow::array::{
-    make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Float32Builder,
-    Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, ListBuilder,
-    RecordBatch, StringBuilder,
+    make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder,
+    Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
+    ListBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder, TimestampNanosecondBuilder,
 };
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::{Date32Type, Schema, SchemaRef};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::{stream, StreamExt};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug)]
 pub struct PostgresConnection {
@@ -213,6 +215,10 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
         Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
+        Type::DATE => Ok(RemoteType::Postgres(PostgresType::Date)),
+        Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
+        Type::TIMESTAMPTZ => Ok(RemoteType::Postgres(PostgresType::TimestampTz)),
+        Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
         Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
         Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
         Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
@@ -220,6 +226,7 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
         Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
         Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
+        Type::BYTEA_ARRAY => Ok(RemoteType::Postgres(PostgresType::ByteaArray)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported postgres type {pg_type:?}",
         ))),
@@ -352,6 +359,80 @@ fn rows_to_batch(
                 Type::BYTEA => {
                     handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, &[u8], row, idx);
                 }
+                Type::TIMESTAMP => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<TimestampNanosecondBuilder>()
+                        .expect("Failed to downcast builder to TimestampNanosecondBuilder for Type::TIMESTAMP");
+                    let v: Option<SystemTime> = row
+                        .try_get(idx)
+                        .expect("Failed to get SystemTime value for column Type::TIMESTAMP");
+
+                    match v {
+                        Some(v) => {
+                            if let Ok(v) = v.duration_since(UNIX_EPOCH) {
+                                let timestamp: i64 = v
+                                    .as_nanos()
+                                    .try_into()
+                                    .expect("Failed to convert SystemTime to i64");
+                                builder.append_value(timestamp);
+                            }
+                        }
+                        None => builder.append_null(),
+                    }
+                }
+                Type::TIMESTAMPTZ => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<TimestampNanosecondBuilder>()
+                        .expect("Failed to downcast builder to TimestampNanosecondBuilder for Type::TIMESTAMP");
+                    let v: Option<chrono::DateTime<chrono::Utc>> = row.try_get(idx).expect(
+                        "Failed to get chrono::DateTime<chrono::Utc> value for column Type::TIMESTAMPTZ",
+                    );
+
+                    match v {
+                        Some(v) => {
+                            let timestamp: i64 = v.timestamp_nanos_opt().expect(&format!("Failed to get timestamp in nanoseconds from {v} for Type::TIMESTAMP"));
+                            builder.append_value(timestamp);
+                        }
+                        None => {}
+                    }
+                }
+                Type::TIME => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Time64NanosecondBuilder>()
+                        .expect(
+                            "Failed to downcast builder to Time64NanosecondBuilder for Type::TIME",
+                        );
+                    let v: Option<chrono::NaiveTime> = row
+                        .try_get(idx)
+                        .expect("Failed to get chrono::NaiveTime value for column Type::TIME");
+
+                    match v {
+                        Some(v) => {
+                            let timestamp: i64 = i64::from(v.num_seconds_from_midnight())
+                                * 1_000_000_000
+                                + i64::from(v.nanosecond());
+                            builder.append_value(timestamp);
+                        }
+                        None => builder.append_null(),
+                    }
+                }
+                Type::DATE => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Date32Builder>()
+                        .expect("Failed to downcast builder to Date32Builder for Type::DATE");
+                    let v: Option<chrono::NaiveDate> = row
+                        .try_get(idx)
+                        .expect("Failed to get chrono::NaiveDate value for column Type::DATE");
+
+                    match v {
+                        Some(v) => builder.append_value(Date32Type::from_naive_date(v)),
+                        None => builder.append_null(),
+                    }
+                }
                 Type::INT2_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
@@ -418,6 +499,16 @@ fn rows_to_batch(
                         Type::VARCHAR_ARRAY,
                         StringBuilder,
                         &str,
+                        row,
+                        idx
+                    );
+                }
+                Type::BYTEA_ARRAY => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::BYTEA_ARRAY,
+                        BinaryBuilder,
+                        &[u8],
                         row,
                         idx
                     );

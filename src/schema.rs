@@ -1,4 +1,4 @@
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -26,6 +26,10 @@ pub enum PostgresType {
     Text,
     Varchar,
     Bytea,
+    Date,
+    Timestamp,
+    TimestampTz,
+    Time,
     Int2Array,
     Int4Array,
     Int8Array,
@@ -33,6 +37,7 @@ pub enum PostgresType {
     Float8Array,
     TextArray,
     VarcharArray,
+    ByteaArray,
 }
 
 impl PostgresType {
@@ -47,6 +52,12 @@ impl PostgresType {
             PostgresType::Float8 => DataType::Float64,
             PostgresType::Text | PostgresType::Varchar => DataType::Utf8,
             PostgresType::Bytea => DataType::Binary,
+            PostgresType::Date => DataType::Date32,
+            PostgresType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
+            PostgresType::TimestampTz => {
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into()))
+            }
+            PostgresType::Time => DataType::Time64(TimeUnit::Nanosecond),
             PostgresType::Int2Array => {
                 DataType::List(Arc::new(Field::new("", DataType::Int16, true)))
             }
@@ -64,6 +75,9 @@ impl PostgresType {
             }
             PostgresType::TextArray | PostgresType::VarcharArray => {
                 DataType::List(Arc::new(Field::new("", DataType::Utf8, true)))
+            }
+            PostgresType::ByteaArray => {
+                DataType::List(Arc::new(Field::new("", DataType::Binary, true)))
             }
         }
     }
