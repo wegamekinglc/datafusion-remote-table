@@ -216,6 +216,10 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
         Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
         Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
+        Type::FLOAT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float4Array)),
+        Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
+        Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
+        Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported postgres type {pg_type:?}",
         ))),
@@ -374,6 +378,46 @@ fn rows_to_batch(
                         Type::INT8_ARRAY,
                         Int64Builder,
                         i64,
+                        row,
+                        idx
+                    );
+                }
+                Type::FLOAT4_ARRAY => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::FLOAT4_ARRAY,
+                        Float32Builder,
+                        f32,
+                        row,
+                        idx
+                    );
+                }
+                Type::FLOAT8_ARRAY => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::FLOAT8_ARRAY,
+                        Float64Builder,
+                        f64,
+                        row,
+                        idx
+                    );
+                }
+                Type::TEXT_ARRAY => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::TEXT_ARRAY,
+                        StringBuilder,
+                        &str,
+                        row,
+                        idx
+                    );
+                }
+                Type::VARCHAR_ARRAY => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::VARCHAR_ARRAY,
+                        StringBuilder,
+                        &str,
                         row,
                         idx
                     );

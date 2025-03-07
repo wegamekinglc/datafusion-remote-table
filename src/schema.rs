@@ -29,6 +29,10 @@ pub enum PostgresType {
     Int2Array,
     Int4Array,
     Int8Array,
+    Float4Array,
+    Float8Array,
+    TextArray,
+    VarcharArray,
 }
 
 impl PostgresType {
@@ -51,6 +55,15 @@ impl PostgresType {
             }
             PostgresType::Int8Array => {
                 DataType::List(Arc::new(Field::new("", DataType::Int64, true)))
+            }
+            PostgresType::Float4Array => {
+                DataType::List(Arc::new(Field::new("", DataType::Float32, true)))
+            }
+            PostgresType::Float8Array => {
+                DataType::List(Arc::new(Field::new("", DataType::Float64, true)))
+            }
+            PostgresType::TextArray | PostgresType::VarcharArray => {
+                DataType::List(Arc::new(Field::new("", DataType::Utf8, true)))
             }
         }
     }
