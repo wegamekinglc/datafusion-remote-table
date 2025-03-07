@@ -1,7 +1,7 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{Connection, DFResult, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform};
-use bb8_postgres::tokio_postgres::types::{Kind, Type};
+use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use chrono::Timelike;
@@ -17,17 +17,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::{stream, StreamExt};
 use std::string::ToString;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-static POSTGIS_GEOMETRY_TYPE: LazyLock<Type> = LazyLock::new(|| {
-    Type::new(
-        "geometry".to_string(),
-        17959,
-        Kind::Simple,
-        "public".to_string(),
-    )
-});
 
 #[derive(Debug)]
 pub struct PostgresConnection {
@@ -214,29 +205,32 @@ impl Connection for PostgresConnection {
 }
 
 fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
-    match *pg_type {
-        Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
-        Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
-        Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),
-        Type::INT4 => Ok(RemoteType::Postgres(PostgresType::Int4)),
-        Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
-        Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
-        Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
-        Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
-        Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
-        Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
-        Type::DATE => Ok(RemoteType::Postgres(PostgresType::Date)),
-        Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
-        Type::TIMESTAMPTZ => Ok(RemoteType::Postgres(PostgresType::TimestampTz)),
-        Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
-        Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
-        Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
-        Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
-        Type::FLOAT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float4Array)),
-        Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
-        Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
-        Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
-        Type::BYTEA_ARRAY => Ok(RemoteType::Postgres(PostgresType::ByteaArray)),
+    match pg_type {
+        &Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
+        &Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
+        &Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),
+        &Type::INT4 => Ok(RemoteType::Postgres(PostgresType::Int4)),
+        &Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
+        &Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
+        &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
+        &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
+        &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
+        &Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
+        &Type::DATE => Ok(RemoteType::Postgres(PostgresType::Date)),
+        &Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
+        &Type::TIMESTAMPTZ => Ok(RemoteType::Postgres(PostgresType::TimestampTz)),
+        &Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
+        &Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
+        &Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
+        &Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
+        &Type::FLOAT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float4Array)),
+        &Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
+        &Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
+        &Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
+        &Type::BYTEA_ARRAY => Ok(RemoteType::Postgres(PostgresType::ByteaArray)),
+        other if other.name().eq_ignore_ascii_case("geometry") => {
+            Ok(RemoteType::Postgres(PostgresType::PostGisGeometry))
+        }
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported postgres type {pg_type:?}",
         ))),
@@ -338,38 +332,38 @@ fn rows_to_batch(
                 continue;
             }
             let builder = &mut array_builders[idx];
-            match *pg_type {
-                Type::BOOL => {
+            match pg_type {
+                &Type::BOOL => {
                     handle_primitive_type!(builder, Type::BOOL, BooleanBuilder, bool, row, idx);
                 }
-                Type::CHAR => {
+                &Type::CHAR => {
                     handle_primitive_type!(builder, Type::CHAR, Int8Builder, i8, row, idx);
                 }
-                Type::INT2 => {
+                &Type::INT2 => {
                     handle_primitive_type!(builder, Type::INT2, Int16Builder, i16, row, idx);
                 }
-                Type::INT4 => {
+                &Type::INT4 => {
                     handle_primitive_type!(builder, Type::INT4, Int32Builder, i32, row, idx);
                 }
-                Type::INT8 => {
+                &Type::INT8 => {
                     handle_primitive_type!(builder, Type::INT8, Int64Builder, i64, row, idx);
                 }
-                Type::FLOAT4 => {
+                &Type::FLOAT4 => {
                     handle_primitive_type!(builder, Type::FLOAT4, Float32Builder, f32, row, idx);
                 }
-                Type::FLOAT8 => {
+                &Type::FLOAT8 => {
                     handle_primitive_type!(builder, Type::FLOAT8, Float64Builder, f64, row, idx);
                 }
-                Type::TEXT => {
+                &Type::TEXT => {
                     handle_primitive_type!(builder, Type::TEXT, StringBuilder, &str, row, idx);
                 }
-                Type::VARCHAR => {
+                &Type::VARCHAR => {
                     handle_primitive_type!(builder, Type::VARCHAR, StringBuilder, &str, row, idx);
                 }
-                Type::BYTEA => {
+                &Type::BYTEA => {
                     handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, &[u8], row, idx);
                 }
-                Type::TIMESTAMP => {
+                &Type::TIMESTAMP => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
@@ -391,7 +385,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                Type::TIMESTAMPTZ => {
+                &Type::TIMESTAMPTZ => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
@@ -408,7 +402,7 @@ fn rows_to_batch(
                         None => {}
                     }
                 }
-                Type::TIME => {
+                &Type::TIME => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Time64NanosecondBuilder>()
@@ -429,7 +423,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                Type::DATE => {
+                &Type::DATE => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Date32Builder>()
@@ -443,7 +437,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                Type::INT2_ARRAY => {
+                &Type::INT2_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::INT2_ARRAY,
@@ -453,7 +447,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::INT4_ARRAY => {
+                &Type::INT4_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::INT4_ARRAY,
@@ -463,7 +457,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::INT8_ARRAY => {
+                &Type::INT8_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::INT8_ARRAY,
@@ -473,7 +467,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::FLOAT4_ARRAY => {
+                &Type::FLOAT4_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::FLOAT4_ARRAY,
@@ -483,7 +477,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::FLOAT8_ARRAY => {
+                &Type::FLOAT8_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::FLOAT8_ARRAY,
@@ -493,7 +487,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::TEXT_ARRAY => {
+                &Type::TEXT_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::TEXT_ARRAY,
@@ -503,7 +497,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::VARCHAR_ARRAY => {
+                &Type::VARCHAR_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::VARCHAR_ARRAY,
@@ -513,7 +507,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                Type::BYTEA_ARRAY => {
+                &Type::BYTEA_ARRAY => {
                     handle_primitive_array_type!(
                         builder,
                         Type::BYTEA_ARRAY,
@@ -523,15 +517,8 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                POSTGIS_GEOMETRY_TYPE => {
-                    handle_primitive_type!(
-                        builder,
-                        POSTGIS_GEOMETRY_TYPE,
-                        BinaryBuilder,
-                        &[u8],
-                        row,
-                        idx
-                    );
+                other if other.name().eq_ignore_ascii_case("geometry") => {
+                    handle_primitive_type!(builder, "geometry", BinaryBuilder, &[u8], row, idx);
                 }
                 _ => {
                     return Err(DataFusionError::Execution(format!(
