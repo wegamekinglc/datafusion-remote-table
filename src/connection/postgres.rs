@@ -1,7 +1,7 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{Connection, DFResult, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform};
-use bb8_postgres::tokio_postgres::types::Type;
+use bb8_postgres::tokio_postgres::types::{Kind, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use chrono::Timelike;
@@ -16,8 +16,18 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::{stream, StreamExt};
-use std::sync::Arc;
+use std::string::ToString;
+use std::sync::{Arc, LazyLock};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static POSTGIS_GEOMETRY_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    Type::new(
+        "geometry".to_string(),
+        17959,
+        Kind::Simple,
+        "public".to_string(),
+    )
+});
 
 #[derive(Debug)]
 pub struct PostgresConnection {
@@ -507,6 +517,16 @@ fn rows_to_batch(
                     handle_primitive_array_type!(
                         builder,
                         Type::BYTEA_ARRAY,
+                        BinaryBuilder,
+                        &[u8],
+                        row,
+                        idx
+                    );
+                }
+                POSTGIS_GEOMETRY_TYPE => {
+                    handle_primitive_type!(
+                        builder,
+                        POSTGIS_GEOMETRY_TYPE,
                         BinaryBuilder,
                         &[u8],
                         row,

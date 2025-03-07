@@ -38,6 +38,7 @@ pub enum PostgresType {
     TextArray,
     VarcharArray,
     ByteaArray,
+    PostGisGeometry,
 }
 
 impl PostgresType {
@@ -79,6 +80,7 @@ impl PostgresType {
             PostgresType::ByteaArray => {
                 DataType::List(Arc::new(Field::new("", DataType::Binary, true)))
             }
+            PostgresType::PostGisGeometry => DataType::Binary,
         }
     }
 }
