@@ -237,6 +237,31 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
     Ok((RemoteSchema::new(remote_fields), pg_types))
 }
 
+macro_rules! handle_primitive_type {
+    ($builder:expr, $pg_type:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_ty>()
+            .expect(concat!(
+                "Failed to downcast builder to ",
+                stringify!($builder_ty),
+                " for ",
+                stringify!($pg_type)
+            ));
+        let v: Option<$value_ty> = $row.try_get($index).expect(concat!(
+            "Failed to get ",
+            stringify!($value_ty),
+            " value for column ",
+            stringify!($pg_type)
+        ));
+
+        match v {
+            Some(v) => builder.append_value(v),
+            None => builder.append_null(),
+        }
+    }};
+}
+
 fn rows_to_batch(
     rows: &[Row],
     pg_types: &Vec<Type>,
@@ -254,144 +279,43 @@ fn rows_to_batch(
             if !projections_contains(projection, idx) {
                 continue;
             }
-            let array_builder = &mut array_builders[idx];
+            let builder = &mut array_builders[idx];
             match *pg_type {
-                // TODO use macro to simplify
                 Type::BOOL => {
-                    let value: Option<bool> = row.try_get(idx).expect(&format!(
-                        "Failed to get bool value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<BooleanBuilder>()
-                        .expect("Failed to downcast builder to BooleanBuilder for BOOL");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::BOOL, BooleanBuilder, bool, row, idx);
                 }
                 Type::CHAR => {
-                    let value: Option<i8> = row.try_get(idx).expect(&format!(
-                        "Failed to get i8 value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<Int8Builder>()
-                        .expect("Failed to downcast builder to Int8Builder for CHAR");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::CHAR, Int8Builder, i8, row, idx);
                 }
                 Type::INT2 => {
-                    let value: Option<i16> = row.try_get(idx).expect(&format!(
-                        "Failed to get i16 value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<Int16Builder>()
-                        .expect("Failed to downcast builder to Int16Builder for INT2");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::INT2, Int16Builder, i16, row, idx);
                 }
                 Type::INT4 => {
-                    let value: Option<i32> = row.try_get(idx).expect(&format!(
-                        "Failed to get i32 value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<Int32Builder>()
-                        .expect("Failed to downcast builder to Int32Builder for INT4");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::INT4, Int32Builder, i32, row, idx);
                 }
                 Type::INT8 => {
-                    let value: Option<i64> = row.try_get(idx).expect(&format!(
-                        "Failed to get i64 value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<Int64Builder>()
-                        .expect("Failed to downcast builder to Int64Builder for INT8");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::INT8, Int64Builder, i64, row, idx);
                 }
                 Type::FLOAT4 => {
-                    let value: Option<f32> = row.try_get(idx).expect(&format!(
-                        "Failed to get f32 value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<Float32Builder>()
-                        .expect("Failed to downcast builder to Float32Builder for FLOAT4");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::FLOAT4, Float32Builder, f32, row, idx);
                 }
                 Type::FLOAT8 => {
-                    let value: Option<f64> = row.try_get(idx).expect(&format!(
-                        "Failed to get f64 value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<Float64Builder>()
-                        .expect("Failed to downcast builder to Float64Builder for FLOAT8");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::FLOAT8, Float64Builder, f64, row, idx);
                 }
                 Type::TEXT => {
-                    let value: Option<&str> = row.try_get(idx).expect(&format!(
-                        "Failed to get &str value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
-                        .expect("Failed to downcast builder to StringBuilder for TEXT");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(&v),
-                    }
+                    handle_primitive_type!(builder, Type::TEXT, StringBuilder, &str, row, idx);
                 }
                 Type::VARCHAR => {
-                    let value: Option<&str> = row.try_get(idx).expect(&format!(
-                        "Failed to get &str value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
-                        .expect("Failed to downcast builder to StringBuilder for VARCHAR");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::VARCHAR, StringBuilder, &str, row, idx);
                 }
                 Type::BYTEA => {
-                    let value: Option<&[u8]> = row.try_get(idx).expect(&format!(
-                        "Failed to get &[u8] value for column {idx} from row: {row:?}",
-                    ));
-                    let builder = array_builder
-                        .as_any_mut()
-                        .downcast_mut::<BinaryBuilder>()
-                        .expect("Failed to downcast builder to BinaryBuilder for BYTEA");
-                    match value {
-                        None => builder.append_null(),
-                        Some(v) => builder.append_value(v),
-                    }
+                    handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, &[u8], row, idx);
                 }
                 Type::INT2_ARRAY => {
                     let value: Option<Vec<i16>> = row.try_get(idx).expect(&format!(
                         "Failed to get i16 array value for column {idx} from row: {row:?}",
                     ));
-                    let builder = array_builder
+                    let builder = builder
                         .as_any_mut()
                         .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
                         .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT2_ARRAY");
@@ -413,7 +337,7 @@ fn rows_to_batch(
                     let value: Option<Vec<i32>> = row.try_get(idx).expect(&format!(
                         "Failed to get i32 array value for column {idx} from row: {row:?}",
                     ));
-                    let builder = array_builder
+                    let builder = builder
                         .as_any_mut()
                         .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
                         .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT4_ARRAY");
@@ -435,7 +359,7 @@ fn rows_to_batch(
                     let value: Option<Vec<i64>> = row.try_get(idx).expect(&format!(
                         "Failed to get i64 array value for column {idx} from row: {row:?}",
                     ));
-                    let builder = array_builder
+                    let builder = builder
                         .as_any_mut()
                         .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
                         .expect("Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for INT8_ARRAY");
