@@ -1,7 +1,7 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{Connection, DFResult, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform};
-use bb8_postgres::tokio_postgres::types::Type;
+use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use chrono::Timelike;
@@ -319,6 +319,23 @@ macro_rules! handle_primitive_array_type {
     }};
 }
 
+pub struct GeometryFromSql<'a> {
+    wkb: &'a [u8],
+}
+
+impl<'a> FromSql<'a> for GeometryFromSql<'a> {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(GeometryFromSql { wkb: raw })
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(ty.name(), "geometry")
+    }
+}
+
 fn rows_to_batch(
     rows: &[Row],
     pg_types: &Vec<Type>,
@@ -366,7 +383,7 @@ fn rows_to_batch(
                     handle_primitive_type!(builder, Type::VARCHAR, StringBuilder, &str, row, idx);
                 }
                 &Type::BYTEA => {
-                    handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, &[u8], row, idx);
+                    handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, Vec<u8>, row, idx);
                 }
                 &Type::TIMESTAMP => {
                     let builder = builder
@@ -517,13 +534,24 @@ fn rows_to_batch(
                         builder,
                         Type::BYTEA_ARRAY,
                         BinaryBuilder,
-                        &[u8],
+                        Vec<u8>,
                         row,
                         idx
                     );
                 }
                 other if other.name().eq_ignore_ascii_case("geometry") => {
-                    handle_primitive_type!(builder, "geometry", BinaryBuilder, &[u8], row, idx);
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<BinaryBuilder>()
+                        .expect("Failed to downcast builder to BinaryBuilder for Type::geometry");
+                    let v: Option<GeometryFromSql> = row
+                        .try_get(idx)
+                        .expect("Failed to get GeometryFromSql value for column Type::geometry");
+
+                    match v {
+                        Some(v) => builder.append_value(v.wkb),
+                        None => builder.append_null(),
+                    }
                 }
                 _ => {
                     return Err(DataFusionError::Execution(format!(
