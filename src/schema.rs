@@ -2,38 +2,51 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub enum RemoteDataType {
-    Boolean,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    UInt8,
-    UInt16,
-    UInt32,
-    UInt64,
-    Float16,
-    Float32,
-    Float64,
-    List(Box<RemoteField>),
+pub enum RemoteType {
+    Postgres(PostgresType),
 }
 
-impl RemoteDataType {
+impl RemoteType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
-            RemoteDataType::Boolean => DataType::Boolean,
-            RemoteDataType::Int8 => DataType::Int8,
-            RemoteDataType::Int16 => DataType::Int16,
-            RemoteDataType::Int32 => DataType::Int32,
-            RemoteDataType::Int64 => DataType::Int64,
-            RemoteDataType::UInt8 => DataType::UInt8,
-            RemoteDataType::UInt16 => DataType::UInt16,
-            RemoteDataType::UInt32 => DataType::UInt32,
-            RemoteDataType::UInt64 => DataType::UInt64,
-            RemoteDataType::Float16 => DataType::Float16,
-            RemoteDataType::Float32 => DataType::Float32,
-            RemoteDataType::Float64 => DataType::Float64,
-            RemoteDataType::List(field) => DataType::List(Arc::new(field.to_arrow_field())),
+            RemoteType::Postgres(postgres_type) => postgres_type.to_arrow_type(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum PostgresType {
+    Bool,
+    Char,
+    Int2,
+    Int4,
+    Int8,
+    Float4,
+    Float8,
+    Int2Array,
+    Int4Array,
+    Int8Array,
+}
+
+impl PostgresType {
+    pub fn to_arrow_type(&self) -> DataType {
+        match self {
+            PostgresType::Bool => DataType::Boolean,
+            PostgresType::Char => DataType::Utf8,
+            PostgresType::Int2 => DataType::Int16,
+            PostgresType::Int4 => DataType::Int32,
+            PostgresType::Int8 => DataType::Int64,
+            PostgresType::Float4 => DataType::Float32,
+            PostgresType::Float8 => DataType::Float64,
+            PostgresType::Int2Array => {
+                DataType::List(Arc::new(Field::new("", DataType::Int16, true)))
+            }
+            PostgresType::Int4Array => {
+                DataType::List(Arc::new(Field::new("", DataType::Int32, true)))
+            }
+            PostgresType::Int8Array => {
+                DataType::List(Arc::new(Field::new("", DataType::Int64, true)))
+            }
         }
     }
 }
@@ -41,15 +54,15 @@ impl RemoteDataType {
 #[derive(Debug, Clone)]
 pub struct RemoteField {
     pub name: String,
-    pub data_type: RemoteDataType,
+    pub remote_type: RemoteType,
     pub nullable: bool,
 }
 
 impl RemoteField {
-    pub fn new(name: impl Into<String>, data_type: RemoteDataType, nullable: bool) -> Self {
+    pub fn new(name: impl Into<String>, remote_type: RemoteType, nullable: bool) -> Self {
         RemoteField {
             name: name.into(),
-            data_type,
+            remote_type,
             nullable,
         }
     }
@@ -57,7 +70,7 @@ impl RemoteField {
     pub fn to_arrow_field(&self) -> Field {
         Field::new(
             self.name.clone(),
-            self.data_type.to_arrow_type(),
+            self.remote_type.to_arrow_type(),
             self.nullable,
         )
     }

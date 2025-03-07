@@ -1,10 +1,11 @@
-use crate::{DFResult, RemoteDataType, RemoteField, RemoteSchema};
+use crate::{DFResult, RemoteField, RemoteSchema};
 use datafusion::arrow::array::{
     ArrayRef, BooleanArray, Float16Array, Float32Array, Float64Array, Int16Array, Int32Array,
     Int64Array, Int8Array, ListArray, RecordBatch, UInt16Array, UInt32Array, UInt64Array,
     UInt8Array,
 };
-use datafusion::arrow::datatypes::{Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::common::DataFusionError;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -122,9 +123,9 @@ pub(crate) fn transform_batch(
     let mut new_arrays: Vec<ArrayRef> = Vec::with_capacity(remote_schema.fields.len());
     let mut new_fields: Vec<Field> = Vec::with_capacity(remote_schema.fields.len());
     for (idx, remote_field) in remote_schema.fields.iter().enumerate() {
-        let (new_array, new_field) = match &remote_field.data_type {
+        let (new_array, new_field) = match &remote_field.remote_type.to_arrow_type() {
             // TODO use a macro to reduce boilerplate
-            RemoteDataType::Boolean => {
+            DataType::Boolean => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -132,7 +133,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to BooleanArray");
                 transform.transform_boolean(array, &remote_field)?
             }
-            RemoteDataType::Int8 => {
+            DataType::Int8 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -140,7 +141,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Int8Array");
                 transform.transform_int8(array, &remote_field)?
             }
-            RemoteDataType::Int16 => {
+            DataType::Int16 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -148,7 +149,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Int16Array");
                 transform.transform_int16(array, &remote_field)?
             }
-            RemoteDataType::Int32 => {
+            DataType::Int32 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -156,7 +157,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Int32Array");
                 transform.transform_int32(array, &remote_field)?
             }
-            RemoteDataType::Int64 => {
+            DataType::Int64 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -164,7 +165,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Int64Array");
                 transform.transform_int64(array, &remote_field)?
             }
-            RemoteDataType::UInt8 => {
+            DataType::UInt8 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -172,7 +173,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to UInt8Array");
                 transform.transform_uint8(array, &remote_field)?
             }
-            RemoteDataType::UInt16 => {
+            DataType::UInt16 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -180,7 +181,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to UInt16Array");
                 transform.transform_uint16(array, &remote_field)?
             }
-            RemoteDataType::UInt32 => {
+            DataType::UInt32 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -188,7 +189,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to UInt32Array");
                 transform.transform_uint32(array, &remote_field)?
             }
-            RemoteDataType::UInt64 => {
+            DataType::UInt64 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -196,7 +197,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to UInt64Array");
                 transform.transform_uint64(array, &remote_field)?
             }
-            RemoteDataType::Float16 => {
+            DataType::Float16 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -204,7 +205,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Float16Array");
                 transform.transform_float16(array, &remote_field)?
             }
-            RemoteDataType::Float32 => {
+            DataType::Float32 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -212,7 +213,7 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Float32Array");
                 transform.transform_float32(array, &remote_field)?
             }
-            RemoteDataType::Float64 => {
+            DataType::Float64 => {
                 let array = batch
                     .column(idx)
                     .as_any()
@@ -220,13 +221,18 @@ pub(crate) fn transform_batch(
                     .expect("Failed to downcast to Float64Array");
                 transform.transform_float64(array, &remote_field)?
             }
-            RemoteDataType::List(_field) => {
+            DataType::List(_field) => {
                 let array = batch
                     .column(idx)
                     .as_any()
                     .downcast_ref::<ListArray>()
                     .expect("Failed to downcast to ListArray");
                 transform.transform_list(array, &remote_field)?
+            }
+            data_type => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported arrow type {data_type:?}",
+                )))
             }
         };
         new_arrays.push(new_array);

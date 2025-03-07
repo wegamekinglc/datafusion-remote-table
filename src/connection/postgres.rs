@@ -1,6 +1,6 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
-use crate::{Connection, DFResult, RemoteDataType, RemoteField, RemoteSchema, Transform};
+use crate::{Connection, DFResult, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform};
 use bb8_postgres::tokio_postgres::types::Type;
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
@@ -209,56 +209,72 @@ fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
         match *col_type {
             // TODO use macro to simplify
             Type::BOOL => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Boolean, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Bool),
+                    true,
+                ));
             }
             Type::CHAR => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int8, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Char),
+                    true,
+                ));
             }
             Type::INT2 => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int16, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Int2),
+                    true,
+                ));
             }
             Type::INT4 => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int32, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Int4),
+                    true,
+                ));
             }
             Type::INT8 => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Int64, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Int8),
+                    true,
+                ));
             }
             Type::FLOAT4 => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Float32, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Float4),
+                    true,
+                ));
             }
             Type::FLOAT8 => {
-                remote_fields.push(RemoteField::new(col.name(), RemoteDataType::Float64, true));
+                remote_fields.push(RemoteField::new(
+                    col.name(),
+                    RemoteType::Postgres(PostgresType::Float8),
+                    true,
+                ));
             }
             Type::INT2_ARRAY => {
                 remote_fields.push(RemoteField::new(
                     col.name(),
-                    RemoteDataType::List(Box::new(RemoteField::new(
-                        "",
-                        RemoteDataType::Int16,
-                        true,
-                    ))),
+                    RemoteType::Postgres(PostgresType::Int2Array),
                     true,
                 ));
             }
             Type::INT4_ARRAY => {
                 remote_fields.push(RemoteField::new(
                     col.name(),
-                    RemoteDataType::List(Box::new(RemoteField::new(
-                        "",
-                        RemoteDataType::Int32,
-                        true,
-                    ))),
+                    RemoteType::Postgres(PostgresType::Int4Array),
                     true,
                 ));
             }
             Type::INT8_ARRAY => {
                 remote_fields.push(RemoteField::new(
                     col.name(),
-                    RemoteDataType::List(Box::new(RemoteField::new(
-                        "",
-                        RemoteDataType::Int64,
-                        true,
-                    ))),
+                    RemoteType::Postgres(PostgresType::Int8Array),
                     true,
                 ));
             }
