@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package remote_table;
+
+message RemoteTableExec {
+  string sql = 1;
+}

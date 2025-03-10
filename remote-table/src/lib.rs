@@ -4,6 +4,7 @@ mod exec;
 mod schema;
 mod table;
 mod transform;
+mod generated;
 
 pub use codec::*;
 pub use connection::*;

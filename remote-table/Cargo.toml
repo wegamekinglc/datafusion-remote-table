@@ -16,6 +16,11 @@ async-stream = { version = "0.3" }
 bb8 = { version = "0.9" }
 bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
 chrono = "0.4"
+prost = "0.13.5"
 
 [dev-dependencies]
 tokio = { workspace = true }
+
+[build-dependencies]
+# Pin these dependencies so that the generated output is deterministic
+prost-build = "=0.13.5"

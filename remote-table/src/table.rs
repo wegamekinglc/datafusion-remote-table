@@ -45,7 +45,7 @@ impl TableProvider for RemoteTable {
     }
 
     fn table_type(&self) -> TableType {
-        TableType::Temporary
+        TableType::View
     }
 
     async fn scan(
