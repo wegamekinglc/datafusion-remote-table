@@ -2,6 +2,53 @@ syntax = "proto3";
 
 package remote_table;
 
+import "datafusion_common.proto";
+
 message RemoteTableExec {
-  string sql = 1;
+  ConnectionOptions conn_options = 1;
+  string sql = 2;
+  datafusion_common.Schema projected_schema = 3;
+  Projection projection = 4;
+  optional bytes transform = 5;
+}
+
+message ConnectionOptions {
+  oneof connection_options {
+    PostgresConnectionOptions postgres = 1;
+    MysqlConnectionOptions mysql = 2;
+    OracleConnectionOptions oracle = 3;
+    SqliteConnectionOptions sqlite = 4;
+  }
+}
+
+message PostgresConnectionOptions {
+  string host = 1;
+  uint32 port = 2;
+  string username = 3;
+  string password = 4;
+  optional string database = 5;
+}
+
+message MysqlConnectionOptions {
+  string host = 1;
+  uint32 port = 2;
+  string username = 3;
+  string password = 4;
+  optional string database = 5;
+}
+
+message OracleConnectionOptions {
+  string host = 1;
+  uint32 port = 2;
+  string username = 3;
+  string password = 4;
+  optional string database = 5;
+}
+
+message SqliteConnectionOptions {
+  string path = 1;
+}
+
+message Projection {
+  repeated uint32 projection = 1;
 }

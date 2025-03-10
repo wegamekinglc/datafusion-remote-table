@@ -15,37 +15,37 @@ use std::task::{Context, Poll};
 
 #[derive(Debug)]
 pub struct RemoteTableExec {
-    conn_options: ConnectionOptions,
-    sql: String,
-    projection: Option<Vec<usize>>,
+    pub(crate) conn_options: ConnectionOptions,
+    pub(crate) sql: String,
+    pub(crate) projection: Option<Vec<usize>>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     conn: Arc<dyn Connection>,
     plan_properties: PlanProperties,
 }
 
 impl RemoteTableExec {
-    pub async fn try_new(
+    pub fn new(
         conn_options: ConnectionOptions,
         projected_schema: SchemaRef,
         sql: String,
         projection: Option<Vec<usize>>,
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
-    ) -> DFResult<Self> {
+    ) -> Self {
         let plan_properties = PlanProperties::new(
             EquivalenceProperties::new(projected_schema),
             Partitioning::UnknownPartitioning(1),
             EmissionType::Incremental,
             Boundedness::Bounded,
         );
-        Ok(Self {
+        Self {
             conn_options,
             sql,
             projection,
             transform,
             conn,
             plan_properties,
-        })
+        }
     }
 }
 

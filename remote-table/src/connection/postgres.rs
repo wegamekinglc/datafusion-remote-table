@@ -46,11 +46,6 @@ impl Pool for PostgresPool {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct PostgresConnection {
-    conn: bb8::PooledConnection<'static, PostgresConnectionManager<NoTls>>,
-}
-
 pub(crate) async fn connect_postgres(
     options: &PostgresConnectionOptions,
 ) -> DFResult<PostgresPool> {
@@ -75,6 +70,11 @@ pub(crate) async fn connect_postgres(
         })?;
 
     Ok(PostgresPool { pool })
+}
+
+#[derive(Debug)]
+pub(crate) struct PostgresConnection {
+    conn: bb8::PooledConnection<'static, PostgresConnectionManager<NoTls>>,
 }
 
 #[async_trait::async_trait]
