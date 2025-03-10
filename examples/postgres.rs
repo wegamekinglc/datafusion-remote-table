@@ -12,7 +12,7 @@ pub async fn main() {
         database: None,
     });
     let remote_table =
-        RemoteTable::try_new(options, "SELECT * from lwz_remote_test4".to_string(), None)
+        RemoteTable::try_new(options, "SELECT * from lwz_remote_test4", None)
             .await
             .unwrap();
 

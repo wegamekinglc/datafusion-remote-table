@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::process::Command;
-
-use super::{get_cmd_output, get_cmd_output_result, run_command};
+use log::info;
+use crate::utils::cmd::{get_cmd_output_result, get_cmd_output, run_command};
 
 /// A utility to manage the lifecycle of `docker compose`.
 ///
@@ -108,7 +108,7 @@ impl DockerCompose {
             .trim()
             .parse::<IpAddr>();
         ip_result.unwrap_or_else(|e| {
-            println!("Invalid IP, {e}");
+            info!("Invalid IP, {e}");
             panic!("Failed to parse IP for {container_name}")
         })
     }

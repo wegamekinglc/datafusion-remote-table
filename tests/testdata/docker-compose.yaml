@@ -1,23 +1,16 @@
 networks:
-  rest_bridge:
+  test_bridge:
 
 services:
-  rest:
-    image: apache/iceberg-rest-fixture
+  postgres:
+    image: postgres:latest
     environment:
-      - AWS_ACCESS_KEY_ID=admin
-      - AWS_SECRET_ACCESS_KEY=password
-      - AWS_REGION=us-east-1
-      - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
-      - CATALOG_URI=jdbc:sqlite:file:/tmp/iceberg_rest_mode=memory
-      - CATALOG_WAREHOUSE=s3://icebergdata/demo
-      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
-      - CATALOG_S3_ENDPOINT=http://minio:9000
-    depends_on:
-      - minio
-    networks:
-      rest_bridge:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
     ports:
-      - 8181:8181
-    expose:
-      - 8181
+      - "5432:5432"
+    volumes:
+      - ./postgres_init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - test_bridge

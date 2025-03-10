@@ -1,11 +1,12 @@
 use std::process::Command;
+use log::info;
 
 pub fn run_command(mut cmd: Command, desc: impl ToString) {
     let desc = desc.to_string();
     println!("Starting to {}, command: {:?}", &desc, cmd);
     let exit = cmd.status().unwrap();
     if exit.success() {
-        println!("{} succeed!", desc)
+        info!("{} succeed!", desc)
     } else {
         panic!("{} failed: {:?}", desc, exit);
     }
@@ -13,12 +14,12 @@ pub fn run_command(mut cmd: Command, desc: impl ToString) {
 
 pub fn get_cmd_output_result(mut cmd: Command, desc: impl ToString) -> Result<String, String> {
     let desc = desc.to_string();
-    println!("Starting to {}, command: {:?}", &desc, cmd);
+    info!("Starting to {}, command: {:?}", &desc, cmd);
     let result = cmd.output();
     match result {
         Ok(output) => {
             if output.status.success() {
-                println!("{} succeed!", desc);
+                info!("{} succeed!", desc);
                 Ok(String::from_utf8(output.stdout).unwrap())
             } else {
                 Err(format!("{} failed with rc: {:?}", desc, output.status))

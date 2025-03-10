@@ -19,9 +19,10 @@ pub struct RemoteTable {
 impl RemoteTable {
     pub async fn try_new(
         conn_options: ConnectionOptions,
-        sql: String,
+        sql: impl Into<String>,
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<Self> {
+        let sql = sql.into();
         let conn = connect(&conn_options).await?;
         let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.as_deref()).await?;
         Ok(RemoteTable {
