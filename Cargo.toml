@@ -1,3 +1,8 @@
 [workspace]
-members = ["integration_tests", "remote-table"]
+members = ["integration-tests", "remote-table"]
 resolver = "2"
+
+[workspace.dependencies]
+datafusion = "45"
+datafusion-proto = "45"
+tokio = { version = "1", features = ["full"] }

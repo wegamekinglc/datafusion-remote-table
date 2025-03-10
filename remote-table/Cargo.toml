@@ -8,8 +8,8 @@ license = "MIT"
 repository = "https://github.com/systemxlabs/datafusion-remote-table"
 
 [dependencies]
-datafusion = "45"
-datafusion-proto = "45"
+datafusion = { workspace = true }
+datafusion-proto = { workspace = true }
 async-trait = "0.1"
 futures = "0.3"
 async-stream = { version = "0.3" }
@@ -18,4 +18,4 @@ bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
 chrono = "0.4"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { workspace = true }
