@@ -1,16 +1,11 @@
-networks:
-  test_bridge:
-
 services:
   postgres:
     image: postgres:latest
     environment:
       - POSTGRES_DB=postgres
-      - POSTGRES_USER=user
+      - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
     ports:
       - "5432:5432"
     volumes:
       - ./postgres_init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - test_bridge

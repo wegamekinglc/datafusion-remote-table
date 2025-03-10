@@ -19,5 +19,7 @@ CREATE TABLE supported_data_types (
     boolean_column BOOLEAN,
 
     integer_array_column INTEGER[],
-    text_array_column TEXT[],
+    text_array_column TEXT[]
 );
+
+INSERT INTO supported_data_types values (1, 2, 3, 4, 5, 'char', 'varchar', 'text', E'\\xDEADBEEF', '2023-10-01', '12:34:56', '2023-10-01 12:34:56', '2023-10-01 12:34:56+00', TRUE, ARRAY[1, 2], ARRAY['text0', 'text1']);

@@ -5,16 +5,15 @@ use std::sync::Arc;
 #[tokio::main]
 pub async fn main() {
     let options = ConnectionOptions::Postgres(PostgresConnectionOptions {
-        host: "192.168.0.227".to_string(),
-        port: 33448,
-        username: "postgres".to_string(),
-        password: "bjsh".to_string(),
+        host: "localhost".to_string(),
+        port: 5432,
+        username: "user".to_string(),
+        password: "password".to_string(),
         database: None,
     });
-    let remote_table =
-        RemoteTable::try_new(options, "SELECT * from lwz_remote_test4", None)
-            .await
-            .unwrap();
+    let remote_table = RemoteTable::try_new(options, "SELECT * from supported_data_types", None)
+        .await
+        .unwrap();
 
     let ctx = SessionContext::new();
     ctx.register_table("remote_table", Arc::new(remote_table))

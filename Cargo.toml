@@ -1,24 +1,3 @@
-[package]
-name = "datafusion-remote-table"
-version = "0.2.0"
-edition = "2021"
-authors = ["lewiszlw <lewiszlw520@gmail.com>"]
-description = "Execute SQL queries on remote databases and make results as datafusion table provider"
-license = "MIT"
-repository = "https://github.com/systemxlabs/datafusion-remote-table"
-
-[dependencies]
-datafusion = "45"
-datafusion-proto = "45"
-async-trait = "0.1"
-futures = "0.3"
-async-stream = { version = "0.3" }
-bb8 = { version = "0.9" }
-bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
-chrono = "0.4"
-
-[dev-dependencies]
-tokio = { version = "1", features = ["full"] }
-ctor = "0.4"
-env_logger = "0.11"
-log = "0.4"
+[workspace]
+members = ["integration_tests", "remote-table"]
+resolver = "2"

@@ -220,6 +220,7 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
         &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
+        &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
         &Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
         &Type::DATE => Ok(RemoteType::Postgres(PostgresType::Date)),
         &Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
@@ -381,6 +382,20 @@ fn rows_to_batch(
                 }
                 &Type::VARCHAR => {
                     handle_primitive_type!(builder, Type::VARCHAR, StringBuilder, &str, row, idx);
+                }
+                &Type::BPCHAR => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<StringBuilder>()
+                        .expect("Failed to downcast builder to StringBuilder for Type::BPCHAR");
+                    let v: Option<&str> = row
+                        .try_get(idx)
+                        .expect("Failed to get &str value for column Type::BPCHAR");
+
+                    match v {
+                        Some(v) => builder.append_value(v.trim_end()),
+                        None => builder.append_null(),
+                    }
                 }
                 &Type::BYTEA => {
                     handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, Vec<u8>, row, idx);
