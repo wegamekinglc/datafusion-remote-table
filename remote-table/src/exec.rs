@@ -1,5 +1,5 @@
 use crate::transform::transform_batch;
-use crate::{connect, ConnectionOptions, DFResult, RemoteSchema, Transform};
+use crate::{Connection, ConnectionOptions, DFResult, RemoteSchema, Transform};
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
@@ -19,6 +19,7 @@ pub struct RemoteTableExec {
     sql: String,
     projection: Option<Vec<usize>>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
+    conn: Arc<dyn Connection>,
     plan_properties: PlanProperties,
 }
 
@@ -29,6 +30,7 @@ impl RemoteTableExec {
         sql: String,
         projection: Option<Vec<usize>>,
         transform: Option<Arc<dyn Transform>>,
+        conn: Arc<dyn Connection>,
     ) -> DFResult<Self> {
         let plan_properties = PlanProperties::new(
             EquivalenceProperties::new(projected_schema),
@@ -41,6 +43,7 @@ impl RemoteTableExec {
             sql,
             projection,
             transform,
+            conn,
             plan_properties,
         })
     }
@@ -78,7 +81,7 @@ impl ExecutionPlan for RemoteTableExec {
         assert_eq!(partition, 0);
         let schema = self.schema();
         let fut = build_and_transform_stream(
-            self.conn_options.clone(),
+            self.conn.clone(),
             self.sql.clone(),
             self.projection.clone(),
             self.transform.clone(),
@@ -90,13 +93,12 @@ impl ExecutionPlan for RemoteTableExec {
 }
 
 async fn build_and_transform_stream(
-    conn_options: ConnectionOptions,
+    conn: Arc<dyn Connection>,
     sql: String,
     projection: Option<Vec<usize>>,
     transform: Option<Arc<dyn Transform>>,
     schema: SchemaRef,
 ) -> DFResult<SendableRecordBatchStream> {
-    let conn = connect(&conn_options).await?;
     let (stream, remote_schema) = conn.query(sql, projection).await?;
     assert_eq!(schema.fields().len(), remote_schema.fields.len());
     if let Some(transform) = transform.as_ref() {

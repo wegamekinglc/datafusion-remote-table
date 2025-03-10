@@ -12,6 +12,12 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
 use std::fmt::Debug;
 use std::path::PathBuf;
+use std::sync::Arc;
+
+#[async_trait::async_trait]
+pub trait Pool: Debug + Send + Sync {
+    async fn get(&self) -> DFResult<Arc<dyn Connection>>;
+}
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
@@ -28,11 +34,11 @@ pub trait Connection: Debug + Send + Sync {
     ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)>;
 }
 
-pub async fn connect(options: &ConnectionOptions) -> DFResult<Box<dyn Connection>> {
+pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
     match options {
         ConnectionOptions::Postgres(options) => {
-            let conn = connect_postgres(options).await?;
-            Ok(Box::new(conn))
+            let pool = connect_postgres(options).await?;
+            Ok(Arc::new(pool))
         }
         ConnectionOptions::Oracle(_options) => {
             todo!()

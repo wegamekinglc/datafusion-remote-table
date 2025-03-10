@@ -1,4 +1,4 @@
-use crate::{connect, ConnectionOptions, DFResult, RemoteTableExec, Transform};
+use crate::{connect, ConnectionOptions, DFResult, Pool, RemoteTableExec, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::project_schema;
@@ -14,6 +14,7 @@ pub struct RemoteTable {
     pub(crate) sql: String,
     pub(crate) schema: SchemaRef,
     pub(crate) transform: Option<Arc<dyn Transform>>,
+    pub(crate) pool: Arc<dyn Pool>,
 }
 
 impl RemoteTable {
@@ -23,13 +24,15 @@ impl RemoteTable {
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<Self> {
         let sql = sql.into();
-        let conn = connect(&conn_options).await?;
+        let pool = connect(&conn_options).await?;
+        let conn = pool.get().await?;
         let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.as_deref()).await?;
         Ok(RemoteTable {
             conn_options,
             sql,
             schema: arrow_schema,
             transform,
+            pool,
         })
     }
 }
@@ -63,6 +66,7 @@ impl TableProvider for RemoteTable {
                 self.sql.clone(),
                 projection.cloned(),
                 self.transform.clone(),
+                self.pool.get().await?,
             )
             .await?,
         ))

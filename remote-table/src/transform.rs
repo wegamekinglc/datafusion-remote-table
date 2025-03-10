@@ -190,7 +190,6 @@ pub(crate) fn transform_batch(
     let mut new_fields: Vec<Field> = Vec::with_capacity(remote_schema.fields.len());
     for (idx, remote_field) in remote_schema.fields.iter().enumerate() {
         let (new_array, new_field) = match &remote_field.remote_type.to_arrow_type() {
-            // TODO use a macro to reduce boilerplate
             DataType::Boolean => {
                 let array = batch
                     .column(idx)

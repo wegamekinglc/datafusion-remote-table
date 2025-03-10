@@ -1,6 +1,8 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
-use crate::{Connection, DFResult, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform};
+use crate::{
+    Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform,
+};
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
@@ -30,13 +32,28 @@ pub struct PostgresConnectionOptions {
 }
 
 #[derive(Debug)]
-pub(crate) struct PostgresConnection {
+pub struct PostgresPool {
     pool: bb8::Pool<PostgresConnectionManager<NoTls>>,
+}
+
+#[async_trait::async_trait]
+impl Pool for PostgresPool {
+    async fn get(&self) -> DFResult<Arc<dyn Connection>> {
+        let conn = self.pool.get_owned().await.map_err(|e| {
+            DataFusionError::Execution(format!("Failed to get postgres connection due to {e:?}"))
+        })?;
+        Ok(Arc::new(PostgresConnection { conn }))
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PostgresConnection {
+    conn: bb8::PooledConnection<'static, PostgresConnectionManager<NoTls>>,
 }
 
 pub(crate) async fn connect_postgres(
     options: &PostgresConnectionOptions,
-) -> DFResult<PostgresConnection> {
+) -> DFResult<PostgresPool> {
     let mut config = bb8_postgres::tokio_postgres::config::Config::new();
     config
         .host(&options.host)
@@ -57,7 +74,7 @@ pub(crate) async fn connect_postgres(
             ))
         })?;
 
-    Ok(PostgresConnection { pool })
+    Ok(PostgresPool { pool })
 }
 
 #[async_trait::async_trait]
@@ -67,12 +84,8 @@ impl Connection for PostgresConnection {
         sql: &str,
         transform: Option<&dyn Transform>,
     ) -> DFResult<(RemoteSchema, SchemaRef)> {
-        let conn = self.pool.get().await.map_err(|e| {
-            DataFusionError::Execution(format!(
-                "Failed to get connection from postgres connection pool due to {e}",
-            ))
-        })?;
-        let mut stream = conn
+        let mut stream = self
+            .conn
             .query_raw(sql, Vec::<String>::new())
             .await
             .map_err(|e| {
@@ -122,12 +135,8 @@ impl Connection for PostgresConnection {
         sql: String,
         projection: Option<Vec<usize>>,
     ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)> {
-        let conn = self.pool.get().await.map_err(|e| {
-            DataFusionError::Execution(format!(
-                "Failed to get connection from postgres connection pool due to {e}",
-            ))
-        })?;
-        let mut stream = conn
+        let mut stream = self
+            .conn
             .query_raw(&sql, Vec::<String>::new())
             .await
             .map_err(|e| {
