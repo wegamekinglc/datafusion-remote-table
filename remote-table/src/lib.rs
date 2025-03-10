@@ -1,10 +1,10 @@
 mod codec;
 mod connection;
 mod exec;
+mod generated;
 mod schema;
 mod table;
 mod transform;
-mod generated;
 
 pub use codec::*;
 pub use connection::*;

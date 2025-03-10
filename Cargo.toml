@@ -1,8 +1,11 @@
 [workspace]
-members = ["integration-tests", "remote-table"]
+members = ["integration-tests", "remote-table", "remote-table/gen"]
 resolver = "2"
 
 [workspace.dependencies]
 datafusion = "45"
 datafusion-proto = "45"
 tokio = { version = "1", features = ["full"] }
+prost = "=0.13.5"
+# Pin these dependencies so that the generated output is deterministic
+prost-build = "=0.13.5"
