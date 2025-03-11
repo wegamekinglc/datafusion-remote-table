@@ -4,7 +4,9 @@ use crate::{
     Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
 };
 use async_stream::stream;
-use datafusion::arrow::array::{make_builder, ArrayRef, Int16Builder, Int32Builder, Int64Builder, Int8Builder, RecordBatch};
+use datafusion::arrow::array::{
+    make_builder, ArrayRef, Int16Builder, Int32Builder, Int64Builder, Int8Builder, RecordBatch,
+};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
