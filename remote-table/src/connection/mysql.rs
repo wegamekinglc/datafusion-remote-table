@@ -5,7 +5,8 @@ use crate::{
 };
 use async_stream::stream;
 use datafusion::arrow::array::{
-    make_builder, ArrayRef, Int16Builder, Int32Builder, Int64Builder, Int8Builder, RecordBatch,
+    make_builder, ArrayRef, Float32Builder, Float64Builder, Int16Builder, Int32Builder,
+    Int64Builder, Int8Builder, RecordBatch,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
@@ -174,6 +175,8 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_SHORT => Ok(RemoteType::Mysql(MysqlType::SmallInt)),
         ColumnType::MYSQL_TYPE_LONG => Ok(RemoteType::Mysql(MysqlType::Integer)),
         ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
+        ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
+        ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
         ))),
@@ -242,6 +245,12 @@ fn rows_to_batch(
                 }
                 ColumnType::MYSQL_TYPE_LONGLONG => {
                     handle_primitive_type!(builder, col, Int64Builder, i64, row, idx);
+                }
+                ColumnType::MYSQL_TYPE_FLOAT => {
+                    handle_primitive_type!(builder, col, Float32Builder, f32, row, idx);
+                }
+                ColumnType::MYSQL_TYPE_DOUBLE => {
+                    handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
                 }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
