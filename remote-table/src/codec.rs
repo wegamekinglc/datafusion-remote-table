@@ -100,7 +100,10 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
                 conn_options: Some(serialized_connection_options),
                 sql: exec.sql.clone(),
                 projected_schema: Some(exec.schema().as_ref().try_into()?),
-                projection: exec.projection.as_ref().map(serialize_projection),
+                projection: exec
+                    .projection
+                    .as_ref()
+                    .map(|p| serialize_projection(p.as_slice())),
                 transform: serialized_transform,
             };
 
@@ -200,7 +203,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
     }
 }
 
-fn serialize_projection(projection: &Vec<usize>) -> protobuf::Projection {
+fn serialize_projection(projection: &[usize]) -> protobuf::Projection {
     protobuf::Projection {
         projection: projection.iter().map(|n| *n as u32).collect(),
     }

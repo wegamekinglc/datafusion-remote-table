@@ -348,14 +348,14 @@ impl<'a> FromSql<'a> for GeometryFromSql<'a> {
 
 fn rows_to_batch(
     rows: &[Row],
-    pg_types: &Vec<Type>,
+    pg_types: &[Type],
     arrow_schema: SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
     let projected_schema = project_schema(&arrow_schema, projection)?;
     let mut array_builders = vec![];
     for field in arrow_schema.fields() {
-        let builder = make_builder(&field.data_type(), rows.len());
+        let builder = make_builder(field.data_type(), rows.len());
         array_builders.push(builder);
     }
     for row in rows {
@@ -442,10 +442,10 @@ fn rows_to_batch(
 
                     match v {
                         Some(v) => {
-                            let timestamp: i64 = v.timestamp_nanos_opt().expect(&format!("Failed to get timestamp in nanoseconds from {v} for Type::TIMESTAMP"));
+                            let timestamp: i64 = v.timestamp_nanos_opt().unwrap_or_else(|| panic!("Failed to get timestamp in nanoseconds from {v} for Type::TIMESTAMP"));
                             builder.append_value(timestamp);
                         }
-                        None => {}
+                        None => builder.append_null(),
                     }
                 }
                 &Type::TIME => {
