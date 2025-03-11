@@ -30,6 +30,7 @@ pub async fn all_supported_mysql_types() {
         .collect()
         .await
         .unwrap();
+    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
 
     assert_eq!(
         &pretty_format_batches(&result).unwrap().to_string(),

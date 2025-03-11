@@ -4,7 +4,7 @@ use crate::{
     Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
 };
 use async_stream::stream;
-use datafusion::arrow::array::{make_builder, ArrayRef, Int16Builder, Int8Builder, RecordBatch};
+use datafusion::arrow::array::{make_builder, ArrayRef, Int16Builder, Int32Builder, Int64Builder, Int8Builder, RecordBatch};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
@@ -190,6 +190,26 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
     Ok(RemoteSchema::new(remote_fields))
 }
 
+macro_rules! handle_primitive_type {
+    ($builder:expr, $mysql_col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_ty>()
+            .expect(concat!(
+                "Failed to downcast builder to ",
+                stringify!($builder_ty),
+                " for ",
+                stringify!($mysql_col)
+            ));
+        let v = $row.get::<$value_ty, usize>($index);
+
+        match v {
+            Some(v) => builder.append_value(v),
+            None => builder.append_null(),
+        }
+    }};
+}
+
 fn rows_to_batch(
     rows: &[Row],
     arrow_schema: SchemaRef,
@@ -210,20 +230,16 @@ fn rows_to_batch(
             let builder = &mut array_builders[idx];
             match col.column_type() {
                 ColumnType::MYSQL_TYPE_TINY => {
-                    let builder = builder.as_any_mut().downcast_mut::<Int8Builder>().unwrap();
-                    let v = row.get::<i8, usize>(idx);
-                    match v {
-                        Some(v) => builder.append_value(v),
-                        None => builder.append_null(),
-                    }
+                    handle_primitive_type!(builder, col, Int8Builder, i8, row, idx);
                 }
                 ColumnType::MYSQL_TYPE_SHORT => {
-                    let builder = builder.as_any_mut().downcast_mut::<Int16Builder>().unwrap();
-                    let v = row.get::<i16, usize>(idx);
-                    match v {
-                        Some(v) => builder.append_value(v),
-                        None => builder.append_null(),
-                    }
+                    handle_primitive_type!(builder, col, Int16Builder, i16, row, idx);
+                }
+                ColumnType::MYSQL_TYPE_LONG => {
+                    handle_primitive_type!(builder, col, Int32Builder, i32, row, idx);
+                }
+                ColumnType::MYSQL_TYPE_LONGLONG => {
+                    handle_primitive_type!(builder, col, Int64Builder, i64, row, idx);
                 }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
