@@ -4,7 +4,7 @@ use crate::{
     Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
 };
 use async_stream::stream;
-use datafusion::arrow::array::{make_builder, ArrayRef, Int8Builder, RecordBatch};
+use datafusion::arrow::array::{make_builder, ArrayRef, Int16Builder, Int8Builder, RecordBatch};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
@@ -212,6 +212,14 @@ fn rows_to_batch(
                 ColumnType::MYSQL_TYPE_TINY => {
                     let builder = builder.as_any_mut().downcast_mut::<Int8Builder>().unwrap();
                     let v = row.get::<i8, usize>(idx);
+                    match v {
+                        Some(v) => builder.append_value(v),
+                        None => builder.append_null(),
+                    }
+                }
+                ColumnType::MYSQL_TYPE_SHORT => {
+                    let builder = builder.as_any_mut().downcast_mut::<Int16Builder>().unwrap();
+                    let v = row.get::<i16, usize>(idx);
                     match v {
                         Some(v) => builder.append_value(v),
                         None => builder.append_null(),
