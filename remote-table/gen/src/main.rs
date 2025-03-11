@@ -2,7 +2,7 @@ use std::path::Path;
 
 fn main() -> Result<(), String> {
     let proto_path = Path::new("proto/remote_table.proto");
-    let out_dir = Path::new("src");
+    let out_dir = Path::new(env!("OUT_DIR"));
 
     prost_build::Config::new()
         .out_dir(out_dir)
@@ -15,7 +15,7 @@ fn main() -> Result<(), String> {
     let prost = out_dir.join("remote_table.rs");
     let target = Path::new("../src/generated/prost.rs");
     println!("Copying {} to {}", prost.display(), target.display(),);
-    std::fs::rename(prost, target).unwrap();
+    std::fs::copy(prost, target).unwrap();
 
     Ok(())
 }
