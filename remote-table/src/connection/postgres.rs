@@ -12,12 +12,12 @@ use datafusion::arrow::array::{
     Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
     ListBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder, TimestampNanosecondBuilder,
 };
-use datafusion::arrow::datatypes::{Date32Type, Schema, SchemaRef};
+use datafusion::arrow::datatypes::{Date32Type, SchemaRef};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use std::string::ToString;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -114,14 +114,9 @@ impl Connection for PostgresConnection {
                 "No data returned from postgres".to_string(),
             ));
         };
-        let (remote_schema, pg_types) = build_remote_schema(first_row)?;
+        let remote_schema = build_remote_schema(first_row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        let batch = rows_to_batch(
-            std::slice::from_ref(first_row),
-            &pg_types,
-            arrow_schema,
-            None,
-        )?;
+        let batch = rows_to_batch(std::slice::from_ref(first_row), arrow_schema, None)?;
         if let Some(transform) = transform {
             let transformed_batch = transform_batch(batch, transform, &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
@@ -148,12 +143,8 @@ impl Connection for PostgresConnection {
             .boxed();
 
         let Some(first_chunk) = stream.next().await else {
-            return Ok((
-                Box::pin(RecordBatchStreamAdapter::new(
-                    Arc::new(Schema::empty()),
-                    stream::empty(),
-                )),
-                RemoteSchema::empty(),
+            return Err(DataFusionError::Execution(
+                "No data returned from postgres".to_string(),
             ));
         };
         let first_chunk: Vec<Row> = first_chunk
@@ -169,11 +160,10 @@ impl Connection for PostgresConnection {
                 "No data returned from postgres".to_string(),
             ));
         };
-        let (remote_schema, pg_types) = build_remote_schema(first_row)?;
+        let remote_schema = build_remote_schema(first_row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         let first_chunk = rows_to_batch(
             first_chunk.as_slice(),
-            &pg_types,
             arrow_schema.clone(),
             projection.as_ref(),
         )?;
@@ -188,26 +178,14 @@ impl Connection for PostgresConnection {
                         "Failed to collect rows from postgres due to {e}",
                     ))
                 })?;
-            let batch = rows_to_batch(
-                rows.as_slice(),
-                &pg_types,
-                arrow_schema.clone(),
-                projection.as_ref(),
-            )?;
+            let batch = rows_to_batch(rows.as_slice(), arrow_schema.clone(), projection.as_ref())?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
         let output_stream = async_stream::stream! {
            yield Ok(first_chunk);
            while let Some(batch) = stream.next().await {
-                match batch {
-                    Ok(batch) => {
-                        yield Ok(batch); // we can yield the batch as-is because we've already converted to Arrow in the chunk map
-                    }
-                    Err(e) => {
-                        yield Err(DataFusionError::Execution(format!("Failed to fetch batch: {e}")));
-                    }
-                }
+                yield batch
            }
         };
 
@@ -252,19 +230,16 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
     }
 }
 
-fn build_remote_schema(row: &Row) -> DFResult<(RemoteSchema, Vec<Type>)> {
+fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
     let mut remote_fields = vec![];
-    let mut pg_types = vec![];
     for col in row.columns() {
-        let col_type = col.type_();
-        pg_types.push(col_type.clone());
         remote_fields.push(RemoteField::new(
             col.name(),
-            pg_type_to_remote_type(col_type)?,
+            pg_type_to_remote_type(col.type_())?,
             true,
         ));
     }
-    Ok((RemoteSchema::new(remote_fields), pg_types))
+    Ok(RemoteSchema::new(remote_fields))
 }
 
 macro_rules! handle_primitive_type {
@@ -348,7 +323,6 @@ impl<'a> FromSql<'a> for GeometryFromSql<'a> {
 
 fn rows_to_batch(
     rows: &[Row],
-    pg_types: &[Type],
     arrow_schema: SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
@@ -359,12 +333,12 @@ fn rows_to_batch(
         array_builders.push(builder);
     }
     for row in rows {
-        for (idx, pg_type) in pg_types.iter().enumerate() {
+        for (idx, col) in row.columns().iter().enumerate() {
             if !projections_contains(projection, idx) {
                 continue;
             }
             let builder = &mut array_builders[idx];
-            match pg_type {
+            match col.type_() {
                 &Type::BOOL => {
                     handle_primitive_type!(builder, Type::BOOL, BooleanBuilder, bool, row, idx);
                 }
@@ -579,7 +553,7 @@ fn rows_to_batch(
                 }
                 _ => {
                     return Err(DataFusionError::Execution(format!(
-                        "Unsupported postgres type {pg_type:?}",
+                        "Unsupported postgres type {col:?}",
                     )));
                 }
             }

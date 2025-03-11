@@ -4,8 +4,10 @@ version = "0.3.0"
 edition = "2021"
 authors = ["lewiszlw <lewiszlw520@gmail.com>"]
 description = "Execute SQL queries on remote databases and make results as datafusion table provider"
+keywords = ["SQL", "database"]
 license = "MIT"
 repository = "https://github.com/systemxlabs/datafusion-remote-table"
+readme = "../README.md"
 
 [dependencies]
 datafusion = { workspace = true }
@@ -17,4 +19,12 @@ bb8 = { version = "0.9" }
 bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
 chrono = "0.4"
 prost = { workspace = true }
+mysql_async = { version = "0.35", features = [
+    "native-tls-tls",
+    "chrono",
+    "time",
+    "bigdecimal",
+] }
+
+[dev-dependencies]
 tokio = { workspace = true }

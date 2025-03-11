@@ -4,16 +4,19 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub enum RemoteType {
     Postgres(PostgresType),
+    Mysql(MysqlType),
 }
 
 impl RemoteType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
             RemoteType::Postgres(postgres_type) => postgres_type.to_arrow_type(),
+            RemoteType::Mysql(mysql_type) => mysql_type.to_arrow_type(),
         }
     }
 }
 
+/// https://www.postgresql.org/docs/current/datatype.html
 #[derive(Debug, Clone)]
 pub enum PostgresType {
     Bool,
@@ -82,6 +85,25 @@ impl PostgresType {
                 DataType::List(Arc::new(Field::new("", DataType::Binary, true)))
             }
             PostgresType::PostGisGeometry => DataType::Binary,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MysqlType {
+    TinyInt,
+    SmallInt,
+    Integer,
+    BigInt,
+}
+
+impl MysqlType {
+    pub fn to_arrow_type(&self) -> DataType {
+        match self {
+            MysqlType::TinyInt => DataType::Int8,
+            MysqlType::SmallInt => DataType::Int16,
+            MysqlType::Integer => DataType::Int32,
+            MysqlType::BigInt => DataType::Int64,
         }
     }
 }
