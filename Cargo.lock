@@ -1163,7 +1163,7 @@ dependencies = [
 
 [[package]]
 name = "datafusion-remote-table"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -1674,6 +1674,7 @@ version = "0.1.0"
 dependencies = [
  "ctor",
  "datafusion",
+ "datafusion-proto",
  "datafusion-remote-table",
  "tokio",
 ]
