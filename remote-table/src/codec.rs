@@ -43,6 +43,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
                 "Failed to decode remote table execution plan: {e:?}"
             ))
         })?;
+
         let transform = if let Some(bytes) = proto.transform {
             let Some(transform_codec) = self.transform_codec.as_ref() else {
                 return Err(DataFusionError::Execution(
@@ -53,20 +54,30 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
         } else {
             None
         };
+
         let projected_schema: SchemaRef = Arc::new(convert_required!(&proto.projected_schema)?);
+
         let projection: Option<Vec<usize>> = proto
             .projection
             .map(|p| p.projection.iter().map(|n| *n as usize).collect());
+
         let conn_options = parse_connection_options(proto.conn_options.unwrap());
-        // let pool = connect(&conn_options).unwrap();
-        // Ok(Arc::new(RemoteTableExec::new(
-        //     conn_options,
-        //     projected_schema,
-        //     proto.sql,
-        //     projection,
-        //     transform,
-        // )))
-        todo!()
+        let conn = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let pool = connect(&conn_options).await?;
+                let conn = pool.get().await?;
+                Ok::<_, DataFusionError>(conn)
+            })
+        })?;
+
+        Ok(Arc::new(RemoteTableExec::new(
+            conn_options,
+            projected_schema,
+            proto.sql,
+            projection,
+            transform,
+            conn,
+        )))
     }
 
     fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> DFResult<()> {

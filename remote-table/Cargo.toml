@@ -17,6 +17,4 @@ bb8 = { version = "0.9" }
 bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
 chrono = "0.4"
 prost = { workspace = true }
-
-[dev-dependencies]
 tokio = { workspace = true }
