@@ -11,7 +11,7 @@ pub async fn all_supported_mysql_types() {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     let options = ConnectionOptions::Mysql(
         MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")
-            .with_database(Some("test")),
+            .with_database(Some("test".to_string())),
     );
     let table = RemoteTable::try_new(options, "select * from supported_data_types", None)
         .await

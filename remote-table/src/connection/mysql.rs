@@ -100,12 +100,12 @@ impl Connection for MysqlConnection {
         };
         let remote_schema = build_remote_schema(&row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        let batch = rows_to_batch(&[row], arrow_schema.clone(), None)?;
         if let Some(transform) = transform {
+            let batch = rows_to_batch(&[row], arrow_schema.clone(), None)?;
             let transformed_batch = transform_batch(batch, transform, &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
-            Ok((remote_schema, batch.schema()))
+            Ok((remote_schema, arrow_schema))
         }
     }
 

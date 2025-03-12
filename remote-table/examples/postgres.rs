@@ -4,13 +4,12 @@ use std::sync::Arc;
 
 #[tokio::main]
 pub async fn main() {
-    let options = ConnectionOptions::Postgres(PostgresConnectionOptions {
-        host: "localhost".to_string(),
-        port: 5432,
-        username: "user".to_string(),
-        password: "password".to_string(),
-        database: None,
-    });
+    let options = ConnectionOptions::Postgres(PostgresConnectionOptions::new(
+        "localhost",
+        5432,
+        "user",
+        "password",
+    ));
     let remote_table = RemoteTable::try_new(options, "SELECT * from supported_data_types", None)
         .await
         .unwrap();

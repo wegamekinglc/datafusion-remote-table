@@ -42,7 +42,7 @@ message OracleConnectionOptions {
   uint32 port = 2;
   string username = 3;
   string password = 4;
-  optional string database = 5;
+  string service_name = 5;
 }
 
 message SqliteConnectionOptions {

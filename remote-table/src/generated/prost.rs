@@ -67,8 +67,8 @@ pub struct OracleConnectionOptions {
     pub username: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
     pub password: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "5")]
-    pub database: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, tag = "5")]
+    pub service_name: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SqliteConnectionOptions {

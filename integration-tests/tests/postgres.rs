@@ -14,7 +14,7 @@ pub async fn all_supported_postgres_types() {
     setup();
     let options = ConnectionOptions::Postgres(
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
-            .with_database(Some("postgres")),
+            .with_database(Some("postgres".to_string())),
     );
     let table = RemoteTable::try_new(options, "select * from supported_data_types", None)
         .await
@@ -43,7 +43,7 @@ pub async fn exec_plan_serialization() {
     setup();
     let options = ConnectionOptions::Postgres(
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
-            .with_database(Some("postgres")),
+            .with_database(Some("postgres".to_string())),
     );
     let table = RemoteTable::try_new(options, "select * from simple_table", None)
         .await

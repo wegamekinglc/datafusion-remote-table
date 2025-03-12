@@ -15,17 +15,23 @@ datafusion-proto = { workspace = true }
 async-trait = "0.1"
 futures = "0.3"
 async-stream = { version = "0.3" }
-bb8 = { version = "0.9" }
-bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
 chrono = "0.4"
 prost = { workspace = true }
+derive-with = "0.6"
+bb8 = { version = "0.9" }
+# Postgres
+bb8-postgres = { version = "0.9", features = ["with-chrono-0_4"] }
+# MySQL
 mysql_async = { version = "0.35", features = [
     "native-tls-tls",
     "chrono",
     "time",
     "bigdecimal",
 ] }
-derive-with = "0.6"
+# Oracle
+#bb8-oracle = { version = "0.2", features = ["chrono"]}
+oracle = "0.6"
+bb8-oracle = { git = "https://github.com/lewiszlw/bb8-oracle.git", branch = "bump-bb8" }
 
 [dev-dependencies]
 tokio = { workspace = true }

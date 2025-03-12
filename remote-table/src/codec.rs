@@ -151,7 +151,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     port: options.port as u32,
                     username: options.username.clone(),
                     password: options.password.clone(),
-                    database: options.database.clone(),
+                    service_name: options.service_name.clone(),
                 },
             )),
         },
@@ -191,7 +191,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 port: options.port as u16,
                 username: options.username,
                 password: options.password,
-                database: options.database,
+                service_name: options.service_name,
             })
         }
         Some(protobuf::connection_options::ConnectionOptions::Sqlite(options)) => {

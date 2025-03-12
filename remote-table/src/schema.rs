@@ -5,6 +5,7 @@ use std::sync::Arc;
 pub enum RemoteType {
     Postgres(PostgresType),
     Mysql(MysqlType),
+    Oracle(OracleType),
 }
 
 impl RemoteType {
@@ -12,6 +13,7 @@ impl RemoteType {
         match self {
             RemoteType::Postgres(postgres_type) => postgres_type.to_arrow_type(),
             RemoteType::Mysql(mysql_type) => mysql_type.to_arrow_type(),
+            RemoteType::Oracle(oracle_type) => oracle_type.to_arrow_type(),
         }
     }
 }
@@ -108,6 +110,20 @@ impl MysqlType {
             MysqlType::BigInt => DataType::Int64,
             MysqlType::Float => DataType::Float32,
             MysqlType::Double => DataType::Float64,
+        }
+    }
+}
+
+// https://docs.oracle.com/cd/B28359_01/server.111/b28286/sql_elements001.htm#i54330
+#[derive(Debug, Clone)]
+pub enum OracleType {
+    Varchar2(u32),
+}
+
+impl OracleType {
+    pub fn to_arrow_type(&self) -> DataType {
+        match self {
+            OracleType::Varchar2(_) => DataType::Utf8,
         }
     }
 }

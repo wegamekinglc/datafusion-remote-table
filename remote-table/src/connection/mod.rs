@@ -44,8 +44,9 @@ pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
             let pool = connect_mysql(options)?;
             Ok(Arc::new(pool))
         }
-        ConnectionOptions::Oracle(_options) => {
-            todo!()
+        ConnectionOptions::Oracle(options) => {
+            let pool = connect_oracle(options).await?;
+            Ok(Arc::new(pool))
         }
         ConnectionOptions::Sqlite(_) => {
             todo!()
