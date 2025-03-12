@@ -56,6 +56,9 @@ pub async fn connect_oracle(options: &OracleConnectionOptions) -> DFResult<Oracl
         options.password.clone(),
         connect_string,
     );
+    let _ = connector
+        .connect()
+        .map_err(|e| DataFusionError::Internal(format!("Failed to connect to oracle: {e:?}")))?;
     let manager = OracleConnectionManager::from_connector(connector);
     let pool = bb8::Pool::builder()
         .build(manager)
