@@ -35,14 +35,11 @@ impl MysqlConnectionOptions {
         username: impl Into<String>,
         password: impl Into<String>,
     ) -> Self {
-        let host = host.into();
-        let username = username.into();
-        let password = password.into();
         Self {
-            host,
+            host: host.into(),
             port,
-            username,
-            password,
+            username: username.into(),
+            password: password.into(),
             database: None,
         }
     }

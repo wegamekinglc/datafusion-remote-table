@@ -23,6 +23,24 @@ pub struct OracleConnectionOptions {
     pub service_name: String,
 }
 
+impl OracleConnectionOptions {
+    pub fn new(
+        host: impl Into<String>,
+        port: u16,
+        username: impl Into<String>,
+        password: impl Into<String>,
+        service_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            host: host.into(),
+            port,
+            username: username.into(),
+            password: password.into(),
+            service_name: service_name.into(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct OraclePool {
     pool: bb8::Pool<OracleConnectionManager>,
