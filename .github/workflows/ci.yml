@@ -25,6 +25,7 @@ jobs:
           wget https://download.oracle.com/otn_software/linux/instantclient/2370000/instantclient-basic-linux.x64-23.7.0.25.01.zip
           unzip instantclient-basic-linux.x64-23.7.0.25.01.zip
           sudo mv instantclient_23_7 /opt/oracle
+          export LD_LIBRARY_PATH=/opt/oracle:$LD_LIBRARY_PATH
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
