@@ -25,6 +25,7 @@ mysql_async = { version = "0.35", features = [
     "time",
     "bigdecimal",
 ] }
+derive-with = "0.6"
 
 [dev-dependencies]
 tokio = { workspace = true }

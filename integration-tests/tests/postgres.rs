@@ -12,13 +12,10 @@ use std::sync::Arc;
 #[tokio::test]
 pub async fn all_supported_postgres_types() {
     setup();
-    let options = ConnectionOptions::Postgres(PostgresConnectionOptions {
-        host: "localhost".to_string(),
-        port: 5432,
-        username: "postgres".to_string(),
-        password: "password".to_string(),
-        database: Some("postgres".to_string()),
-    });
+    let options = ConnectionOptions::Postgres(
+        PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
+            .with_database(Some("postgres")),
+    );
     let table = RemoteTable::try_new(options, "select * from supported_data_types", None)
         .await
         .unwrap();
@@ -44,13 +41,10 @@ pub async fn all_supported_postgres_types() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn exec_plan_serialization() {
     setup();
-    let options = ConnectionOptions::Postgres(PostgresConnectionOptions {
-        host: "localhost".to_string(),
-        port: 5432,
-        username: "postgres".to_string(),
-        password: "password".to_string(),
-        database: Some("postgres".to_string()),
-    });
+    let options = ConnectionOptions::Postgres(
+        PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
+            .with_database(Some("postgres")),
+    );
     let table = RemoteTable::try_new(options, "select * from simple_table", None)
         .await
         .unwrap();

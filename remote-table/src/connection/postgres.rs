@@ -22,13 +22,33 @@ use std::string::ToString;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, derive_with::With)]
 pub struct PostgresConnectionOptions {
-    pub host: String,
-    pub port: u16,
-    pub username: String,
-    pub password: String,
-    pub database: Option<String>,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) username: String,
+    pub(crate) password: String,
+    pub(crate) database: Option<String>,
+}
+
+impl PostgresConnectionOptions {
+    pub fn new(
+        host: impl Into<String>,
+        port: u16,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
+        let host = host.into();
+        let username = username.into();
+        let password = password.into();
+        Self {
+            host,
+            port,
+            username,
+            password,
+            database: None,
+        }
+    }
 }
 
 #[derive(Debug)]

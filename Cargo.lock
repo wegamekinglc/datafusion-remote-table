@@ -1286,6 +1286,7 @@ dependencies = [
  "chrono",
  "datafusion",
  "datafusion-proto",
+ "derive-with",
  "futures",
  "mysql_async",
  "prost",
@@ -1318,6 +1319,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b42b6fa04a440b495c8b04d0e71b707c585f83cb9cb28cf8cd0d976c315e31b4"
 dependencies = [
  "powerfmt",
+]
+
+[[package]]
+name = "derive-with"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "992217a3266a8ec291ddcb89766ec32f6ec01a8dfa9ff5f0ad5e89d08f59ed5c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

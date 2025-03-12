@@ -9,13 +9,10 @@ pub async fn all_supported_mysql_types() {
     setup();
     // Wait for the database to be ready to connect
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-    let options = ConnectionOptions::Mysql(MysqlConnectionOptions {
-        host: "127.0.0.1".to_string(),
-        port: 3306,
-        username: "root".to_string(),
-        password: "password".to_string(),
-        database: Some("test".to_string()),
-    });
+    let options = ConnectionOptions::Mysql(
+        MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")
+            .with_database(Some("test")),
+    );
     let table = RemoteTable::try_new(options, "select * from supported_data_types", None)
         .await
         .unwrap();
