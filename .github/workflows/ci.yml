@@ -28,7 +28,7 @@ jobs:
           unzip instantclient-basic-linux.x64-23.7.0.25.01.zip
           ls -l /opt/oracle/instantclient_23_7
           export LD_LIBRARY_PATH=/opt/oracle/instantclient_23_7:$LD_LIBRARY_PATH
-          cp -r /opt/oracle/instantclient_23_7 /usr/local/lib/
+          sudo cp -r /opt/oracle/instantclient_23_7 /usr/local/lib/
           ls -l /usr/local/lib/instantclient_23_7
           export LD_LIBRARY_PATH=/usr/local/lib/instantclient_23_7:$LD_LIBRARY_PATH
           echo $LD_LIBRARY_PATH
