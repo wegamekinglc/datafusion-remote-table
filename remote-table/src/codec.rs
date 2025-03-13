@@ -62,10 +62,12 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             .map(|p| p.projection.iter().map(|n| *n as usize).collect());
 
         let conn_options = parse_connection_options(proto.conn_options.unwrap());
-        let conn = futures::executor::block_on(async {
-            let pool = connect(&conn_options).await?;
-            let conn = pool.get().await?;
-            Ok::<_, DataFusionError>(conn)
+        let conn = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let pool = connect(&conn_options).await?;
+                let conn = pool.get().await?;
+                Ok::<_, DataFusionError>(conn)
+            })
         })?;
 
         Ok(Arc::new(RemoteTableExec::new(
