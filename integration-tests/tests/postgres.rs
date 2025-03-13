@@ -10,7 +10,7 @@ use integration_tests::shared_containers::setup_shared_containers;
 use std::sync::Arc;
 
 #[tokio::test]
-pub async fn all_supported_postgres_types() {
+pub async fn supported_postgres_types() {
     setup_shared_containers();
     let options = ConnectionOptions::Postgres(
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
@@ -30,6 +30,8 @@ pub async fn all_supported_postgres_types() {
         .collect()
         .await
         .unwrap();
+    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+
     assert_eq!(&pretty_format_batches(&result).unwrap().to_string(),
                "+-----------------+----------------+---------------+---------------+------------------+-------------+----------------+-------------+--------------+-------------+-------------+---------------------+----------------------+----------------+----------------------+-------------------+
 | smallint_column | integer_column | bigint_column | serial_column | bigserial_column | char_column | varchar_column | text_column | bytea_column | date_column | time_column | timestamp_column    | timestamptz_column   | boolean_column | integer_array_column | text_array_column |
@@ -38,7 +40,7 @@ pub async fn all_supported_postgres_types() {
 +-----------------+----------------+---------------+---------------+------------------+-------------+----------------+-------------+--------------+-------------+-------------+---------------------+----------------------+----------------+----------------------+-------------------+")
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+#[tokio::test]
 pub async fn exec_plan_serialization() {
     setup_shared_containers();
     let options = ConnectionOptions::Postgres(

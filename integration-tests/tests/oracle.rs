@@ -5,7 +5,7 @@ use integration_tests::shared_containers::setup_shared_containers;
 use std::sync::Arc;
 
 #[tokio::test]
-pub async fn all_supported_oracle_types() {
+pub async fn supported_oracle_types() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     let options = ConnectionOptions::Oracle(OracleConnectionOptions::new(

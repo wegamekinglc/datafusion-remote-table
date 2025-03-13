@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 #[tokio::test]
-pub async fn all_supported_sqlite_types() {
+pub async fn supported_sqlite_types() {
     let options = ConnectionOptions::Sqlite(PathBuf::from(format!(
         "{}/testdata/sqlite3.db",
         env!("CARGO_MANIFEST_DIR")
