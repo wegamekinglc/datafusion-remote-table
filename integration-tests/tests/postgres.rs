@@ -33,14 +33,33 @@ pub async fn supported_postgres_types() {
     println!("{}", pretty_format_batches(result.as_slice()).unwrap());
 
     assert_eq!(&pretty_format_batches(&result).unwrap().to_string(),
-               "+-----------------+----------------+---------------+---------------+------------------+-------------+----------------+-------------+--------------+-------------+-------------+---------------------+----------------------+----------------+----------------------+-------------------+
-| smallint_column | integer_column | bigint_column | serial_column | bigserial_column | char_column | varchar_column | text_column | bytea_column | date_column | time_column | timestamp_column    | timestamptz_column   | boolean_column | integer_array_column | text_array_column |
-+-----------------+----------------+---------------+---------------+------------------+-------------+----------------+-------------+--------------+-------------+-------------+---------------------+----------------------+----------------+----------------------+-------------------+
-| 1               | 2              | 3             | 4             | 5                | char        | varchar        | text        | deadbeef     | 2023-10-01  | 12:34:56    | 2023-10-01T12:34:56 | 2023-10-01T12:34:56Z | true           | [1, 2]               | [text0, text1]    |
-+-----------------+----------------+---------------+---------------+------------------+-------------+----------------+-------------+--------------+-------------+-------------+---------------------+----------------------+----------------+----------------------+-------------------+")
+        "+--------------+-------------+------------+------------+---------------+----------+-------------+----------+-----------+------------+----------+---------------------+----------------------+-------------+-------------------+----------------+
+| smallint_col | integer_col | bigint_col | serial_col | bigserial_col | char_col | varchar_col | text_col | bytea_col | date_col   | time_col | timestamp_col       | timestamptz_col      | boolean_col | integer_array_col | text_array_col |
++--------------+-------------+------------+------------+---------------+----------+-------------+----------+-----------+------------+----------+---------------------+----------------------+-------------+-------------------+----------------+
+| 1            | 2           | 3          | 4          | 5             | char     | varchar     | text     | deadbeef  | 2023-10-01 | 12:34:56 | 2023-10-01T12:34:56 | 2023-10-01T12:34:56Z | true        | [1, 2]            | [text0, text1] |
++--------------+-------------+------------+------------+---------------+----------+-------------+----------+-----------+------------+----------+---------------------+----------------------+-------------+-------------------+----------------+"
+    );
+
+    let result = ctx
+        .sql("SELECT integer_col, char_col FROM remote_table")
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+
+    assert_eq!(
+        &pretty_format_batches(&result).unwrap().to_string(),
+        "+-------------+----------+
+| integer_col | char_col |
++-------------+----------+
+| 2           | char     |
++-------------+----------+"
+    );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn exec_plan_serialization() {
     setup_shared_containers();
     let options = ConnectionOptions::Postgres(
