@@ -7,6 +7,7 @@ pub use mysql::*;
 pub use oracle::*;
 pub use postgres::*;
 
+use crate::connection::sqlite::connect_sqlite;
 use crate::{DFResult, RemoteSchema, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
@@ -48,8 +49,9 @@ pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
             let pool = connect_oracle(options).await?;
             Ok(Arc::new(pool))
         }
-        ConnectionOptions::Sqlite(_) => {
-            todo!()
+        ConnectionOptions::Sqlite(path) => {
+            let pool = connect_sqlite(path).await?;
+            Ok(Arc::new(pool))
         }
     }
 }

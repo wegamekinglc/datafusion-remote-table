@@ -13,11 +13,19 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::memory::MemoryStream;
 use rusqlite::types::Type;
 use rusqlite::{Row, Rows};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct SqlitePool {
     pool: tokio_rusqlite::Connection,
+}
+
+pub async fn connect_sqlite(path: &PathBuf) -> DFResult<SqlitePool> {
+    let pool = tokio_rusqlite::Connection::open(path).await.map_err(|e| {
+        DataFusionError::Execution(format!("Failed to open sqlite connection: {e:?}"))
+    })?;
+    Ok(SqlitePool { pool })
 }
 
 #[async_trait::async_trait]
