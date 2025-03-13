@@ -35,6 +35,7 @@ jobs:
           export PATH=/usr/local/lib/instantclient_23_7:$PATH
           echo $LD_LIBRARY_PATH
           echo $PATH
+          echo "LD_LIBRARY_PATH=/usr/local/lib/instantclient_23_7" >> $GITHUB_ENV
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
