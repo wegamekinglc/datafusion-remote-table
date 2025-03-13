@@ -22,7 +22,8 @@ jobs:
       - name: Install oracle instant client
         run: |
           sudo apt-get update
-          sudo apt-get install -y libaio1 libaio-dev
+          sudo apt-get install -y libaio-dev
+          sudo ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1
           mkdir -p /opt/oracle
           cd /opt/oracle
           wget https://download.oracle.com/otn_software/linux/instantclient/2370000/instantclient-basic-linux.x64-23.7.0.25.01.zip
