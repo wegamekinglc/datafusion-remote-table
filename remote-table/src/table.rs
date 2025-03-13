@@ -26,7 +26,7 @@ impl RemoteTable {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
         let conn = pool.get().await?;
-        let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.as_deref()).await?;
+        let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.clone()).await?;
         Ok(RemoteTable {
             conn_options,
             sql,

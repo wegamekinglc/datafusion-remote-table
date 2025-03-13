@@ -24,7 +24,7 @@ pub trait Connection: Debug + Send + Sync {
     async fn infer_schema(
         &self,
         sql: &str,
-        transform: Option<&dyn Transform>,
+        transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchema, SchemaRef)>;
 
     async fn query(

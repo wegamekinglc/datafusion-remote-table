@@ -99,7 +99,7 @@ impl Connection for PostgresConnection {
     async fn infer_schema(
         &self,
         sql: &str,
-        transform: Option<&dyn Transform>,
+        transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchema, SchemaRef)> {
         let mut stream = self
             .conn
@@ -135,7 +135,7 @@ impl Connection for PostgresConnection {
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
             let batch = rows_to_batch(std::slice::from_ref(first_row), arrow_schema, None)?;
-            let transformed_batch = transform_batch(batch, transform, &remote_schema)?;
+            let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
             Ok((remote_schema, arrow_schema))

@@ -6,6 +6,7 @@ pub enum RemoteType {
     Postgres(PostgresType),
     Mysql(MysqlType),
     Oracle(OracleType),
+    Sqlite(SqliteType),
 }
 
 impl RemoteType {
@@ -14,6 +15,7 @@ impl RemoteType {
             RemoteType::Postgres(postgres_type) => postgres_type.to_arrow_type(),
             RemoteType::Mysql(mysql_type) => mysql_type.to_arrow_type(),
             RemoteType::Oracle(oracle_type) => oracle_type.to_arrow_type(),
+            RemoteType::Sqlite(sqlite_type) => sqlite_type.to_arrow_type(),
         }
     }
 }
@@ -124,6 +126,28 @@ impl OracleType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
             OracleType::Varchar2(_) => DataType::Utf8,
+        }
+    }
+}
+
+// https://www.sqlite.org/datatype3.html
+#[derive(Debug, Clone)]
+pub enum SqliteType {
+    Null,
+    Integer,
+    Real,
+    Text,
+    Blob,
+}
+
+impl SqliteType {
+    pub fn to_arrow_type(&self) -> DataType {
+        match self {
+            SqliteType::Null => DataType::Null,
+            SqliteType::Integer => DataType::Int64,
+            SqliteType::Real => DataType::Float64,
+            SqliteType::Text => DataType::Utf8,
+            SqliteType::Blob => DataType::Binary,
         }
     }
 }

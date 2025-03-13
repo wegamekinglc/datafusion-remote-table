@@ -87,7 +87,7 @@ impl Connection for OracleConnection {
     async fn infer_schema(
         &self,
         sql: &str,
-        transform: Option<&dyn Transform>,
+        transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchema, SchemaRef)> {
         let row = self.conn.query_row(sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to query one row to infer schema: {e:?}"))
@@ -96,7 +96,7 @@ impl Connection for OracleConnection {
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
             let batch = rows_to_batch(&[row], arrow_schema, None)?;
-            let transformed_batch = transform_batch(batch, transform, &remote_schema)?;
+            let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
             Ok((remote_schema, arrow_schema))
