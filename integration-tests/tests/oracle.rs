@@ -7,8 +7,7 @@ use std::sync::Arc;
 #[tokio::test]
 pub async fn all_supported_oracle_types() {
     setup();
-    println!("LD_LIBRARY_PATH: {}", env!("LD_LIBRARY_PATH"));
-    // tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     let options = ConnectionOptions::Oracle(OracleConnectionOptions::new(
         "127.0.0.1",
         49161,
