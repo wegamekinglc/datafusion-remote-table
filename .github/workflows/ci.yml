@@ -21,6 +21,7 @@ jobs:
 
       - name: Install oracle instant client
         run: |
+          sudo apt-get update
           sudo apt-get install -y libaio1 libaio-dev
           mkdir -p /opt/oracle
           cd /opt/oracle
