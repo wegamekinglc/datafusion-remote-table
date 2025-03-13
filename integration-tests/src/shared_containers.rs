@@ -11,7 +11,7 @@ pub static SHARED_CONTAINERS: LazyLock<DockerCompose> = LazyLock::new(|| {
     compose
 });
 
-pub fn setup() {
+pub fn setup_shared_containers() {
     let _ = SHARED_CONTAINERS.project_name();
 }
 

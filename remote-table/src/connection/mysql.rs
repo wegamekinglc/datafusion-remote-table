@@ -1,7 +1,8 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
+    project_remote_schema, Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema,
+    RemoteType, Transform,
 };
 use async_stream::stream;
 use datafusion::arrow::array::{
@@ -158,6 +159,7 @@ impl Connection for MysqlConnection {
         };
 
         let remote_schema = build_remote_schema(first_row)?;
+        let projected_remote_schema = project_remote_schema(&remote_schema, projection.as_ref());
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         let first_chunk = rows_to_batch(
             first_chunk.as_slice(),
@@ -181,7 +183,7 @@ impl Connection for MysqlConnection {
 
         Ok((
             Box::pin(RecordBatchStreamAdapter::new(schema, output_stream)),
-            remote_schema,
+            projected_remote_schema,
         ))
     }
 }

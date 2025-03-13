@@ -1,7 +1,8 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
+    project_remote_schema, Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
+    RemoteType, Transform,
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{make_builder, ArrayRef, RecordBatch, StringBuilder};
@@ -131,6 +132,7 @@ impl Connection for OracleConnection {
         };
 
         let remote_schema = build_remote_schema(first_row)?;
+        let projected_remote_schema = project_remote_schema(&remote_schema, projection.as_ref());
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         let first_chunk = rows_to_batch(
             first_chunk.as_slice(),
@@ -161,7 +163,7 @@ impl Connection for OracleConnection {
 
         Ok((
             Box::pin(RecordBatchStreamAdapter::new(schema, output_stream)),
-            remote_schema,
+            projected_remote_schema,
         ))
     }
 }

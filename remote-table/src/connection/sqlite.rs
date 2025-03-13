@@ -1,7 +1,8 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, Pool, RemoteField, RemoteSchema, RemoteType, SqliteType, Transform,
+    project_remote_schema, Connection, DFResult, Pool, RemoteField, RemoteSchema, RemoteType,
+    SqliteType, Transform,
 };
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder,
@@ -87,6 +88,7 @@ impl Connection for SqliteConnection {
         sql: String,
         projection: Option<Vec<usize>>,
     ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)> {
+        let projection_clone = projection.clone();
         let (first_batch, batch, remote_schema) = self
             .conn
             .call(move |conn| {
@@ -109,7 +111,7 @@ impl Connection for SqliteConnection {
 
                 let first_batch = row_to_batch(first_row, arrow_schema.clone())
                     .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
-                let batch = rows_to_batch(rows, arrow_schema, projection.as_ref())
+                let batch = rows_to_batch(rows, arrow_schema, projection_clone.as_ref())
                     .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                 Ok((first_batch, batch, remote_schema))
             })
@@ -122,7 +124,7 @@ impl Connection for SqliteConnection {
                 schema,
                 None,
             )?),
-            remote_schema,
+            project_remote_schema(&remote_schema, projection.as_ref()),
         ))
     }
 }

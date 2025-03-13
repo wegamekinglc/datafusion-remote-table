@@ -198,3 +198,19 @@ impl RemoteSchema {
         Schema::new(fields)
     }
 }
+
+pub fn project_remote_schema(
+    schema: &RemoteSchema,
+    projection: Option<&Vec<usize>>,
+) -> RemoteSchema {
+    match projection {
+        Some(projection) => {
+            let fields = projection
+                .iter()
+                .map(|i| schema.fields[*i].clone())
+                .collect::<Vec<_>>();
+            RemoteSchema::new(fields)
+        }
+        None => schema.clone(),
+    }
+}

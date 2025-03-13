@@ -6,12 +6,12 @@ use datafusion_proto::protobuf::PhysicalPlanNode;
 use datafusion_remote_table::{
     ConnectionOptions, PostgresConnectionOptions, RemotePhysicalCodec, RemoteTable,
 };
-use integration_tests::shared_containers::setup;
+use integration_tests::shared_containers::setup_shared_containers;
 use std::sync::Arc;
 
 #[tokio::test]
 pub async fn all_supported_postgres_types() {
-    setup();
+    setup_shared_containers();
     let options = ConnectionOptions::Postgres(
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
             .with_database(Some("postgres".to_string())),
@@ -40,7 +40,7 @@ pub async fn all_supported_postgres_types() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn exec_plan_serialization() {
-    setup();
+    setup_shared_containers();
     let options = ConnectionOptions::Postgres(
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
             .with_database(Some("postgres".to_string())),

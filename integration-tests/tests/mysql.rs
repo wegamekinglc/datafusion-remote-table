@@ -1,12 +1,12 @@
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::prelude::SessionContext;
 use datafusion_remote_table::{ConnectionOptions, MysqlConnectionOptions, RemoteTable};
-use integration_tests::shared_containers::setup;
+use integration_tests::shared_containers::setup_shared_containers;
 use std::sync::Arc;
 
 #[tokio::test]
 pub async fn all_supported_mysql_types() {
-    setup();
+    setup_shared_containers();
     // Wait for the database to be ready to connect
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     let options = ConnectionOptions::Mysql(

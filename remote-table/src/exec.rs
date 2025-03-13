@@ -97,15 +97,15 @@ async fn build_and_transform_stream(
     sql: String,
     projection: Option<Vec<usize>>,
     transform: Option<Arc<dyn Transform>>,
-    schema: SchemaRef,
+    projected_schema: SchemaRef,
 ) -> DFResult<SendableRecordBatchStream> {
     let (stream, remote_schema) = conn.query(sql, projection).await?;
-    assert_eq!(schema.fields().len(), remote_schema.fields.len());
+    assert_eq!(projected_schema.fields().len(), remote_schema.fields.len());
     if let Some(transform) = transform.as_ref() {
         Ok(Box::pin(TransformStream {
             input: stream,
             transform: transform.clone(),
-            schema,
+            schema: projected_schema,
             remote_schema,
         }))
     } else {
