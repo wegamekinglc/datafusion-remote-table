@@ -204,6 +204,9 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
         ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
+        ColumnType::MYSQL_TYPE_STRING if !is_binary && !is_enum => {
+            Ok(RemoteType::Mysql(MysqlType::Char))
+        }
         ColumnType::MYSQL_TYPE_VAR_STRING if !is_binary && !is_enum => {
             Ok(RemoteType::Mysql(MysqlType::Varchar))
         }
@@ -284,7 +287,7 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::Double) => {
                     handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Varchar) => {
+                RemoteType::Mysql(MysqlType::Char) | RemoteType::Mysql(MysqlType::Varchar) => {
                     handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
                 }
                 _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
