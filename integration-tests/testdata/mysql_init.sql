@@ -12,6 +12,8 @@ CREATE TABLE supported_data_types
     double_col DOUBLE,
     date_col DATE,
     datetime_col DATETIME,
+    time_col TIME,
+    timestamp_col TIMESTAMP,
     char_col CHAR(10),
     varchar_col VARCHAR(255),
     binary_col BINARY(10),
@@ -29,5 +31,5 @@ CREATE TABLE supported_data_types
 );
 
 INSERT INTO supported_data_types values
-(1, 2, 3, 4, 5, 1.1, 2.2, '2025-03-14', '2025-03-14 17:36:25', 'char', 'varchar', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}', Point(15, 20)),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 5, 1.1, 2.2, '2025-03-14', '2025-03-14 17:36:25', '11:11:11', '2025-03-14 11:11:11', 'char', 'varchar', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}', Point(15, 20)),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
