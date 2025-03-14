@@ -56,6 +56,7 @@ pub async fn supported_postgres_types() {
 | integer_col | char_col |
 +-------------+----------+
 | 2           | char     |
+|             |          |
 +-------------+----------+"
     );
 }
