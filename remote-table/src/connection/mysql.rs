@@ -241,6 +241,7 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_BLOB if col_length == 4294967295 && is_blob && is_binary => {
             Ok(RemoteType::Mysql(MysqlType::LongBlob))
         }
+        ColumnType::MYSQL_TYPE_JSON => Ok(RemoteType::Mysql(MysqlType::Json)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
         ))),
@@ -324,7 +325,7 @@ fn rows_to_batch(
                 | RemoteType::Mysql(MysqlType::MediumText) => {
                     handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::LongText) => {
+                RemoteType::Mysql(MysqlType::LongText) | RemoteType::Mysql(MysqlType::Json) => {
                     handle_primitive_type!(builder, col, LargeStringBuilder, String, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::Binary)

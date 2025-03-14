@@ -115,6 +115,7 @@ pub enum MysqlType {
     Blob,
     MediumBlob,
     LongBlob,
+    Json,
 }
 
 impl MysqlType {
@@ -139,6 +140,7 @@ impl MysqlType {
             MysqlType::Blob => DataType::Binary,
             MysqlType::MediumBlob => DataType::Binary,
             MysqlType::LongBlob => DataType::LargeBinary,
+            MysqlType::Json => DataType::LargeUtf8,
         }
     }
 }
