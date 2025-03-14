@@ -98,6 +98,7 @@ impl PostgresType {
 pub enum MysqlType {
     TinyInt,
     SmallInt,
+    MediumInt,
     Integer,
     BigInt,
     Float,
@@ -119,6 +120,7 @@ impl MysqlType {
         match self {
             MysqlType::TinyInt => DataType::Int8,
             MysqlType::SmallInt => DataType::Int16,
+            MysqlType::MediumInt => DataType::Int32,
             MysqlType::Integer => DataType::Int32,
             MysqlType::BigInt => DataType::Int64,
             MysqlType::Float => DataType::Float32,

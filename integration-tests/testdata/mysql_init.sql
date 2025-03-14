@@ -6,6 +6,7 @@ CREATE TABLE supported_data_types
     tinyint_col TINYINT,
     smallint_col SMALLINT,
     integer_col INT,
+    mediumint_col MEDIUMINT,
     bigint_col BIGINT,
     float_col FLOAT,
     double_col DOUBLE,
@@ -22,5 +23,5 @@ CREATE TABLE supported_data_types
 );
 
 INSERT INTO supported_data_types values
-(1, 2, 3, 4, 1.1, 2.2, 'char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 5, 1.1, 2.2, 'char', 'varchar', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);

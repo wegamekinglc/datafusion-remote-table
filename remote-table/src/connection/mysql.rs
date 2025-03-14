@@ -203,6 +203,7 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
     match mysql_col.column_type() {
         ColumnType::MYSQL_TYPE_TINY => Ok(RemoteType::Mysql(MysqlType::TinyInt)),
         ColumnType::MYSQL_TYPE_SHORT => Ok(RemoteType::Mysql(MysqlType::SmallInt)),
+        ColumnType::MYSQL_TYPE_INT24 => Ok(RemoteType::Mysql(MysqlType::MediumInt)),
         ColumnType::MYSQL_TYPE_LONG => Ok(RemoteType::Mysql(MysqlType::Integer)),
         ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
@@ -300,7 +301,7 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::SmallInt) => {
                     handle_primitive_type!(builder, col, Int16Builder, i16, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Integer) => {
+                RemoteType::Mysql(MysqlType::MediumInt) | RemoteType::Mysql(MysqlType::Integer) => {
                     handle_primitive_type!(builder, col, Int32Builder, i32, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::BigInt) => {
