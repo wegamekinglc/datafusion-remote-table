@@ -225,11 +225,11 @@ macro_rules! handle_primitive_type {
                 " for ",
                 stringify!($mysql_col)
             ));
-        let v = $row.get::<$value_ty, usize>($index);
+        let v = $row.get::<Option<$value_ty>, usize>($index);
 
         match v {
-            Some(v) => builder.append_value(v),
-            None => builder.append_null(),
+            Some(Some(v)) => builder.append_value(v),
+            _ => builder.append_null(),
         }
     }};
 }
