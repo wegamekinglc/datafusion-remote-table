@@ -7,7 +7,7 @@ use crate::{
 use async_stream::stream;
 use datafusion::arrow::array::{
     make_builder, ArrayRef, Float32Builder, Float64Builder, Int16Builder, Int32Builder,
-    Int64Builder, Int8Builder, RecordBatch,
+    Int64Builder, Int8Builder, RecordBatch, StringBuilder,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
@@ -15,7 +15,7 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::lock::Mutex;
 use futures::StreamExt;
-use mysql_async::consts::ColumnType;
+use mysql_async::consts::{ColumnFlags, ColumnType};
 use mysql_async::prelude::Queryable;
 use mysql_async::{Column, Row};
 use std::sync::Arc;
@@ -99,7 +99,7 @@ impl Connection for MysqlConnection {
         let remote_schema = build_remote_schema(&row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
-            let batch = rows_to_batch(&[row], arrow_schema.clone(), None)?;
+            let batch = rows_to_batch(&[row], &remote_schema, arrow_schema.clone(), None)?;
             let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
@@ -163,6 +163,7 @@ impl Connection for MysqlConnection {
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         let first_chunk = rows_to_batch(
             first_chunk.as_slice(),
+            &remote_schema,
             arrow_schema.clone(),
             projection.as_ref(),
         )?;
@@ -170,7 +171,12 @@ impl Connection for MysqlConnection {
 
         let mut stream = stream.map(move |rows| {
             let rows = rows?;
-            let batch = rows_to_batch(rows.as_slice(), arrow_schema.clone(), projection.as_ref())?;
+            let batch = rows_to_batch(
+                rows.as_slice(),
+                &remote_schema,
+                arrow_schema.clone(),
+                projection.as_ref(),
+            )?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
@@ -189,6 +195,8 @@ impl Connection for MysqlConnection {
 }
 
 fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
+    let is_binary = mysql_col.flags().contains(ColumnFlags::BINARY_FLAG);
+    let is_enum = mysql_col.flags().contains(ColumnFlags::ENUM_FLAG);
     match mysql_col.column_type() {
         ColumnType::MYSQL_TYPE_TINY => Ok(RemoteType::Mysql(MysqlType::TinyInt)),
         ColumnType::MYSQL_TYPE_SHORT => Ok(RemoteType::Mysql(MysqlType::SmallInt)),
@@ -196,6 +204,10 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
         ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
+        ColumnType::MYSQL_TYPE_VAR_STRING if !is_binary && !is_enum => {
+            Ok(RemoteType::Mysql(MysqlType::Varchar))
+        }
+        ColumnType::MYSQL_TYPE_VARCHAR => Ok(RemoteType::Mysql(MysqlType::Varchar)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
         ))),
@@ -236,6 +248,7 @@ macro_rules! handle_primitive_type {
 
 fn rows_to_batch(
     rows: &[Row],
+    remote_schema: &RemoteSchema,
     arrow_schema: SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
@@ -247,35 +260,34 @@ fn rows_to_batch(
     }
 
     for row in rows {
-        for (idx, col) in row.columns_ref().iter().enumerate() {
+        for (idx, remote_field) in remote_schema.fields.iter().enumerate() {
             if !projections_contains(projection, idx) {
                 continue;
             }
             let builder = &mut array_builders[idx];
-            match col.column_type() {
-                ColumnType::MYSQL_TYPE_TINY => {
+            match remote_field.remote_type {
+                RemoteType::Mysql(MysqlType::TinyInt) => {
                     handle_primitive_type!(builder, col, Int8Builder, i8, row, idx);
                 }
-                ColumnType::MYSQL_TYPE_SHORT => {
+                RemoteType::Mysql(MysqlType::SmallInt) => {
                     handle_primitive_type!(builder, col, Int16Builder, i16, row, idx);
                 }
-                ColumnType::MYSQL_TYPE_LONG => {
+                RemoteType::Mysql(MysqlType::Integer) => {
                     handle_primitive_type!(builder, col, Int32Builder, i32, row, idx);
                 }
-                ColumnType::MYSQL_TYPE_LONGLONG => {
+                RemoteType::Mysql(MysqlType::BigInt) => {
                     handle_primitive_type!(builder, col, Int64Builder, i64, row, idx);
                 }
-                ColumnType::MYSQL_TYPE_FLOAT => {
+                RemoteType::Mysql(MysqlType::Float) => {
                     handle_primitive_type!(builder, col, Float32Builder, f32, row, idx);
                 }
-                ColumnType::MYSQL_TYPE_DOUBLE => {
+                RemoteType::Mysql(MysqlType::Double) => {
                     handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
                 }
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "Unsupported mysql type: {col:?}",
-                    )));
+                RemoteType::Mysql(MysqlType::Varchar) => {
+                    handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
                 }
+                _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
             }
         }
     }

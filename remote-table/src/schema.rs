@@ -101,6 +101,7 @@ pub enum MysqlType {
     BigInt,
     Float,
     Double,
+    Varchar,
 }
 
 impl MysqlType {
@@ -112,6 +113,7 @@ impl MysqlType {
             MysqlType::BigInt => DataType::Int64,
             MysqlType::Float => DataType::Float32,
             MysqlType::Double => DataType::Float64,
+            MysqlType::Varchar => DataType::Utf8,
         }
     }
 }
