@@ -31,8 +31,7 @@ mysql_async = { version = "0.35", features = [
 ] }
 # Oracle
 oracle = "0.6"
-#bb8-oracle = { version = "0.2", features = ["chrono"]}
-bb8-oracle = { git = "https://github.com/lewiszlw/bb8-oracle.git", branch = "bump-bb8" }
+bb8-oracle = { version = "0.3", features = ["chrono"]}
 # Sqlite
 rusqlite = "0.32"
 tokio-rusqlite = { version = "0.6.0", features = ["bundled"] }

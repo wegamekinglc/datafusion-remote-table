@@ -34,5 +34,11 @@ pub async fn main() {
 }
 ```
 
+## Supported databases
+- [x] Postgres
+- [x] MySQL
+- [x] Oracle
+- [x] SQLite
+
 ## Thanks
 - [datafusion-table-providers](https://crates.io/crates/datafusion-table-providers)

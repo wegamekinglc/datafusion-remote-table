@@ -402,8 +402,9 @@ dependencies = [
 
 [[package]]
 name = "bb8-oracle"
-version = "0.2.0"
-source = "git+https://github.com/lewiszlw/bb8-oracle.git?branch=bump-bb8#cf0c2af1556916ae9c652932e4952d96453d4b0a"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a471c2e1027f28a98972d3d38bd2612efd05cf7b27d6cc1566ec901537e2d1c8"
 dependencies = [
  "bb8",
  "oracle",
@@ -2456,6 +2457,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3db40fe6e4df881b683691ade5ef1f7b1afd52aefa115581f7b92855524d7ec0"
 dependencies = [
  "cc",
+ "chrono",
  "odpic-sys",
  "once_cell",
  "oracle_procmacro",
