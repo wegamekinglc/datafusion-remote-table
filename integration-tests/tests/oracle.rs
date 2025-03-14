@@ -43,6 +43,7 @@ pub async fn supported_oracle_types() {
 | VARCHAR2_COL |
 +--------------+
 | varchar2     |
+|              |
 +--------------+"
     );
 }

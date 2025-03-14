@@ -4,3 +4,4 @@ CREATE TABLE supported_data_types
 );
 
 INSERT INTO supported_data_types values ('varchar2');
+INSERT INTO supported_data_types values (NULL);
