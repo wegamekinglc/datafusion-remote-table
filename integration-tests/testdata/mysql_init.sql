@@ -13,10 +13,12 @@ CREATE TABLE supported_data_types
     varchar_col VARCHAR(255),
     tinytext_col TINYTEXT,
     text_col TEXT,
+    mediumtext_col MEDIUMTEXT,
     tinyblob_col TINYBLOB,
-    blob_col BLOB
+    blob_col BLOB,
+    mediumblob_col MEDIUMBLOB
 );
 
 INSERT INTO supported_data_types values
-(1, 2, 3, 4, 1.1, 2.2, 'char', 'varchar', 'tinytext', 'text', X'01', X'02'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 1.1, 2.2, 'char', 'varchar', 'tinytext', 'text', 'mediumtext', X'01', X'02', X'03'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);

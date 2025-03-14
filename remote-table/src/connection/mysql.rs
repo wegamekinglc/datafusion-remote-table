@@ -219,11 +219,17 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_BLOB if col_length == 262140 && is_blob && !is_binary => {
             Ok(RemoteType::Mysql(MysqlType::Text))
         }
+        ColumnType::MYSQL_TYPE_BLOB if col_length == 67108860 && is_blob && !is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::MediumText))
+        }
         ColumnType::MYSQL_TYPE_BLOB if col_length == 255 && is_blob && is_binary => {
             Ok(RemoteType::Mysql(MysqlType::TinyBlob))
         }
         ColumnType::MYSQL_TYPE_BLOB if col_length == 65535 && is_blob && is_binary => {
             Ok(RemoteType::Mysql(MysqlType::Blob))
+        }
+        ColumnType::MYSQL_TYPE_BLOB if col_length == 16777215 && is_blob && is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::MediumBlob))
         }
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
@@ -304,10 +310,13 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::Char)
                 | RemoteType::Mysql(MysqlType::Varchar)
                 | RemoteType::Mysql(MysqlType::TinyText)
-                | RemoteType::Mysql(MysqlType::Text) => {
+                | RemoteType::Mysql(MysqlType::Text)
+                | RemoteType::Mysql(MysqlType::MediumText) => {
                     handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::TinyBlob) | RemoteType::Mysql(MysqlType::Blob) => {
+                RemoteType::Mysql(MysqlType::TinyBlob)
+                | RemoteType::Mysql(MysqlType::Blob)
+                | RemoteType::Mysql(MysqlType::MediumBlob) => {
                     handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
                 }
                 _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
