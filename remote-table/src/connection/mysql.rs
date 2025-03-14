@@ -6,8 +6,8 @@ use crate::{
 };
 use async_stream::stream;
 use datafusion::arrow::array::{
-    make_builder, ArrayRef, Float32Builder, Float64Builder, Int16Builder, Int32Builder,
-    Int64Builder, Int8Builder, RecordBatch, StringBuilder,
+    make_builder, ArrayRef, BinaryBuilder, Float32Builder, Float64Builder, Int16Builder,
+    Int32Builder, Int64Builder, Int8Builder, RecordBatch, StringBuilder,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
@@ -196,7 +196,9 @@ impl Connection for MysqlConnection {
 
 fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
     let is_binary = mysql_col.flags().contains(ColumnFlags::BINARY_FLAG);
+    let is_blob = mysql_col.flags().contains(ColumnFlags::BLOB_FLAG);
     let is_enum = mysql_col.flags().contains(ColumnFlags::ENUM_FLAG);
+    let col_length = mysql_col.column_length();
     match mysql_col.column_type() {
         ColumnType::MYSQL_TYPE_TINY => Ok(RemoteType::Mysql(MysqlType::TinyInt)),
         ColumnType::MYSQL_TYPE_SHORT => Ok(RemoteType::Mysql(MysqlType::SmallInt)),
@@ -211,6 +213,12 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
             Ok(RemoteType::Mysql(MysqlType::Varchar))
         }
         ColumnType::MYSQL_TYPE_VARCHAR => Ok(RemoteType::Mysql(MysqlType::Varchar)),
+        ColumnType::MYSQL_TYPE_BLOB if col_length == 1020 && is_blob && !is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::TinyText))
+        }
+        ColumnType::MYSQL_TYPE_BLOB if col_length == 255 && is_blob && is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::TinyBlob))
+        }
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
         ))),
@@ -287,8 +295,13 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::Double) => {
                     handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Char) | RemoteType::Mysql(MysqlType::Varchar) => {
+                RemoteType::Mysql(MysqlType::Char)
+                | RemoteType::Mysql(MysqlType::Varchar)
+                | RemoteType::Mysql(MysqlType::TinyText) => {
                     handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
+                }
+                RemoteType::Mysql(MysqlType::TinyBlob) => {
+                    handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
                 }
                 _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
             }

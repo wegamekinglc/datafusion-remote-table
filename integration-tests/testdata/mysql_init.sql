@@ -10,9 +10,11 @@ CREATE TABLE supported_data_types
     float_col FLOAT,
     double_col DOUBLE,
     char_col CHAR(10),
-    varchar_col VARCHAR(255)
+    varchar_col VARCHAR(255),
+    tinytext_col TINYTEXT,
+    tinyblob_col TINYBLOB
 );
 
 INSERT INTO supported_data_types values
-(1, 2, 3, 4, 1.1, 2.2, 'char', 'varchar'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 1.1, 2.2, 'char', 'varchar', 'tinytext', X'010203'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);

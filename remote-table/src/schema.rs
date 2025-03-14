@@ -103,6 +103,11 @@ pub enum MysqlType {
     Double,
     Char,
     Varchar,
+    TinyText,
+    Text,
+    MediumText,
+    LongText,
+    TinyBlob,
 }
 
 impl MysqlType {
@@ -116,6 +121,11 @@ impl MysqlType {
             MysqlType::Double => DataType::Float64,
             MysqlType::Char => DataType::Utf8,
             MysqlType::Varchar => DataType::Utf8,
+            MysqlType::TinyText => DataType::Utf8,
+            MysqlType::Text => DataType::Utf8,
+            MysqlType::MediumText => DataType::Utf8,
+            MysqlType::LongText => DataType::LargeUtf8,
+            MysqlType::TinyBlob => DataType::Binary,
         }
     }
 }
