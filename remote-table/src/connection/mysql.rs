@@ -5,12 +5,8 @@ use crate::{
     RemoteType, Transform,
 };
 use async_stream::stream;
-use datafusion::arrow::array::{
-    make_builder, ArrayRef, BinaryBuilder, Float32Builder, Float64Builder, Int16Builder,
-    Int32Builder, Int64Builder, Int8Builder, LargeBinaryBuilder, LargeStringBuilder, RecordBatch,
-    StringBuilder,
-};
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::array::{make_builder, ArrayRef, BinaryBuilder, Date32Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, TimestampMicrosecondBuilder};
+use datafusion::arrow::datatypes::{Date32Type, SchemaRef};
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -208,6 +204,8 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
         ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
+        ColumnType::MYSQL_TYPE_DATE => Ok(RemoteType::Mysql(MysqlType::Date)),
+        ColumnType::MYSQL_TYPE_DATETIME => Ok(RemoteType::Mysql(MysqlType::Datetime)),
         ColumnType::MYSQL_TYPE_STRING if empty_flags => Ok(RemoteType::Mysql(MysqlType::Char)),
         ColumnType::MYSQL_TYPE_STRING if is_binary => Ok(RemoteType::Mysql(MysqlType::Binary)),
         ColumnType::MYSQL_TYPE_VAR_STRING if empty_flags => {
@@ -266,11 +264,9 @@ macro_rules! handle_primitive_type {
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
-            .expect(concat!(
-                "Failed to downcast builder to ",
-                stringify!($builder_ty),
-                " for ",
-                stringify!($mysql_col)
+            .expect(&format!(
+                concat!("Failed to downcast builder to ", stringify!($builder_ty), " for {:?}"),
+                $mysql_col
             ));
         let v = $row.get::<Option<$value_ty>, usize>($index);
 
@@ -302,42 +298,70 @@ fn rows_to_batch(
             let builder = &mut array_builders[idx];
             match remote_field.remote_type {
                 RemoteType::Mysql(MysqlType::TinyInt) => {
-                    handle_primitive_type!(builder, col, Int8Builder, i8, row, idx);
+                    handle_primitive_type!(builder, remote_field, Int8Builder, i8, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::SmallInt) => {
-                    handle_primitive_type!(builder, col, Int16Builder, i16, row, idx);
+                    handle_primitive_type!(builder, remote_field, Int16Builder, i16, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::MediumInt) | RemoteType::Mysql(MysqlType::Integer) => {
-                    handle_primitive_type!(builder, col, Int32Builder, i32, row, idx);
+                    handle_primitive_type!(builder, remote_field, Int32Builder, i32, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::BigInt) => {
-                    handle_primitive_type!(builder, col, Int64Builder, i64, row, idx);
+                    handle_primitive_type!(builder, remote_field, Int64Builder, i64, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::Float) => {
-                    handle_primitive_type!(builder, col, Float32Builder, f32, row, idx);
+                    handle_primitive_type!(builder, remote_field, Float32Builder, f32, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::Double) => {
-                    handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
+                    handle_primitive_type!(builder, remote_field, Float64Builder, f64, row, idx);
+                }
+                RemoteType::Mysql(MysqlType::Date) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Date32Builder>()
+                        .expect(&format!("Failed to downcast builder to Date32Builder for {:?}", remote_field));
+                    let v = row.get::<Option<chrono::NaiveDate>, usize>(idx);
+
+                    match v {
+                        Some(Some(v)) => builder.append_value(Date32Type::from_naive_date(v)),
+                        _ => builder.append_null(),
+                    }
+                }
+                RemoteType::Mysql(MysqlType::Datetime) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<TimestampMicrosecondBuilder>()
+                        .expect(&format!("Failed to downcast builder to TimestampMicrosecondBuilder for {:?}", remote_field));
+                    let v = row.get::<Option<time::PrimitiveDateTime>, usize>(idx);
+
+                    match v {
+                        Some(Some(v)) => {
+                            let timestamp_micros =
+                                (v.assume_utc().unix_timestamp_nanos() / 1_000) as i64;
+                            builder.append_value(timestamp_micros)
+                        },
+                        _ => builder.append_null(),
+                    }
                 }
                 RemoteType::Mysql(MysqlType::Char)
                 | RemoteType::Mysql(MysqlType::Varchar)
                 | RemoteType::Mysql(MysqlType::TinyText)
                 | RemoteType::Mysql(MysqlType::Text)
                 | RemoteType::Mysql(MysqlType::MediumText) => {
-                    handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
+                    handle_primitive_type!(builder, remote_field, StringBuilder, String, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::LongText) | RemoteType::Mysql(MysqlType::Json) => {
-                    handle_primitive_type!(builder, col, LargeStringBuilder, String, row, idx);
+                    handle_primitive_type!(builder, remote_field, LargeStringBuilder, String, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::Binary)
                 | RemoteType::Mysql(MysqlType::Varbinary)
                 | RemoteType::Mysql(MysqlType::TinyBlob)
                 | RemoteType::Mysql(MysqlType::Blob)
                 | RemoteType::Mysql(MysqlType::MediumBlob) => {
-                    handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
+                    handle_primitive_type!(builder, remote_field, BinaryBuilder, Vec<u8>, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::LongBlob) | RemoteType::Mysql(MysqlType::Geometry) => {
-                    handle_primitive_type!(builder, col, LargeBinaryBuilder, Vec<u8>, row, idx);
+                    handle_primitive_type!(builder, remote_field, LargeBinaryBuilder, Vec<u8>, row, idx);
                 }
                 _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
             }

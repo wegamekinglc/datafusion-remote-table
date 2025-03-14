@@ -1339,6 +1339,7 @@ dependencies = [
  "oracle",
  "prost",
  "rusqlite",
+ "time",
  "tokio",
  "tokio-rusqlite",
 ]
@@ -3406,6 +3407,7 @@ dependencies = [
  "deranged",
  "num-conv",
  "powerfmt",
+ "serde",
  "time-core",
  "time-macros",
 ]
