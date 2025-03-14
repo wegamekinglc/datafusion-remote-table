@@ -22,9 +22,10 @@ CREATE TABLE supported_data_types
     blob_col BLOB,
     mediumblob_col MEDIUMBLOB,
     longblob_col LONGBLOB,
-    json_col JSON
+    json_col JSON,
+    geometry_col GEOMETRY
 );
 
 INSERT INTO supported_data_types values
-(1, 2, 3, 4, 5, 1.1, 2.2, 'char', 'varchar', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 5, 1.1, 2.2, 'char', 'varchar', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}', Point(15, 20)),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);

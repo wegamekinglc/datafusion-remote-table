@@ -242,6 +242,7 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
             Ok(RemoteType::Mysql(MysqlType::LongBlob))
         }
         ColumnType::MYSQL_TYPE_JSON => Ok(RemoteType::Mysql(MysqlType::Json)),
+        ColumnType::MYSQL_TYPE_GEOMETRY => Ok(RemoteType::Mysql(MysqlType::Geometry)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
         ))),
@@ -335,7 +336,7 @@ fn rows_to_batch(
                 | RemoteType::Mysql(MysqlType::MediumBlob) => {
                     handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::LongBlob) => {
+                RemoteType::Mysql(MysqlType::LongBlob) | RemoteType::Mysql(MysqlType::Geometry) => {
                     handle_primitive_type!(builder, col, LargeBinaryBuilder, Vec<u8>, row, idx);
                 }
                 _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
