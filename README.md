@@ -36,9 +36,25 @@ pub async fn main() {
 
 ## Supported databases
 - [x] Postgres
+  - [x] Int2 / Int4 / Int8
+  - [x] Float4 / Float8
+  - [x] Char / Varchar / Text / Bpchar / Bytea
+  - [x] Date / Time / Timestamp / Timestamptz
+  - [x] Int2Array / Int4Array / Int8Array
+  - [x] Float4Array / Float8Array
+  - [x] VarcharArray / TextArray / ByteaArray
 - [x] MySQL
+  - [x] TinyInt / Smallint / MediumInt / Int / Bigint
+  - [x] Float / Double
+  - [x] Date / DateTime / Time / Timestamp
+  - [x] Char / Varchar / Binary / Varbinary
+  - [x] TinyText / Text / MediumText / LongText
+  - [x] TinyBlob / Blob / MediumBlob / LongBlob
+  - [x] Json / Geometry
 - [x] Oracle
+  - [x] Varchar2
 - [x] SQLite
+  - [x] Null / Integer / Real / Text / Blob
 
 ## Thanks
 - [datafusion-table-providers](https://crates.io/crates/datafusion-table-providers)
