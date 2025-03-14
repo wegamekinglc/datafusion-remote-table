@@ -93,6 +93,7 @@ impl PostgresType {
     }
 }
 
+// https://dev.mysql.com/doc/refman/8.4/en/data-types.html
 #[derive(Debug, Clone)]
 pub enum MysqlType {
     TinyInt,
@@ -110,6 +111,7 @@ pub enum MysqlType {
     TinyBlob,
     Blob,
     MediumBlob,
+    LongBlob,
 }
 
 impl MysqlType {
@@ -130,6 +132,7 @@ impl MysqlType {
             MysqlType::TinyBlob => DataType::Binary,
             MysqlType::Blob => DataType::Binary,
             MysqlType::MediumBlob => DataType::Binary,
+            MysqlType::LongBlob => DataType::LargeBinary,
         }
     }
 }
