@@ -12,8 +12,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::memory::MemoryStream;
-use rusqlite::types::Type;
-use rusqlite::{Row, Rows};
+use rusqlite::{Column, Row, Rows};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -53,23 +52,21 @@ impl Connection for SqliteConnection {
         self.conn
             .call(move |conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                let col_names = stmt
-                    .column_names()
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>();
-                let mut rows = stmt.query([])?;
-                let Some(first_row) = rows.next()? else {
-                    return Err(tokio_rusqlite::Error::Other(Box::new(
-                        DataFusionError::Execution("No data returned from sqlite".to_string()),
-                    )));
-                };
+                let columns: Vec<OwnedColumn> =
+                    stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
 
-                let remote_schema = build_remote_schema(first_row, col_names.as_slice());
+                let remote_schema = build_remote_schema(columns.as_slice())
+                    .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?;
                 let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
 
                 if let Some(transform) = transform {
-                    let batch = row_to_batch(first_row, arrow_schema)
+                    let mut rows = stmt.query([])?;
+                    let Some(first_row) = rows.next()? else {
+                        return Err(tokio_rusqlite::Error::Other(Box::new(
+                            DataFusionError::Execution("No data returned from sqlite".to_string()),
+                        )));
+                    };
+                    let batch = row_to_batch(first_row, &remote_schema, arrow_schema)
                         .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                     let transformed_batch =
                         transform_batch(batch, transform.as_ref(), &remote_schema)
@@ -93,11 +90,8 @@ impl Connection for SqliteConnection {
             .conn
             .call(move |conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                let col_names = stmt
-                    .column_names()
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>();
+                let columns: Vec<OwnedColumn> =
+                    stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
                 let mut rows = stmt.query([])?;
 
                 let Some(first_row) = rows.next()? else {
@@ -106,17 +100,23 @@ impl Connection for SqliteConnection {
                     )));
                 };
 
-                let remote_schema = build_remote_schema(first_row, col_names.as_slice());
+                let remote_schema = build_remote_schema(columns.as_slice())
+                    .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?;
                 let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
 
-                let first_batch = row_to_batch(first_row, arrow_schema.clone())
+                let first_batch = row_to_batch(first_row, &remote_schema, arrow_schema.clone())
                     .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
-                let batch = rows_to_batch(rows, arrow_schema, projection_clone.as_ref())
-                    .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
+                let batch = rows_to_batch(
+                    rows,
+                    &remote_schema,
+                    arrow_schema,
+                    projection_clone.as_ref(),
+                )
+                .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                 Ok((first_batch, batch, remote_schema))
             })
             .await
-            .unwrap();
+            .map_err(|e| DataFusionError::Execution(format!("Failed to exec query: {e:?}")))?;
         let schema = first_batch.schema();
         Ok((
             Box::pin(MemoryStream::try_new(
@@ -129,37 +129,54 @@ impl Connection for SqliteConnection {
     }
 }
 
-fn sqlite_type_to_remote_type(sqlite_type: Type) -> RemoteType {
-    match sqlite_type {
-        Type::Null => RemoteType::Sqlite(SqliteType::Null),
-        Type::Integer => RemoteType::Sqlite(SqliteType::Integer),
-        Type::Real => RemoteType::Sqlite(SqliteType::Real),
-        Type::Text => RemoteType::Sqlite(SqliteType::Text),
-        Type::Blob => RemoteType::Sqlite(SqliteType::Blob),
+#[derive(Debug)]
+struct OwnedColumn {
+    name: String,
+    decl_type: Option<String>,
+}
+
+fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
+    OwnedColumn {
+        name: sqlite_col.name().to_string(),
+        decl_type: sqlite_col.decl_type().map(|x| x.to_string()),
     }
 }
 
-fn build_remote_schema(row: &Row, col_names: &[String]) -> RemoteSchema {
-    let mut remote_fields = Vec::with_capacity(col_names.len());
-    for (i, col_name) in col_names.iter().enumerate() {
-        let remote_type = sqlite_type_to_remote_type(
-            row.get_ref(i)
-                .expect("Failed to get sqlite value ref")
-                .data_type(),
-        );
-        remote_fields.push(RemoteField::new(col_name, remote_type, false));
+fn sqlite_type_to_remote_type(sqlite_col: &OwnedColumn) -> DFResult<RemoteType> {
+    match sqlite_col.decl_type.as_deref() {
+        None => Ok(RemoteType::Sqlite(SqliteType::Null)),
+        Some(t) if t.eq_ignore_ascii_case("integer") => Ok(RemoteType::Sqlite(SqliteType::Integer)),
+        Some(t) if t.eq_ignore_ascii_case("real") => Ok(RemoteType::Sqlite(SqliteType::Real)),
+        Some(t) if t.eq_ignore_ascii_case("text") => Ok(RemoteType::Sqlite(SqliteType::Text)),
+        Some(t) if t.eq_ignore_ascii_case("blob") => Ok(RemoteType::Sqlite(SqliteType::Blob)),
+        _ => Err(DataFusionError::NotImplemented(format!(
+            "Unsupported sqlite type: {:?}",
+            sqlite_col.decl_type
+        ))),
     }
-    RemoteSchema::new(remote_fields)
 }
 
-fn row_to_batch(row: &Row, arrow_schema: SchemaRef) -> DFResult<RecordBatch> {
+fn build_remote_schema(columns: &[OwnedColumn]) -> DFResult<RemoteSchema> {
+    let mut remote_fields = Vec::with_capacity(columns.len());
+    for col in columns.iter() {
+        let remote_type = sqlite_type_to_remote_type(col)?;
+        remote_fields.push(RemoteField::new(&col.name, remote_type, true));
+    }
+    Ok(RemoteSchema::new(remote_fields))
+}
+
+fn row_to_batch(
+    row: &Row,
+    remote_schema: &RemoteSchema,
+    arrow_schema: SchemaRef,
+) -> DFResult<RecordBatch> {
     let mut array_builders = vec![];
     for field in arrow_schema.fields() {
         let builder = make_builder(field.data_type(), 1000);
         array_builders.push(builder);
     }
 
-    append_rows_to_array_builders(row, array_builders.as_mut_slice());
+    append_rows_to_array_builders(row, remote_schema, array_builders.as_mut_slice());
 
     let columns = array_builders
         .into_iter()
@@ -170,6 +187,7 @@ fn row_to_batch(row: &Row, arrow_schema: SchemaRef) -> DFResult<RecordBatch> {
 
 fn rows_to_batch(
     mut rows: Rows,
+    remote_schema: &RemoteSchema,
     arrow_schema: SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
@@ -183,7 +201,7 @@ fn rows_to_batch(
     while let Some(row) = rows.next().map_err(|e| {
         DataFusionError::Execution(format!("Failed to get next row from sqlite: {e:?}"))
     })? {
-        append_rows_to_array_builders(row, array_builders.as_mut_slice());
+        append_rows_to_array_builders(row, remote_schema, array_builders.as_mut_slice());
     }
 
     let projected_columns = array_builders
@@ -220,32 +238,34 @@ macro_rules! handle_primitive_type {
     }};
 }
 
-fn append_rows_to_array_builders(row: &Row, array_builders: &mut [Box<dyn ArrayBuilder>]) {
+fn append_rows_to_array_builders(
+    row: &Row,
+    remote_schema: &RemoteSchema,
+    array_builders: &mut [Box<dyn ArrayBuilder>],
+) {
     for (i, builder) in array_builders.iter_mut().enumerate() {
-        let sqlite_type = row
-            .get_ref(i)
-            .expect("Failed to get sqlite value ref")
-            .data_type();
-        match sqlite_type {
-            Type::Null => {
+        let remote_type = &remote_schema.fields[i].remote_type;
+        match remote_type {
+            RemoteType::Sqlite(SqliteType::Null) => {
                 let builder = builder
                     .as_any_mut()
                     .downcast_mut::<NullBuilder>()
                     .expect("Failed to downcast builder to NullBuilder");
                 builder.append_null();
             }
-            Type::Integer => {
+            RemoteType::Sqlite(SqliteType::Integer) => {
                 handle_primitive_type!(builder, Type::Integer, Int64Builder, i64, row, i);
             }
-            Type::Real => {
+            RemoteType::Sqlite(SqliteType::Real) => {
                 handle_primitive_type!(builder, Type::Real, Float64Builder, f64, row, i);
             }
-            Type::Text => {
+            RemoteType::Sqlite(SqliteType::Text) => {
                 handle_primitive_type!(builder, Type::Text, StringBuilder, String, row, i);
             }
-            Type::Blob => {
+            RemoteType::Sqlite(SqliteType::Blob) => {
                 handle_primitive_type!(builder, Type::Blob, BinaryBuilder, Vec<u8>, row, i);
             }
+            _ => panic!("Invalid sqlite type: {:?}", remote_type),
         }
     }
 }

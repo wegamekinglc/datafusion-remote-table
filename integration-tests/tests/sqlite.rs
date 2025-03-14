@@ -29,6 +29,8 @@ pub async fn supported_sqlite_types() {
         .await
         .unwrap();
 
+    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+
     assert_eq!(
         pretty_format_batches(result.as_slice())
             .unwrap()
@@ -37,6 +39,7 @@ pub async fn supported_sqlite_types() {
 | null_col | int_col | real_col | text_col | blob_col |
 +----------+---------+----------+----------+----------+
 |          | 1       | 1.1      | text     | 010203   |
+|          |         |          |          |          |
 +----------+---------+----------+----------+----------+"
     );
 }

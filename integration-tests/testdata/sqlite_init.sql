@@ -6,4 +6,6 @@ CREATE TABLE supported_data_types (
     blob_col BLOB
 );
 
-INSERT INTO supported_data_types VALUES (NULL, 1, 1.1, 'text', X'010203');
+INSERT INTO supported_data_types VALUES
+(NULL, 1, 1.1, 'text', X'010203'),
+(NULL, NULL, NULL, NULL, NULL);
