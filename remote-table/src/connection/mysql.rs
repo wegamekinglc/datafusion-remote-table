@@ -209,8 +209,12 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
         ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
         ColumnType::MYSQL_TYPE_STRING if empty_flags => Ok(RemoteType::Mysql(MysqlType::Char)),
+        ColumnType::MYSQL_TYPE_STRING if is_binary => Ok(RemoteType::Mysql(MysqlType::Binary)),
         ColumnType::MYSQL_TYPE_VAR_STRING if empty_flags => {
             Ok(RemoteType::Mysql(MysqlType::Varchar))
+        }
+        ColumnType::MYSQL_TYPE_VAR_STRING if is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::Varbinary))
         }
         ColumnType::MYSQL_TYPE_VARCHAR => Ok(RemoteType::Mysql(MysqlType::Varchar)),
         ColumnType::MYSQL_TYPE_BLOB if col_length == 1020 && is_blob && !is_binary => {
@@ -323,7 +327,9 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::LongText) => {
                     handle_primitive_type!(builder, col, LargeStringBuilder, String, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::TinyBlob)
+                RemoteType::Mysql(MysqlType::Binary)
+                | RemoteType::Mysql(MysqlType::Varbinary)
+                | RemoteType::Mysql(MysqlType::TinyBlob)
                 | RemoteType::Mysql(MysqlType::Blob)
                 | RemoteType::Mysql(MysqlType::MediumBlob) => {
                     handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
