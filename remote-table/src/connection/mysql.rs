@@ -271,14 +271,16 @@ macro_rules! handle_primitive_type {
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
-            .expect(&format!(
-                concat!(
-                    "Failed to downcast builder to ",
-                    stringify!($builder_ty),
-                    " for {:?}"
-                ),
-                $mysql_col
-            ));
+            .unwrap_or_else(|| {
+                panic!(
+                    concat!(
+                        "Failed to downcast builder to ",
+                        stringify!($builder_ty),
+                        " for {:?}"
+                    ),
+                    $mysql_col
+                )
+            });
         let v = $row.get::<Option<$value_ty>, usize>($index);
 
         match v {
@@ -327,14 +329,15 @@ fn rows_to_batch(
                     handle_primitive_type!(builder, remote_field, Float64Builder, f64, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::Date) => {
-                    let builder =
-                        builder
-                            .as_any_mut()
-                            .downcast_mut::<Date32Builder>()
-                            .expect(&format!(
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Date32Builder>()
+                        .unwrap_or_else(|| {
+                            panic!(
                                 "Failed to downcast builder to Date32Builder for {:?}",
                                 remote_field
-                            ));
+                            )
+                        });
                     let v = row.get::<Option<chrono::NaiveDate>, usize>(idx);
 
                     match v {
@@ -347,10 +350,12 @@ fn rows_to_batch(
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampMicrosecondBuilder>()
-                        .expect(&format!(
+                        .unwrap_or_else(|| {
+                            panic!(
                             "Failed to downcast builder to TimestampMicrosecondBuilder for {:?}",
                             remote_field
-                        ));
+                        )
+                        });
                     let v = row.get::<Option<time::PrimitiveDateTime>, usize>(idx);
 
                     match v {
@@ -366,10 +371,12 @@ fn rows_to_batch(
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Time64NanosecondBuilder>()
-                        .expect(&format!(
-                            "Failed to downcast builder to Time64NanosecondBuilder for {:?}",
-                            remote_field
-                        ));
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Failed to downcast builder to Time64NanosecondBuilder for {:?}",
+                                remote_field
+                            )
+                        });
                     let v = row.get::<Option<chrono::NaiveTime>, usize>(idx);
 
                     match v {
