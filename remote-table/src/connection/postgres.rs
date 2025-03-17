@@ -602,6 +602,10 @@ fn rows_to_batch(
                                     .try_into()
                                     .expect("Failed to convert SystemTime to i64");
                                 builder.append_value(timestamp);
+                            } else {
+                                return Err(DataFusionError::Execution(format!(
+                                    "Failed to convert SystemTime {v:?} to i64 for {field:?}"
+                                )));
                             }
                         }
                         None => builder.append_null(),

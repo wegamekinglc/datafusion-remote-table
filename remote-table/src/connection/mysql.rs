@@ -336,7 +336,7 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::Double) => {
                     handle_primitive_type!(builder, remote_field, Float64Builder, f64, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Decimal(precision, _scale)) => {
+                RemoteType::Mysql(MysqlType::Decimal(precision, scale)) => {
                     if precision > 38 {
                         let builder = builder
                             .as_any_mut()
@@ -367,7 +367,7 @@ fn rows_to_batch(
 
                         match v {
                             Some(Some(v)) => {
-                                let Some(v) = big_decimal_to_i128(&v, None) else {
+                                let Some(v) = big_decimal_to_i128(&v, Some(scale as u32)) else {
                                     return Err(DataFusionError::Execution(format!(
                                         "Failed to convert BigDecimal {v:?} to i128"
                                     )));
