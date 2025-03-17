@@ -8,13 +8,15 @@ use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
 use bigdecimal::{BigDecimal, ToPrimitive};
+use byteorder::{BigEndian, ReadBytesExt};
 use chrono::Timelike;
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder,
     Decimal128Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
-    ListBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder, TimestampNanosecondBuilder,
+    IntervalMonthDayNanoBuilder, ListBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder,
+    TimestampNanosecondBuilder,
 };
-use datafusion::arrow::datatypes::{Date32Type, SchemaRef};
+use datafusion::arrow::datatypes::{Date32Type, IntervalMonthDayNanoType, SchemaRef};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -256,6 +258,7 @@ fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<Rem
         &Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
         &Type::TIMESTAMPTZ => Ok(RemoteType::Postgres(PostgresType::TimestampTz)),
         &Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
+        &Type::INTERVAL => Ok(RemoteType::Postgres(PostgresType::Interval)),
         &Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
         &Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
         &Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
@@ -464,6 +467,34 @@ impl<'a> FromSql<'a> for BigDecimalFromSql {
     }
 }
 
+// interval_send - Postgres C (https://github.com/postgres/postgres/blob/master/src/backend/utils/adt/timestamp.c#L1032)
+// interval values are internally stored as three integral fields: months, days, and microseconds
+#[derive(Debug)]
+struct IntervalFromSql {
+    time: i64,
+    day: i32,
+    month: i32,
+}
+
+impl<'a> FromSql<'a> for IntervalFromSql {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let mut cursor = std::io::Cursor::new(raw);
+
+        let time = cursor.read_i64::<BigEndian>()?;
+        let day = cursor.read_i32::<BigEndian>()?;
+        let month = cursor.read_i32::<BigEndian>()?;
+
+        Ok(IntervalFromSql { time, day, month })
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(*ty, Type::INTERVAL)
+    }
+}
+
 pub struct GeometryFromSql<'a> {
     wkb: &'a [u8],
 }
@@ -633,6 +664,28 @@ fn rows_to_batch(
 
                     match v {
                         Some(v) => builder.append_value(Date32Type::from_naive_date(v)),
+                        None => builder.append_null(),
+                    }
+                }
+                RemoteType::Postgres(PostgresType::Interval) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<IntervalMonthDayNanoBuilder>()
+                        .expect("Failed to downcast builder to IntervalMonthDayNanoBuilder for Type::INTERVAL");
+
+                    let v: Option<IntervalFromSql> = row
+                        .try_get(idx)
+                        .expect("Failed to get IntervalFromSql value for column Type::INTERVAL");
+
+                    match v {
+                        Some(v) => {
+                            let interval_month_day_nano = IntervalMonthDayNanoType::make_value(
+                                v.month,
+                                v.day,
+                                v.time * 1_000,
+                            );
+                            builder.append_value(interval_month_day_nano);
+                        }
                         None => builder.append_null(),
                     }
                 }

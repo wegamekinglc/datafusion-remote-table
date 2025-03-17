@@ -1,4 +1,4 @@
-use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, Schema, TimeUnit};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -46,6 +46,7 @@ pub enum PostgresType {
     Timestamp,
     TimestampTz,
     Time,
+    Interval,
     Bool,
     Int2Array,
     Int4Array,
@@ -77,6 +78,7 @@ impl PostgresType {
                 DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into()))
             }
             PostgresType::Time => DataType::Time64(TimeUnit::Nanosecond),
+            PostgresType::Interval => DataType::Interval(IntervalUnit::MonthDayNano),
             PostgresType::Bool => DataType::Boolean,
             PostgresType::Int2Array => {
                 DataType::List(Arc::new(Field::new("", DataType::Int16, true)))

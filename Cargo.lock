@@ -1331,6 +1331,7 @@ dependencies = [
  "bb8-oracle",
  "bb8-postgres",
  "bigdecimal",
+ "byteorder",
  "chrono",
  "datafusion",
  "datafusion-proto",
