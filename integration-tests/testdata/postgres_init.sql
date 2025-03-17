@@ -2,11 +2,12 @@ CREATE TABLE supported_data_types (
     smallint_col SMALLINT,
     integer_col INTEGER,
     bigint_col BIGINT,
-    serial_col SERIAL,
-    bigserial_col BIGSERIAL,
+    real_col REAL,
+    double_col DOUBLE PRECISION,
 
     char_col CHAR(10),
     varchar_col VARCHAR(255),
+    bpchar_col BPCHAR,
     text_col TEXT,
 
     bytea_col BYTEA,
@@ -18,13 +19,19 @@ CREATE TABLE supported_data_types (
 
     boolean_col BOOLEAN,
 
+    smallint_array_col SMALLINT[],
     integer_array_col INTEGER[],
+    bigint_array_col BIGINT[],
+    real_array_col REAL[],
+    double_array_col DOUBLE PRECISION[],
+
+
     text_array_col TEXT[]
 );
 
 INSERT INTO supported_data_types VALUES
-(1, 2, 3, 4, 5, 'char', 'varchar', 'text', E'\\xDEADBEEF', '2023-10-01', '12:34:56', '2023-10-01 12:34:56', '2023-10-01 12:34:56+00', TRUE, ARRAY[1, 2], ARRAY['text0', 'text1']),
-(NULL, NULL, NULL, 4, 5, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 1.1, 2.2, 'char', 'varchar', 'bpchar', 'text', E'\\xDEADBEEF', '2023-10-01', '12:34:56', '2023-10-01 12:34:56', '2023-10-01 12:34:56+00', TRUE, ARRAY[1, 2], ARRAY[3, 4], ARRAY[5, 6], ARRAY[1.1, 2.2], ARRAY[3.3, 4.4], ARRAY['text0', 'text1']),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id SERIAL PRIMARY KEY,

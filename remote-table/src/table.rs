@@ -1,4 +1,4 @@
-use crate::{connect, ConnectionOptions, DFResult, Pool, RemoteTableExec, Transform};
+use crate::{connect, ConnectionOptions, DFResult, Pool, RemoteSchema, RemoteTableExec, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::project_schema;
@@ -12,6 +12,7 @@ use std::sync::Arc;
 pub struct RemoteTable {
     pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
+    pub(crate) remote_schema: RemoteSchema,
     pub(crate) schema: SchemaRef,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     pub(crate) pool: Arc<dyn Pool>,
@@ -26,14 +27,19 @@ impl RemoteTable {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
         let conn = pool.get().await?;
-        let (_remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.clone()).await?;
+        let (remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.clone()).await?;
         Ok(RemoteTable {
             conn_options,
             sql,
+            remote_schema,
             schema: arrow_schema,
             transform,
             pool,
         })
+    }
+
+    pub fn remote_schema(&self) -> &RemoteSchema {
+        &self.remote_schema
     }
 }
 

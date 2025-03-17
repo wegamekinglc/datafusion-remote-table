@@ -135,7 +135,12 @@ impl Connection for PostgresConnection {
         let remote_schema = build_remote_schema(first_row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
-            let batch = rows_to_batch(std::slice::from_ref(first_row), arrow_schema, None)?;
+            let batch = rows_to_batch(
+                std::slice::from_ref(first_row),
+                &remote_schema,
+                arrow_schema,
+                None,
+            )?;
             let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
@@ -183,6 +188,7 @@ impl Connection for PostgresConnection {
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         let first_chunk = rows_to_batch(
             first_chunk.as_slice(),
+            &remote_schema,
             arrow_schema.clone(),
             projection.as_ref(),
         )?;
@@ -197,7 +203,12 @@ impl Connection for PostgresConnection {
                         "Failed to collect rows from postgres due to {e}",
                     ))
                 })?;
-            let batch = rows_to_batch(rows.as_slice(), arrow_schema.clone(), projection.as_ref())?;
+            let batch = rows_to_batch(
+                rows.as_slice(),
+                &remote_schema,
+                arrow_schema.clone(),
+                projection.as_ref(),
+            )?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
@@ -217,13 +228,12 @@ impl Connection for PostgresConnection {
 
 fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
     match pg_type {
-        &Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
-        &Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
         &Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),
         &Type::INT4 => Ok(RemoteType::Postgres(PostgresType::Int4)),
         &Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
         &Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
         &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
+        &Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
         &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
@@ -232,6 +242,7 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
         &Type::TIMESTAMPTZ => Ok(RemoteType::Postgres(PostgresType::TimestampTz)),
         &Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
+        &Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
         &Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
         &Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
         &Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
@@ -342,6 +353,7 @@ impl<'a> FromSql<'a> for GeometryFromSql<'a> {
 
 fn rows_to_batch(
     rows: &[Row],
+    remote_schema: &RemoteSchema,
     arrow_schema: SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
@@ -352,40 +364,37 @@ fn rows_to_batch(
         array_builders.push(builder);
     }
     for row in rows {
-        for (idx, col) in row.columns().iter().enumerate() {
+        for (idx, field) in remote_schema.fields.iter().enumerate() {
             if !projections_contains(projection, idx) {
                 continue;
             }
             let builder = &mut array_builders[idx];
-            match col.type_() {
-                &Type::BOOL => {
-                    handle_primitive_type!(builder, Type::BOOL, BooleanBuilder, bool, row, idx);
-                }
-                &Type::CHAR => {
-                    handle_primitive_type!(builder, Type::CHAR, Int8Builder, i8, row, idx);
-                }
-                &Type::INT2 => {
+            match field.remote_type {
+                RemoteType::Postgres(PostgresType::Int2) => {
                     handle_primitive_type!(builder, Type::INT2, Int16Builder, i16, row, idx);
                 }
-                &Type::INT4 => {
+                RemoteType::Postgres(PostgresType::Int4) => {
                     handle_primitive_type!(builder, Type::INT4, Int32Builder, i32, row, idx);
                 }
-                &Type::INT8 => {
+                RemoteType::Postgres(PostgresType::Int8) => {
                     handle_primitive_type!(builder, Type::INT8, Int64Builder, i64, row, idx);
                 }
-                &Type::FLOAT4 => {
+                RemoteType::Postgres(PostgresType::Float4) => {
                     handle_primitive_type!(builder, Type::FLOAT4, Float32Builder, f32, row, idx);
                 }
-                &Type::FLOAT8 => {
+                RemoteType::Postgres(PostgresType::Float8) => {
                     handle_primitive_type!(builder, Type::FLOAT8, Float64Builder, f64, row, idx);
                 }
-                &Type::TEXT => {
+                RemoteType::Postgres(PostgresType::Char) => {
+                    handle_primitive_type!(builder, Type::CHAR, Int8Builder, i8, row, idx);
+                }
+                RemoteType::Postgres(PostgresType::Text) => {
                     handle_primitive_type!(builder, Type::TEXT, StringBuilder, &str, row, idx);
                 }
-                &Type::VARCHAR => {
+                RemoteType::Postgres(PostgresType::Varchar) => {
                     handle_primitive_type!(builder, Type::VARCHAR, StringBuilder, &str, row, idx);
                 }
-                &Type::BPCHAR => {
+                RemoteType::Postgres(PostgresType::Bpchar) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<StringBuilder>()
@@ -399,10 +408,10 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                &Type::BYTEA => {
+                RemoteType::Postgres(PostgresType::Bytea) => {
                     handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, Vec<u8>, row, idx);
                 }
-                &Type::TIMESTAMP => {
+                RemoteType::Postgres(PostgresType::Timestamp) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
@@ -424,7 +433,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                &Type::TIMESTAMPTZ => {
+                RemoteType::Postgres(PostgresType::TimestampTz) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
@@ -441,7 +450,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                &Type::TIME => {
+                RemoteType::Postgres(PostgresType::Time) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Time64NanosecondBuilder>()
@@ -462,7 +471,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                &Type::DATE => {
+                RemoteType::Postgres(PostgresType::Date) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Date32Builder>()
@@ -476,7 +485,10 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                &Type::INT2_ARRAY => {
+                RemoteType::Postgres(PostgresType::Bool) => {
+                    handle_primitive_type!(builder, Type::BOOL, BooleanBuilder, bool, row, idx);
+                }
+                RemoteType::Postgres(PostgresType::Int2Array) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::INT2_ARRAY,
@@ -486,7 +498,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::INT4_ARRAY => {
+                RemoteType::Postgres(PostgresType::Int4Array) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::INT4_ARRAY,
@@ -496,7 +508,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::INT8_ARRAY => {
+                RemoteType::Postgres(PostgresType::Int8Array) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::INT8_ARRAY,
@@ -506,7 +518,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::FLOAT4_ARRAY => {
+                RemoteType::Postgres(PostgresType::Float4Array) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::FLOAT4_ARRAY,
@@ -516,7 +528,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::FLOAT8_ARRAY => {
+                RemoteType::Postgres(PostgresType::Float8Array) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::FLOAT8_ARRAY,
@@ -526,7 +538,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::TEXT_ARRAY => {
+                RemoteType::Postgres(PostgresType::TextArray) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::TEXT_ARRAY,
@@ -536,7 +548,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::VARCHAR_ARRAY => {
+                RemoteType::Postgres(PostgresType::VarcharArray) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::VARCHAR_ARRAY,
@@ -546,7 +558,7 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                &Type::BYTEA_ARRAY => {
+                RemoteType::Postgres(PostgresType::ByteaArray) => {
                     handle_primitive_array_type!(
                         builder,
                         Type::BYTEA_ARRAY,
@@ -556,7 +568,8 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                other if other.name().eq_ignore_ascii_case("geometry") => {
+
+                RemoteType::Postgres(PostgresType::PostGisGeometry) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<BinaryBuilder>()
@@ -572,7 +585,7 @@ fn rows_to_batch(
                 }
                 _ => {
                     return Err(DataFusionError::Execution(format!(
-                        "Unsupported postgres type {col:?}",
+                        "Unsupported postgres type {field:?}",
                     )));
                 }
             }

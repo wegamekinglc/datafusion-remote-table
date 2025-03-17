@@ -23,13 +23,18 @@ impl RemoteType {
 /// https://www.postgresql.org/docs/current/datatype.html
 #[derive(Debug, Clone)]
 pub enum PostgresType {
+    // smallint
+    Int2,
+    // integer
+    Int4,
+    // bigint
+    Int8,
+    // real
+    Float4,
+    // double precision
+    Float8,
     Bool,
     Char,
-    Int2,
-    Int4,
-    Int8,
-    Float4,
-    Float8,
     Text,
     Varchar,
     Bpchar,
@@ -52,13 +57,12 @@ pub enum PostgresType {
 impl PostgresType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
-            PostgresType::Bool => DataType::Boolean,
-            PostgresType::Char => DataType::Utf8,
             PostgresType::Int2 => DataType::Int16,
             PostgresType::Int4 => DataType::Int32,
             PostgresType::Int8 => DataType::Int64,
             PostgresType::Float4 => DataType::Float32,
             PostgresType::Float8 => DataType::Float64,
+            PostgresType::Char => DataType::Utf8,
             PostgresType::Text | PostgresType::Varchar | PostgresType::Bpchar => DataType::Utf8,
             PostgresType::Bytea => DataType::Binary,
             PostgresType::Date => DataType::Date32,
@@ -67,6 +71,7 @@ impl PostgresType {
                 DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into()))
             }
             PostgresType::Time => DataType::Time64(TimeUnit::Nanosecond),
+            PostgresType::Bool => DataType::Boolean,
             PostgresType::Int2Array => {
                 DataType::List(Arc::new(Field::new("", DataType::Int16, true)))
             }

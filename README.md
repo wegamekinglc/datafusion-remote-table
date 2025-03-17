@@ -40,6 +40,7 @@ pub async fn main() {
   - [x] Float4 / Float8
   - [x] Char / Varchar / Text / Bpchar / Bytea
   - [x] Date / Time / Timestamp / Timestamptz
+  - [x] Bool
   - [x] Int2Array / Int4Array / Int8Array
   - [x] Float4Array / Float8Array
   - [x] VarcharArray / TextArray / ByteaArray
