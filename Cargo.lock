@@ -1337,6 +1337,7 @@ dependencies = [
  "derive-with",
  "futures",
  "mysql_async",
+ "num-bigint",
  "oracle",
  "prost",
  "rusqlite",

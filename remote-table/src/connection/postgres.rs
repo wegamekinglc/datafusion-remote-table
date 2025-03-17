@@ -7,10 +7,11 @@ use crate::{
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
+use bigdecimal::{BigDecimal, ToPrimitive};
 use chrono::Timelike;
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder,
-    Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
+    Decimal128Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
     ListBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder, TimestampNanosecondBuilder,
 };
 use datafusion::arrow::datatypes::{Date32Type, SchemaRef};
@@ -19,6 +20,7 @@ use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use futures::StreamExt;
+use num_bigint::{BigInt, Sign};
 use std::string::ToString;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -226,13 +228,26 @@ impl Connection for PostgresConnection {
     }
 }
 
-fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
+fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<RemoteType> {
     match pg_type {
         &Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),
         &Type::INT4 => Ok(RemoteType::Postgres(PostgresType::Int4)),
         &Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
         &Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
         &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
+        &Type::NUMERIC => {
+            let v: Option<BigDecimalFromSql> = row.try_get(idx).map_err(|e| {
+                DataFusionError::Execution(format!("Failed to get BigDecimal value: {e:?}"))
+            })?;
+            let scale = match v {
+                Some(v) => v.scale,
+                None => 0,
+            };
+            assert!((scale as u32) <= (i8::MAX as u32));
+            Ok(RemoteType::Postgres(PostgresType::Numeric(
+                scale.try_into().unwrap_or_default(),
+            )))
+        }
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
         &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
@@ -263,10 +278,10 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
 
 fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
     let mut remote_fields = vec![];
-    for col in row.columns() {
+    for (idx, col) in row.columns().iter().enumerate() {
         remote_fields.push(RemoteField::new(
             col.name(),
-            pg_type_to_remote_type(col.type_())?,
+            pg_type_to_remote_type(col.type_(), row, idx)?,
             true,
         ));
     }
@@ -353,6 +368,102 @@ macro_rules! handle_primitive_array_type {
     }};
 }
 
+#[derive(Debug)]
+struct BigDecimalFromSql {
+    inner: BigDecimal,
+    scale: u16,
+}
+
+impl BigDecimalFromSql {
+    #[allow(dead_code)]
+    fn to_decimal_128_with_scale(&self, dest_scale: u16) -> Option<i128> {
+        // Resolve scale difference by upscaling / downscaling to the scale of arrow Decimal128 type
+        if dest_scale != self.scale {
+            return (&self.inner * 10i128.pow(u32::from(dest_scale))).to_i128();
+        }
+
+        (&self.inner * 10i128.pow(u32::from(self.scale))).to_i128()
+    }
+
+    fn to_decimal_128(&self) -> Option<i128> {
+        (&self.inner * 10i128.pow(u32::from(self.scale))).to_i128()
+    }
+}
+
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::cast_possible_wrap)]
+#[allow(clippy::cast_possible_truncation)]
+impl<'a> FromSql<'a> for BigDecimalFromSql {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let raw_u16: Vec<u16> = raw
+            .chunks(2)
+            .map(|chunk| {
+                if chunk.len() == 2 {
+                    u16::from_be_bytes([chunk[0], chunk[1]])
+                } else {
+                    u16::from_be_bytes([chunk[0], 0])
+                }
+            })
+            .collect();
+
+        let base_10_000_digit_count = raw_u16[0];
+        let weight = raw_u16[1] as i16;
+        let sign = raw_u16[2];
+        let scale = raw_u16[3];
+
+        let mut base_10_000_digits = Vec::new();
+        for i in 4..4 + base_10_000_digit_count {
+            base_10_000_digits.push(raw_u16[i as usize]);
+        }
+
+        let mut u8_digits = Vec::new();
+        for &base_10_000_digit in base_10_000_digits.iter().rev() {
+            let mut base_10_000_digit = base_10_000_digit;
+            let mut temp_result = Vec::new();
+            while base_10_000_digit > 0 {
+                temp_result.push((base_10_000_digit % 10) as u8);
+                base_10_000_digit /= 10;
+            }
+            while temp_result.len() < 4 {
+                temp_result.push(0);
+            }
+            u8_digits.extend(temp_result);
+        }
+        u8_digits.reverse();
+
+        let value_scale = 4 * (i64::from(base_10_000_digit_count) - i64::from(weight) - 1);
+        let size = i64::try_from(u8_digits.len())? + i64::from(scale) - value_scale;
+        u8_digits.resize(size as usize, 0);
+
+        let sign = match sign {
+            0x4000 => Sign::Minus,
+            0x0000 => Sign::Plus,
+            _ => {
+                return Err(Box::new(DataFusionError::Execution(
+                    "Failed to parse big decimal from postgres numeric value".to_string(),
+                )));
+            }
+        };
+
+        let Some(digits) = BigInt::from_radix_be(sign, u8_digits.as_slice(), 10) else {
+            return Err(Box::new(DataFusionError::Execution(
+                "Failed to parse big decimal from postgres numeric value".to_string(),
+            )));
+        };
+        Ok(BigDecimalFromSql {
+            inner: BigDecimal::new(digits, i64::from(scale)),
+            scale,
+        })
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        matches!(*ty, Type::NUMERIC)
+    }
+}
+
 pub struct GeometryFromSql<'a> {
     wkb: &'a [u8],
 }
@@ -403,6 +514,30 @@ fn rows_to_batch(
                 }
                 RemoteType::Postgres(PostgresType::Float8) => {
                     handle_primitive_type!(builder, field, Float64Builder, f64, row, idx);
+                }
+                RemoteType::Postgres(PostgresType::Numeric(_scale)) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Decimal128Builder>()
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to Decimal128Builder for {field:?}")
+                        });
+                    let v: Option<BigDecimalFromSql> = row.try_get(idx).map_err(|e| {
+                        DataFusionError::Execution(format!("Failed to get BigDecimal value: {e:?}"))
+                    })?;
+
+                    match v {
+                        Some(v) => {
+                            let Some(v) = v.to_decimal_128() else {
+                                return Err(DataFusionError::Execution(format!(
+                                    "Failed to convert BigDecimal {:?} to i128",
+                                    v
+                                )));
+                            };
+                            builder.append_value(v)
+                        }
+                        None => builder.append_null(),
+                    }
                 }
                 RemoteType::Postgres(PostgresType::Varchar)
                 | RemoteType::Postgres(PostgresType::Text) => {

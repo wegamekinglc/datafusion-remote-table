@@ -37,7 +37,7 @@ pub async fn main() {
 ## Supported databases
 - [x] Postgres
   - [x] Int2 / Int4 / Int8
-  - [x] Float4 / Float8
+  - [x] Float4 / Float8 / Numeric
   - [x] Char / Varchar / Text / Bpchar / Bytea
   - [x] Date / Time / Timestamp / Timestamptz
   - [x] Bool / Geometry(PostGIS)

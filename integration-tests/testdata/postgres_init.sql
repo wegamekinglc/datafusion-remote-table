@@ -4,6 +4,7 @@ CREATE TABLE supported_data_types (
     bigint_col BIGINT,
     real_col REAL,
     double_col DOUBLE PRECISION,
+    numeric_col NUMERIC(10, 2),
 
     char_col CHAR(10),
     varchar_col VARCHAR(255),
@@ -34,8 +35,8 @@ CREATE TABLE supported_data_types (
 );
 
 INSERT INTO supported_data_types VALUES
-(1, 2, 3, 1.1, 2.2, 'char', 'varchar', 'bpchar', 'text', E'\\xDEADBEEF', '2023-10-01', '12:34:56', '2023-10-01 12:34:56', '2023-10-01 12:34:56+00', TRUE, ARRAY[1, 2], ARRAY[3, 4], ARRAY[5, 6], ARRAY[1.1, 2.2], ARRAY[3.3, 4.4], ARRAY['char0', 'char1'], ARRAY['varchar0', 'varchar1'], ARRAY['bpchar0', 'bpchar1'], ARRAY['text0', 'text1'], ARRAY[true, false]),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 1.1, 2.2, 3.3, 'char', 'varchar', 'bpchar', 'text', E'\\xDEADBEEF', '2023-10-01', '12:34:56', '2023-10-01 12:34:56', '2023-10-01 12:34:56+00', TRUE, ARRAY[1, 2], ARRAY[3, 4], ARRAY[5, 6], ARRAY[1.1, 2.2], ARRAY[3.3, 4.4], ARRAY['char0', 'char1'], ARRAY['varchar0', 'varchar1'], ARRAY['bpchar0', 'bpchar1'], ARRAY['text0', 'text1'], ARRAY[true, false]),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id SERIAL PRIMARY KEY,
