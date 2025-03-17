@@ -213,6 +213,7 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_DATETIME => Ok(RemoteType::Mysql(MysqlType::Datetime)),
         ColumnType::MYSQL_TYPE_TIME => Ok(RemoteType::Mysql(MysqlType::Time)),
         ColumnType::MYSQL_TYPE_TIMESTAMP => Ok(RemoteType::Mysql(MysqlType::Timestamp)),
+        ColumnType::MYSQL_TYPE_YEAR => Ok(RemoteType::Mysql(MysqlType::Year)),
         ColumnType::MYSQL_TYPE_STRING if empty_flags => Ok(RemoteType::Mysql(MysqlType::Char)),
         ColumnType::MYSQL_TYPE_STRING if is_binary => Ok(RemoteType::Mysql(MysqlType::Binary)),
         ColumnType::MYSQL_TYPE_VAR_STRING if empty_flags => {
@@ -313,7 +314,7 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::TinyInt) => {
                     handle_primitive_type!(builder, remote_field, Int8Builder, i8, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::SmallInt) => {
+                RemoteType::Mysql(MysqlType::SmallInt) | RemoteType::Mysql(MysqlType::Year) => {
                     handle_primitive_type!(builder, remote_field, Int16Builder, i16, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::MediumInt) | RemoteType::Mysql(MysqlType::Integer) => {
