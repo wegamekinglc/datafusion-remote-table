@@ -171,6 +171,7 @@ impl Connection for OracleConnection {
 fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> {
     match oracle_type {
         ColumnType::Varchar2(size) => Ok(RemoteType::Oracle(OracleType::Varchar2(*size))),
+        ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -184,6 +185,41 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
         remote_fields.push(RemoteField::new(col.name(), remote_type, col.nullable()));
     }
     Ok(RemoteSchema::new(remote_fields))
+}
+
+macro_rules! handle_primitive_type {
+    ($builder:expr, $field:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_ty>()
+            .unwrap_or_else(|| {
+                panic!(
+                    concat!(
+                        "Failed to downcast builder to ",
+                        stringify!($builder_ty),
+                        " for {:?}"
+                    ),
+                    $field
+                )
+            });
+        let v = $row
+            .get::<usize, Option<$value_ty>>($index)
+            .unwrap_or_else(|e| {
+                panic!(
+                    concat!(
+                        "Failed to get ",
+                        stringify!($value_ty),
+                        " value for {:?}: {:?}"
+                    ),
+                    $field, e
+                )
+            });
+
+        match v {
+            Some(v) => builder.append_value(v),
+            None => builder.append_null(),
+        }
+    }};
 }
 
 fn rows_to_batch(
@@ -202,17 +238,8 @@ fn rows_to_batch(
         for (i, col) in row.column_info().iter().enumerate() {
             let builder = &mut array_builders[i];
             match col.oracle_type() {
-                ColumnType::Varchar2(_size) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
-                        .unwrap();
-                    let v = row.get::<usize, Option<String>>(i).unwrap();
-
-                    match v {
-                        Some(v) => builder.append_value(v),
-                        None => builder.append_null(),
-                    }
+                ColumnType::Varchar2(_size) | ColumnType::Char(_size) => {
+                    handle_primitive_type!(builder, col, StringBuilder, String, row, i);
                 }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(

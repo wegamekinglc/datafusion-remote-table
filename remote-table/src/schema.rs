@@ -189,12 +189,14 @@ impl MysqlType {
 #[derive(Debug, Clone)]
 pub enum OracleType {
     Varchar2(u32),
+    Char(u32),
 }
 
 impl OracleType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
             OracleType::Varchar2(_) => DataType::Utf8,
+            OracleType::Char(_) => DataType::Utf8,
         }
     }
 }

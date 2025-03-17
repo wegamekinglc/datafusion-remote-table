@@ -22,6 +22,7 @@ pub async fn supported_oracle_types() {
     )
     .await
     .unwrap();
+    println!("remote schema: {:#?}", table.remote_schema());
 
     let ctx = SessionContext::new();
     ctx.register_table("remote_table", Arc::new(table)).unwrap();
@@ -39,11 +40,11 @@ pub async fn supported_oracle_types() {
         pretty_format_batches(result.as_slice())
             .unwrap()
             .to_string(),
-        "+--------------+
-| VARCHAR2_COL |
-+--------------+
-| varchar2     |
-|              |
-+--------------+"
+        r#"+--------------+------------+
+| VARCHAR2_COL | CHAR_COL   |
++--------------+------------+
+| varchar2     | char       |
+|              |            |
++--------------+------------+"#,
     );
 }

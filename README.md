@@ -53,7 +53,7 @@ pub async fn main() {
   - [x] TinyBlob / Blob / MediumBlob / LongBlob
   - [x] Json / Geometry
 - [x] Oracle
-  - [x] Varchar2
+  - [x] Varchar2 / Char
 - [x] SQLite
   - [x] Null / Integer / Real / Text / Blob
 
