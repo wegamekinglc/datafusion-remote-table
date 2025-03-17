@@ -5,7 +5,10 @@ use crate::{
     RemoteType, Transform,
 };
 use bb8_oracle::OracleConnectionManager;
-use datafusion::arrow::array::{make_builder, ArrayRef, RecordBatch, StringBuilder};
+use bigdecimal::ToPrimitive;
+use datafusion::arrow::array::{
+    make_builder, ArrayRef, Decimal128Builder, RecordBatch, StringBuilder,
+};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
@@ -172,6 +175,9 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
     match oracle_type {
         ColumnType::Varchar2(size) => Ok(RemoteType::Oracle(OracleType::Varchar2(*size))),
         ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
+        ColumnType::Number(precision, scale) => {
+            Ok(RemoteType::Oracle(OracleType::Number(*precision, *scale)))
+        }
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -241,6 +247,35 @@ fn rows_to_batch(
                 ColumnType::Varchar2(_size) | ColumnType::Char(_size) => {
                     handle_primitive_type!(builder, col, StringBuilder, String, row, i);
                 }
+                ColumnType::Number(_precision, scale) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Decimal128Builder>()
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Failed to downcast builder to Decimal128Builder for {:?}",
+                                col
+                            )
+                        });
+
+                    let v = row.get::<usize, Option<String>>(i).unwrap_or_else(|e| {
+                        panic!("Failed to get BigDecimal value for {:?}: {:?}", col, e)
+                    });
+
+                    match v {
+                        Some(v) => {
+                            let decimal = v.parse::<bigdecimal::BigDecimal>().unwrap();
+                            let Some(v) = to_decimal_128(&decimal, *scale) else {
+                                return Err(DataFusionError::Execution(format!(
+                                    "Failed to convert BigDecimal to i128 for {:?}",
+                                    decimal
+                                )));
+                            };
+                            builder.append_value(v);
+                        }
+                        None => builder.append_null(),
+                    }
+                }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
                         "Unsupported oracle type: {col:?}",
@@ -257,4 +292,9 @@ fn rows_to_batch(
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
     Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+}
+
+// TODO common method
+fn to_decimal_128(decimal: &bigdecimal::BigDecimal, scale: i8) -> Option<i128> {
+    (decimal * 10i128.pow(scale as u32)).to_i128()
 }

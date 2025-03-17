@@ -190,6 +190,7 @@ impl MysqlType {
 pub enum OracleType {
     Varchar2(u32),
     Char(u32),
+    Number(u8, i8),
 }
 
 impl OracleType {
@@ -197,6 +198,7 @@ impl OracleType {
         match self {
             OracleType::Varchar2(_) => DataType::Utf8,
             OracleType::Char(_) => DataType::Utf8,
+            OracleType::Number(precision, scale) => DataType::Decimal128(*precision, *scale),
         }
     }
 }

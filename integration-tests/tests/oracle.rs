@@ -34,17 +34,17 @@ pub async fn supported_oracle_types() {
         .collect()
         .await
         .unwrap();
-
     println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+
     assert_eq!(
         pretty_format_batches(result.as_slice())
             .unwrap()
             .to_string(),
-        r#"+--------------+------------+
-| VARCHAR2_COL | CHAR_COL   |
-+--------------+------------+
-| varchar2     | char       |
-|              |            |
-+--------------+------------+"#,
+        r#"+--------------+------------+------------+
+| VARCHAR2_COL | CHAR_COL   | NUMBER_COL |
++--------------+------------+------------+
+| varchar2     | char       | 1.10       |
+|              |            |            |
++--------------+------------+------------+"#,
     );
 }
