@@ -45,7 +45,7 @@ pub async fn main() {
   - [x] VarcharArray / TextArray / ByteaArray
 - [x] MySQL
   - [x] TinyInt / Smallint / MediumInt / Int / Bigint
-  - [x] Float / Double
+  - [x] Float / Double / Decimal
   - [x] Date / DateTime / Time / Timestamp / Year
   - [x] Char / Varchar / Binary / Varbinary
   - [x] TinyText / Text / MediumText / LongText

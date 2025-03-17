@@ -5,13 +5,15 @@ use crate::{
     RemoteType, Transform,
 };
 use async_stream::stream;
+use bigdecimal::{num_bigint, ToPrimitive};
 use chrono::Timelike;
 use datafusion::arrow::array::{
-    make_builder, ArrayRef, BinaryBuilder, Date32Builder, Float32Builder, Float64Builder,
-    Int16Builder, Int32Builder, Int64Builder, Int8Builder, LargeBinaryBuilder, LargeStringBuilder,
-    RecordBatch, StringBuilder, Time64NanosecondBuilder, TimestampMicrosecondBuilder,
+    make_builder, ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder,
+    Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
+    LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder,
+    TimestampMicrosecondBuilder,
 };
-use datafusion::arrow::datatypes::{Date32Type, SchemaRef};
+use datafusion::arrow::datatypes::{i256, Date32Type, SchemaRef};
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -209,6 +211,11 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
         ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
+        ColumnType::MYSQL_TYPE_NEWDECIMAL => {
+            let precision = (mysql_col.column_length() - 2) as u8;
+            let scale = mysql_col.decimals();
+            Ok(RemoteType::Mysql(MysqlType::Decimal(precision, scale)))
+        }
         ColumnType::MYSQL_TYPE_DATE => Ok(RemoteType::Mysql(MysqlType::Date)),
         ColumnType::MYSQL_TYPE_DATETIME => Ok(RemoteType::Mysql(MysqlType::Datetime)),
         ColumnType::MYSQL_TYPE_TIME => Ok(RemoteType::Mysql(MysqlType::Time)),
@@ -329,6 +336,49 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::Double) => {
                     handle_primitive_type!(builder, remote_field, Float64Builder, f64, row, idx);
                 }
+                RemoteType::Mysql(MysqlType::Decimal(precision, _scale)) => {
+                    if precision > 38 {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<Decimal256Builder>()
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "Failed to downcast builder to Decimal256Builder for {:?}",
+                                    remote_field
+                                )
+                            });
+                        let v = row.get::<Option<bigdecimal::BigDecimal>, usize>(idx);
+
+                        match v {
+                            Some(Some(v)) => builder.append_value(to_decimal_256(&v)),
+                            _ => builder.append_null(),
+                        }
+                    } else {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<Decimal128Builder>()
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "Failed to downcast builder to Decimal128Builder for {:?}",
+                                    remote_field
+                                )
+                            });
+                        let v = row.get::<Option<bigdecimal::BigDecimal>, usize>(idx);
+
+                        match v {
+                            Some(Some(v)) => {
+                                let Some(v) = to_decimal_128(&v) else {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "Failed to convert BigDecimal {:?} to i128",
+                                        v
+                                    )));
+                                };
+                                builder.append_value(v)
+                            }
+                            _ => builder.append_null(),
+                        }
+                    }
+                }
                 RemoteType::Mysql(MysqlType::Date) => {
                     let builder = builder
                         .as_any_mut()
@@ -435,4 +485,34 @@ fn rows_to_batch(
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
     Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+}
+
+fn to_decimal_128(decimal: &bigdecimal::BigDecimal) -> Option<i128> {
+    (decimal
+        * 10i128.pow(
+            decimal
+                .fractional_digit_count()
+                .try_into()
+                .unwrap_or_default(),
+        ))
+    .to_i128()
+}
+
+fn to_decimal_256(decimal: &bigdecimal::BigDecimal) -> i256 {
+    let (bigint_value, _) = decimal.as_bigint_and_exponent();
+    let mut bigint_bytes = bigint_value.to_signed_bytes_le();
+
+    let is_negative = bigint_value.sign() == num_bigint::Sign::Minus;
+    let fill_byte = if is_negative { 0xFF } else { 0x00 };
+
+    if bigint_bytes.len() > 32 {
+        bigint_bytes.truncate(32);
+    } else {
+        bigint_bytes.resize(32, fill_byte);
+    };
+
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bigint_bytes);
+
+    i256::from_le_bytes(array)
 }

@@ -103,6 +103,7 @@ pub enum MysqlType {
     BigInt,
     Float,
     Double,
+    Decimal(u8, u8),
     Date,
     Datetime,
     Time,
@@ -134,6 +135,14 @@ impl MysqlType {
             MysqlType::BigInt => DataType::Int64,
             MysqlType::Float => DataType::Float32,
             MysqlType::Double => DataType::Float64,
+            MysqlType::Decimal(precision, scale) => {
+                assert!(*scale <= (i8::MAX as u8));
+                if *precision > 38 {
+                    DataType::Decimal256(*precision, *scale as i8)
+                } else {
+                    DataType::Decimal128(*precision, *scale as i8)
+                }
+            }
             MysqlType::Date => DataType::Date32,
             MysqlType::Datetime => DataType::Timestamp(TimeUnit::Microsecond, None),
             MysqlType::Time => DataType::Time64(TimeUnit::Nanosecond),
