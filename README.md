@@ -43,7 +43,7 @@ pub async fn main() {
   - [x] Bool
   - [x] Int2Array / Int4Array / Int8Array
   - [x] Float4Array / Float8Array
-  - [x] VarcharArray / TextArray / ByteaArray
+  - [x] CharArray / VarcharArray / BpcharArray / TextArray / ByteaArray
 - [x] MySQL
   - [x] TinyInt / Smallint / MediumInt / Int / Bigint
   - [x] Float / Double / Decimal

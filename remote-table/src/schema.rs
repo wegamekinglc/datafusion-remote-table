@@ -53,6 +53,7 @@ pub enum PostgresType {
     BpcharArray,
     TextArray,
     ByteaArray,
+    BoolArray,
     PostGisGeometry,
 }
 
@@ -99,6 +100,9 @@ impl PostgresType {
             }
             PostgresType::ByteaArray => {
                 DataType::List(Arc::new(Field::new("", DataType::Binary, true)))
+            }
+            PostgresType::BoolArray => {
+                DataType::List(Arc::new(Field::new("", DataType::Boolean, true)))
             }
             PostgresType::PostGisGeometry => DataType::Binary,
         }

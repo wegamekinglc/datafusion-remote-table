@@ -233,10 +233,11 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
         &Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
         &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
+        // TODO fix this
         &Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
-        &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
+        &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
         &Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
         &Type::DATE => Ok(RemoteType::Postgres(PostgresType::Date)),
         &Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
@@ -253,6 +254,7 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::BPCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::BpcharArray)),
         &Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
         &Type::BYTEA_ARRAY => Ok(RemoteType::Postgres(PostgresType::ByteaArray)),
+        &Type::BOOL_ARRAY => Ok(RemoteType::Postgres(PostgresType::BoolArray)),
         other if other.name().eq_ignore_ascii_case("geometry") => {
             Ok(RemoteType::Postgres(PostgresType::PostGisGeometry))
         }
@@ -275,22 +277,30 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
 }
 
 macro_rules! handle_primitive_type {
-    ($builder:expr, $pg_type:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+    ($builder:expr, $field:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
-            .expect(concat!(
-                "Failed to downcast builder to ",
-                stringify!($builder_ty),
-                " for ",
-                stringify!($pg_type)
-            ));
-        let v: Option<$value_ty> = $row.try_get($index).expect(concat!(
-            "Failed to get ",
-            stringify!($value_ty),
-            " value for column ",
-            stringify!($pg_type)
-        ));
+            .unwrap_or_else(|| {
+                panic!(
+                    concat!(
+                        "Failed to downcast builder to ",
+                        stringify!($builder_ty),
+                        " for {:?}"
+                    ),
+                    $field
+                )
+            });
+        let v: Option<$value_ty> = $row.try_get($index).unwrap_or_else(|e| {
+            panic!(
+                concat!(
+                    "Failed to get ",
+                    stringify!($value_ty),
+                    " value for {:?}: {:?}"
+                ),
+                $field, e
+            )
+        });
 
         match v {
             Some(v) => builder.append_value(v),
@@ -300,30 +310,40 @@ macro_rules! handle_primitive_type {
 }
 
 macro_rules! handle_primitive_array_type {
-    ($builder:expr, $pg_type:expr, $values_builder_ty:ty, $primitive_value_ty:ty, $row:expr, $index:expr) => {{
+    ($builder:expr, $field:expr, $values_builder_ty:ty, $primitive_value_ty:ty, $row:expr, $index:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
-            .expect(concat!(
-                "Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for ",
-                stringify!($pg_type)
-            ));
+            .unwrap_or_else(|| {
+                panic!(
+                    "Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for {:?}",
+                    $field
+                )
+            });
         let values_builder = builder
             .values()
             .as_any_mut()
             .downcast_mut::<$values_builder_ty>()
-            .expect(concat!(
-                "Failed to downcast values builder to ",
-                stringify!($values_builder_ty),
-                " for ",
-                stringify!($pg_type)
-            ));
-        let v: Option<Vec<$primitive_value_ty>> = $row.try_get($index).expect(concat!(
-            "Failed to get ",
-            stringify!($primitive_value_ty),
-            " array value for column ",
-            stringify!($pg_type)
-        ));
+            .unwrap_or_else(|| {
+                panic!(
+                    concat!(
+                        "Failed to downcast values builder to ",
+                        stringify!($builder_ty),
+                        " for {:?}"
+                    ),
+                    $field
+                )
+            });
+        let v: Option<Vec<$primitive_value_ty>> = $row.try_get($index).unwrap_or_else(|e| {
+            panic!(
+                concat!(
+                    "Failed to get ",
+                    stringify!($value_ty),
+                    " array value for {:?}: {:?}"
+                ),
+                $field, e
+            )
+        });
 
         match v {
             Some(v) => {
@@ -373,37 +393,37 @@ fn rows_to_batch(
             let builder = &mut array_builders[idx];
             match field.remote_type {
                 RemoteType::Postgres(PostgresType::Int2) => {
-                    handle_primitive_type!(builder, Type::INT2, Int16Builder, i16, row, idx);
+                    handle_primitive_type!(builder, field, Int16Builder, i16, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Int4) => {
-                    handle_primitive_type!(builder, Type::INT4, Int32Builder, i32, row, idx);
+                    handle_primitive_type!(builder, field, Int32Builder, i32, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Int8) => {
-                    handle_primitive_type!(builder, Type::INT8, Int64Builder, i64, row, idx);
+                    handle_primitive_type!(builder, field, Int64Builder, i64, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Float4) => {
-                    handle_primitive_type!(builder, Type::FLOAT4, Float32Builder, f32, row, idx);
+                    handle_primitive_type!(builder, field, Float32Builder, f32, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Float8) => {
-                    handle_primitive_type!(builder, Type::FLOAT8, Float64Builder, f64, row, idx);
+                    handle_primitive_type!(builder, field, Float64Builder, f64, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Char) => {
-                    handle_primitive_type!(builder, Type::CHAR, Int8Builder, i8, row, idx);
+                    handle_primitive_type!(builder, field, Int8Builder, i8, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Text) => {
-                    handle_primitive_type!(builder, Type::TEXT, StringBuilder, &str, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::Varchar) => {
-                    handle_primitive_type!(builder, Type::VARCHAR, StringBuilder, &str, row, idx);
+                RemoteType::Postgres(PostgresType::Varchar)
+                | RemoteType::Postgres(PostgresType::Text) => {
+                    handle_primitive_type!(builder, field, StringBuilder, &str, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Bpchar) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<StringBuilder>()
-                        .expect("Failed to downcast builder to StringBuilder for Type::BPCHAR");
-                    let v: Option<&str> = row
-                        .try_get(idx)
-                        .expect("Failed to get &str value for column Type::BPCHAR");
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to StringBuilder for {field:?}")
+                        });
+                    let v: Option<&str> = row.try_get(idx).unwrap_or_else(|e| {
+                        panic!("Failed to get &str value for {field:?}: {e:?}")
+                    });
 
                     match v {
                         Some(v) => builder.append_value(v.trim_end()),
@@ -411,16 +431,16 @@ fn rows_to_batch(
                     }
                 }
                 RemoteType::Postgres(PostgresType::Bytea) => {
-                    handle_primitive_type!(builder, Type::BYTEA, BinaryBuilder, Vec<u8>, row, idx);
+                    handle_primitive_type!(builder, field, BinaryBuilder, Vec<u8>, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Timestamp) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
-                        .expect("Failed to downcast builder to TimestampNanosecondBuilder for Type::TIMESTAMP");
-                    let v: Option<SystemTime> = row
-                        .try_get(idx)
-                        .expect("Failed to get SystemTime value for column Type::TIMESTAMP");
+                        .unwrap_or_else(|| panic!("Failed to downcast builder to TimestampNanosecondBuilder for {field:?}"));
+                    let v: Option<SystemTime> = row.try_get(idx).unwrap_or_else(|e| {
+                        panic!("Failed to get SystemTime value for {field:?}: {e:?}")
+                    });
 
                     match v {
                         Some(v) => {
@@ -439,10 +459,10 @@ fn rows_to_batch(
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
-                        .expect("Failed to downcast builder to TimestampNanosecondBuilder for Type::TIMESTAMP");
-                    let v: Option<chrono::DateTime<chrono::Utc>> = row.try_get(idx).expect(
-                        "Failed to get chrono::DateTime<chrono::Utc> value for column Type::TIMESTAMPTZ",
-                    );
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to TimestampTz for {field:?}")
+                        });
+                    let v: Option<chrono::DateTime<chrono::Utc>> = row.try_get(idx).unwrap_or_else(|e| panic!("Failed to get chrono::DateTime<chrono::Utc> value for {field:?}: {e:?}"));
 
                     match v {
                         Some(v) => {
@@ -488,107 +508,37 @@ fn rows_to_batch(
                     }
                 }
                 RemoteType::Postgres(PostgresType::Bool) => {
-                    handle_primitive_type!(builder, Type::BOOL, BooleanBuilder, bool, row, idx);
+                    handle_primitive_type!(builder, field, BooleanBuilder, bool, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Int2Array) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::INT2_ARRAY,
-                        Int16Builder,
-                        i16,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, Int16Builder, i16, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Int4Array) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::INT4_ARRAY,
-                        Int32Builder,
-                        i32,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, Int32Builder, i32, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Int8Array) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::INT8_ARRAY,
-                        Int64Builder,
-                        i64,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, Int64Builder, i64, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Float4Array) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::FLOAT4_ARRAY,
-                        Float32Builder,
-                        f32,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, Float32Builder, f32, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::Float8Array) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::FLOAT8_ARRAY,
-                        Float64Builder,
-                        f64,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, Float64Builder, f64, row, idx);
                 }
+                // TODO fix bug
                 RemoteType::Postgres(PostgresType::CharArray) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::CHAR_ARRAY,
-                        StringBuilder,
-                        &str,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, StringBuilder, &str, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::VarcharArray) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::VARCHAR_ARRAY,
-                        StringBuilder,
-                        &str,
-                        row,
-                        idx
-                    );
-                }
-                RemoteType::Postgres(PostgresType::BpcharArray) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::BPCHAR_ARRAY,
-                        StringBuilder,
-                        &str,
-                        row,
-                        idx
-                    );
-                }
-                RemoteType::Postgres(PostgresType::TextArray) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::TEXT_ARRAY,
-                        StringBuilder,
-                        &str,
-                        row,
-                        idx
-                    );
+                RemoteType::Postgres(PostgresType::VarcharArray)
+                | RemoteType::Postgres(PostgresType::BpcharArray)
+                | RemoteType::Postgres(PostgresType::TextArray) => {
+                    handle_primitive_array_type!(builder, field, StringBuilder, &str, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::ByteaArray) => {
-                    handle_primitive_array_type!(
-                        builder,
-                        Type::BYTEA_ARRAY,
-                        BinaryBuilder,
-                        Vec<u8>,
-                        row,
-                        idx
-                    );
+                    handle_primitive_array_type!(builder, field, BinaryBuilder, Vec<u8>, row, idx);
+                }
+                RemoteType::Postgres(PostgresType::BoolArray) => {
+                    handle_primitive_array_type!(builder, field, BooleanBuilder, bool, row, idx);
                 }
 
                 RemoteType::Postgres(PostgresType::PostGisGeometry) => {
