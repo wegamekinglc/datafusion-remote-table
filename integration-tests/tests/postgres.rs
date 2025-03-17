@@ -20,6 +20,8 @@ pub async fn supported_postgres_types() {
         .await
         .unwrap();
 
+    println!("remote schema: {:#?}", table.remote_schema());
+
     let ctx = SessionContext::new();
     ctx.register_table("remote_table", Arc::new(table)).unwrap();
 

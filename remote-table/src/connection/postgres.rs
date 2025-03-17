@@ -233,8 +233,6 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
         &Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
         &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
-        // TODO fix this
-        &Type::CHAR => Ok(RemoteType::Postgres(PostgresType::Char)),
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
         &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
@@ -249,7 +247,6 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
         &Type::FLOAT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float4Array)),
         &Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
-        &Type::CHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::CharArray)),
         &Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
         &Type::BPCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::BpcharArray)),
         &Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
@@ -407,9 +404,6 @@ fn rows_to_batch(
                 RemoteType::Postgres(PostgresType::Float8) => {
                     handle_primitive_type!(builder, field, Float64Builder, f64, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Char) => {
-                    handle_primitive_type!(builder, field, Int8Builder, i8, row, idx);
-                }
                 RemoteType::Postgres(PostgresType::Varchar)
                 | RemoteType::Postgres(PostgresType::Text) => {
                     handle_primitive_type!(builder, field, StringBuilder, &str, row, idx);
@@ -524,10 +518,6 @@ fn rows_to_batch(
                 }
                 RemoteType::Postgres(PostgresType::Float8Array) => {
                     handle_primitive_array_type!(builder, field, Float64Builder, f64, row, idx);
-                }
-                // TODO fix bug
-                RemoteType::Postgres(PostgresType::CharArray) => {
-                    handle_primitive_array_type!(builder, field, StringBuilder, &str, row, idx);
                 }
                 RemoteType::Postgres(PostgresType::VarcharArray)
                 | RemoteType::Postgres(PostgresType::BpcharArray)
