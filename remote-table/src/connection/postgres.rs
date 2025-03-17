@@ -1,4 +1,4 @@
-use crate::connection::projections_contains;
+use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
     project_remote_schema, Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema,
@@ -7,7 +7,7 @@ use crate::{
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
 use bb8_postgres::PostgresConnectionManager;
-use bigdecimal::{BigDecimal, ToPrimitive};
+use bigdecimal::BigDecimal;
 use byteorder::{BigEndian, ReadBytesExt};
 use chrono::Timelike;
 use datafusion::arrow::array::{
@@ -380,18 +380,8 @@ struct BigDecimalFromSql {
 }
 
 impl BigDecimalFromSql {
-    #[allow(dead_code)]
-    fn to_decimal_128_with_scale(&self, dest_scale: u16) -> Option<i128> {
-        // Resolve scale difference by upscaling / downscaling to the scale of arrow Decimal128 type
-        if dest_scale != self.scale {
-            return (&self.inner * 10i128.pow(u32::from(dest_scale))).to_i128();
-        }
-
-        (&self.inner * 10i128.pow(u32::from(self.scale))).to_i128()
-    }
-
     fn to_decimal_128(&self) -> Option<i128> {
-        (&self.inner * 10i128.pow(u32::from(self.scale))).to_i128()
+        big_decimal_to_i128(&self.inner, Some(self.scale as u32))
     }
 }
 

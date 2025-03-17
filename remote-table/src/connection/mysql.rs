@@ -1,11 +1,11 @@
-use crate::connection::projections_contains;
+use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
     project_remote_schema, Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema,
     RemoteType, Transform,
 };
 use async_stream::stream;
-use bigdecimal::{num_bigint, ToPrimitive};
+use bigdecimal::num_bigint;
 use chrono::Timelike;
 use datafusion::arrow::array::{
     make_builder, ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder,
@@ -367,10 +367,9 @@ fn rows_to_batch(
 
                         match v {
                             Some(Some(v)) => {
-                                let Some(v) = to_decimal_128(&v) else {
+                                let Some(v) = big_decimal_to_i128(&v, None) else {
                                     return Err(DataFusionError::Execution(format!(
-                                        "Failed to convert BigDecimal {:?} to i128",
-                                        v
+                                        "Failed to convert BigDecimal {v:?} to i128"
                                     )));
                                 };
                                 builder.append_value(v)
@@ -485,17 +484,6 @@ fn rows_to_batch(
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
     Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
-}
-
-fn to_decimal_128(decimal: &bigdecimal::BigDecimal) -> Option<i128> {
-    (decimal
-        * 10i128.pow(
-            decimal
-                .fractional_digit_count()
-                .try_into()
-                .unwrap_or_default(),
-        ))
-    .to_i128()
 }
 
 fn to_decimal_256(decimal: &bigdecimal::BigDecimal) -> i256 {
