@@ -13,8 +13,8 @@ use chrono::Timelike;
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder,
     Decimal128Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
-    IntervalMonthDayNanoBuilder, ListBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder,
-    TimestampNanosecondBuilder,
+    IntervalMonthDayNanoBuilder, LargeStringBuilder, ListBuilder, RecordBatch, StringBuilder,
+    Time64NanosecondBuilder, TimestampNanosecondBuilder,
 };
 use datafusion::arrow::datatypes::{Date32Type, IntervalMonthDayNanoType, SchemaRef};
 use datafusion::common::project_schema;
@@ -260,6 +260,8 @@ fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<Rem
         &Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
         &Type::INTERVAL => Ok(RemoteType::Postgres(PostgresType::Interval)),
         &Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
+        &Type::JSON => Ok(RemoteType::Postgres(PostgresType::Json)),
+        &Type::JSONB => Ok(RemoteType::Postgres(PostgresType::Jsonb)),
         &Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
         &Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
         &Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
@@ -691,6 +693,26 @@ fn rows_to_batch(
                 }
                 RemoteType::Postgres(PostgresType::Bool) => {
                     handle_primitive_type!(builder, field, BooleanBuilder, bool, row, idx);
+                }
+                RemoteType::Postgres(PostgresType::Json)
+                | RemoteType::Postgres(PostgresType::Jsonb) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<LargeStringBuilder>()
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to LargeStringBuilder for {field:?}")
+                        });
+                    let v: Option<serde_json::value::Value> =
+                        row.try_get(idx).unwrap_or_else(|e| {
+                            panic!(
+                                "Failed to get serde_json::value::Value value for {field:?}: {e:?}"
+                            )
+                        });
+
+                    match v {
+                        Some(v) => builder.append_value(v.to_string()),
+                        None => builder.append_null(),
+                    }
                 }
                 RemoteType::Postgres(PostgresType::Int2Array) => {
                     handle_primitive_array_type!(builder, field, Int16Builder, i16, row, idx);

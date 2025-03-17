@@ -40,7 +40,7 @@ pub async fn main() {
   - [x] Float4 / Float8 / Numeric
   - [x] Char / Varchar / Text / Bpchar / Bytea
   - [x] Date / Time / Timestamp / Timestamptz / Interval
-  - [x] Bool / Geometry(PostGIS)
+  - [x] Bool / Json / Jsonb / Geometry(PostGIS)
   - [x] Int2Array / Int4Array / Int8Array
   - [x] Float4Array / Float8Array
   - [x] CharArray / VarcharArray / BpcharArray / TextArray / ByteaArray

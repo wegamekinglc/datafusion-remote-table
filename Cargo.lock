@@ -1342,6 +1342,7 @@ dependencies = [
  "oracle",
  "prost",
  "rusqlite",
+ "serde_json",
  "time",
  "tokio",
  "tokio-rusqlite",
@@ -2695,6 +2696,8 @@ dependencies = [
  "chrono",
  "fallible-iterator 0.2.0",
  "postgres-protocol",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

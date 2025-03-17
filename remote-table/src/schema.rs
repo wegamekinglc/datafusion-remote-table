@@ -48,6 +48,8 @@ pub enum PostgresType {
     Time,
     Interval,
     Bool,
+    Json,
+    Jsonb,
     Int2Array,
     Int4Array,
     Int8Array,
@@ -80,6 +82,7 @@ impl PostgresType {
             PostgresType::Time => DataType::Time64(TimeUnit::Nanosecond),
             PostgresType::Interval => DataType::Interval(IntervalUnit::MonthDayNano),
             PostgresType::Bool => DataType::Boolean,
+            PostgresType::Json | PostgresType::Jsonb => DataType::LargeUtf8,
             PostgresType::Int2Array => {
                 DataType::List(Arc::new(Field::new("", DataType::Int16, true)))
             }
