@@ -33,23 +33,25 @@ pub enum PostgresType {
     Float4,
     // double precision
     Float8,
-    Bool,
     Char,
-    Text,
     Varchar,
+    Text,
     Bpchar,
     Bytea,
     Date,
     Timestamp,
     TimestampTz,
     Time,
+    Bool,
     Int2Array,
     Int4Array,
     Int8Array,
     Float4Array,
     Float8Array,
-    TextArray,
+    CharArray,
     VarcharArray,
+    BpcharArray,
+    TextArray,
     ByteaArray,
     PostGisGeometry,
 }
@@ -62,8 +64,10 @@ impl PostgresType {
             PostgresType::Int8 => DataType::Int64,
             PostgresType::Float4 => DataType::Float32,
             PostgresType::Float8 => DataType::Float64,
-            PostgresType::Char => DataType::Utf8,
-            PostgresType::Text | PostgresType::Varchar | PostgresType::Bpchar => DataType::Utf8,
+            PostgresType::Char
+            | PostgresType::Text
+            | PostgresType::Varchar
+            | PostgresType::Bpchar => DataType::Utf8,
             PostgresType::Bytea => DataType::Binary,
             PostgresType::Date => DataType::Date32,
             PostgresType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
@@ -87,7 +91,10 @@ impl PostgresType {
             PostgresType::Float8Array => {
                 DataType::List(Arc::new(Field::new("", DataType::Float64, true)))
             }
-            PostgresType::TextArray | PostgresType::VarcharArray => {
+            PostgresType::CharArray
+            | PostgresType::VarcharArray
+            | PostgresType::BpcharArray
+            | PostgresType::TextArray => {
                 DataType::List(Arc::new(Field::new("", DataType::Utf8, true)))
             }
             PostgresType::ByteaArray => {

@@ -248,8 +248,10 @@ fn pg_type_to_remote_type(pg_type: &Type) -> DFResult<RemoteType> {
         &Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
         &Type::FLOAT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float4Array)),
         &Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
-        &Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
+        &Type::CHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::CharArray)),
         &Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
+        &Type::BPCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::BpcharArray)),
+        &Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
         &Type::BYTEA_ARRAY => Ok(RemoteType::Postgres(PostgresType::ByteaArray)),
         other if other.name().eq_ignore_ascii_case("geometry") => {
             Ok(RemoteType::Postgres(PostgresType::PostGisGeometry))
@@ -538,10 +540,10 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                RemoteType::Postgres(PostgresType::TextArray) => {
+                RemoteType::Postgres(PostgresType::CharArray) => {
                     handle_primitive_array_type!(
                         builder,
-                        Type::TEXT_ARRAY,
+                        Type::CHAR_ARRAY,
                         StringBuilder,
                         &str,
                         row,
@@ -552,6 +554,26 @@ fn rows_to_batch(
                     handle_primitive_array_type!(
                         builder,
                         Type::VARCHAR_ARRAY,
+                        StringBuilder,
+                        &str,
+                        row,
+                        idx
+                    );
+                }
+                RemoteType::Postgres(PostgresType::BpcharArray) => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::BPCHAR_ARRAY,
+                        StringBuilder,
+                        &str,
+                        row,
+                        idx
+                    );
+                }
+                RemoteType::Postgres(PostgresType::TextArray) => {
+                    handle_primitive_array_type!(
+                        builder,
+                        Type::TEXT_ARRAY,
                         StringBuilder,
                         &str,
                         row,
