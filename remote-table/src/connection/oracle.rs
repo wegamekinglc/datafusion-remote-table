@@ -6,7 +6,8 @@ use crate::{
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
-    make_builder, ArrayRef, Decimal128Builder, RecordBatch, StringBuilder, TimestampSecondBuilder,
+    make_builder, ArrayRef, Decimal128Builder, RecordBatch, StringBuilder,
+    TimestampNanosecondBuilder, TimestampSecondBuilder,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
@@ -178,6 +179,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
             Ok(RemoteType::Oracle(OracleType::Number(*precision, *scale)))
         }
         ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
+        ColumnType::Timestamp(_) => Ok(RemoteType::Oracle(OracleType::Timestamp)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -281,7 +283,9 @@ fn rows_to_batch(
                         .as_any_mut()
                         .downcast_mut::<TimestampSecondBuilder>()
                         .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to Date32Builder for {col:?}")
+                            panic!(
+                                "Failed to downcast builder to TimestampSecondBuilder for {col:?}"
+                            )
                         });
                     let v = row
                         .get::<usize, Option<chrono::NaiveDateTime>>(i)
@@ -292,6 +296,31 @@ fn rows_to_batch(
                     match v {
                         Some(v) => {
                             let t = v.and_utc().timestamp();
+                            builder.append_value(t);
+                        }
+                        None => builder.append_null(),
+                    }
+                }
+                ColumnType::Timestamp(_) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<TimestampNanosecondBuilder>()
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to TimestampNanosecondBuilder for {col:?}")
+                        });
+                    let v = row
+                        .get::<usize, Option<chrono::NaiveDateTime>>(i)
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to get chrono::NaiveDateTime value for {col:?}: {e:?}")
+                        });
+
+                    match v {
+                        Some(v) => {
+                            let t = v.and_utc().timestamp_nanos_opt().ok_or_else(|| {
+                                DataFusionError::Execution(format!(
+                                "Failed to convert chrono::NaiveDateTime {v} to nanos timestamp"
+                            ))
+                            })?;
                             builder.append_value(t);
                         }
                         None => builder.append_null(),

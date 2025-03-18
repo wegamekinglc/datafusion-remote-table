@@ -192,6 +192,7 @@ pub enum OracleType {
     Char(u32),
     Number(u8, i8),
     Date,
+    Timestamp,
 }
 
 impl OracleType {
@@ -201,6 +202,7 @@ impl OracleType {
             OracleType::Char(_) => DataType::Utf8,
             OracleType::Number(precision, scale) => DataType::Decimal128(*precision, *scale),
             OracleType::Date => DataType::Timestamp(TimeUnit::Second, None),
+            OracleType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         }
     }
 }
