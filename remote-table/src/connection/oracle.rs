@@ -6,7 +6,7 @@ use crate::{
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
-    make_builder, ArrayRef, Decimal128Builder, RecordBatch, StringBuilder,
+    make_builder, ArrayRef, Decimal128Builder, RecordBatch, StringBuilder, TimestampSecondBuilder,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::{project_schema, DataFusionError};
@@ -177,6 +177,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::Number(precision, scale) => {
             Ok(RemoteType::Oracle(OracleType::Number(*precision, *scale)))
         }
+        ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -251,26 +252,47 @@ fn rows_to_batch(
                         .as_any_mut()
                         .downcast_mut::<Decimal128Builder>()
                         .unwrap_or_else(|| {
-                            panic!(
-                                "Failed to downcast builder to Decimal128Builder for {:?}",
-                                col
-                            )
+                            panic!("Failed to downcast builder to Decimal128Builder for {col:?}")
                         });
 
                     let v = row.get::<usize, Option<String>>(i).unwrap_or_else(|e| {
-                        panic!("Failed to get BigDecimal value for {:?}: {:?}", col, e)
+                        panic!("Failed to get String value for {col:?}: {e:?}")
                     });
 
                     match v {
                         Some(v) => {
-                            let decimal = v.parse::<bigdecimal::BigDecimal>().unwrap();
+                            let decimal = v.parse::<bigdecimal::BigDecimal>().map_err(|e| {
+                                DataFusionError::Execution(format!(
+                                    "Failed to parse BigDecimal from {v:?}: {e:?}",
+                                ))
+                            })?;
                             let Some(v) = big_decimal_to_i128(&decimal, Some(*scale as u32)) else {
                                 return Err(DataFusionError::Execution(format!(
-                                    "Failed to convert BigDecimal to i128 for {:?}",
-                                    decimal
+                                    "Failed to convert BigDecimal to i128 for {decimal:?}",
                                 )));
                             };
                             builder.append_value(v);
+                        }
+                        None => builder.append_null(),
+                    }
+                }
+                ColumnType::Date => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<TimestampSecondBuilder>()
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to Date32Builder for {col:?}")
+                        });
+                    let v = row
+                        .get::<usize, Option<chrono::NaiveDateTime>>(i)
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to get chrono::NaiveDateTime value for {col:?}: {e:?}")
+                        });
+
+                    match v {
+                        Some(v) => {
+                            let t = v.and_utc().timestamp();
+                            builder.append_value(t);
                         }
                         None => builder.append_null(),
                     }

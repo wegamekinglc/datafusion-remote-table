@@ -379,6 +379,7 @@ fn rows_to_batch(
                     }
                 }
                 RemoteType::Mysql(MysqlType::Date) => {
+                    // TODO this could also be simplified by macro
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Date32Builder>()
