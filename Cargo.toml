@@ -6,6 +6,5 @@ resolver = "2"
 datafusion = "45"
 datafusion-proto = "45"
 tokio = { version = "1", features = ["full"] }
-prost = "=0.13.5"
-# Pin these dependencies so that the generated output is deterministic
-prost-build = "=0.13.5"
+prost = "0.13"
+prost-build = "0.13"
