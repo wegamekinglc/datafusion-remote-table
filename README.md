@@ -41,11 +41,11 @@ pub async fn main() {
   - [x] Char / Varchar / Text / Bpchar / Bytea
   - [x] Date / Time / Timestamp / Timestamptz / Interval
   - [x] Bool / Json / Jsonb / Geometry(PostGIS)
-  - [x] Int2Array / Int4Array / Int8Array
-  - [x] Float4Array / Float8Array
-  - [x] CharArray / VarcharArray / BpcharArray / TextArray / ByteaArray
+  - [x] Int2[] / Int4[] / Int8[]
+  - [x] Float4[] / Float8[]
+  - [x] Char[] / Varchar[] / Bpchar[] / Text[] / Bytea[]
 - [x] MySQL
-  - [x] TinyInt / Smallint / MediumInt / Int / Bigint
+  - [x] TinyInt (Unsigned) / Smallint (Unsigned) / MediumInt (Unsigned) / Int (Unsigned) / Bigint (Unsigned)
   - [x] Float / Double / Decimal
   - [x] Date / DateTime / Time / Timestamp / Year
   - [x] Char / Varchar / Binary / Varbinary

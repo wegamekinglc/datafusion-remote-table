@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgis/postgis:latest
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
