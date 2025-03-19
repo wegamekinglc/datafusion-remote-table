@@ -11,7 +11,7 @@ use datafusion::arrow::array::{
     make_builder, ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder,
     Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
     LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder,
-    TimestampMicrosecondBuilder,
+    TimestampMicrosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
 };
 use datafusion::arrow::datatypes::{i256, Date32Type, SchemaRef};
 use datafusion::common::{project_schema, DataFusionError};
@@ -202,13 +202,44 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
     let empty_flags = mysql_col.flags().is_empty();
     let is_binary = mysql_col.flags().contains(ColumnFlags::BINARY_FLAG);
     let is_blob = mysql_col.flags().contains(ColumnFlags::BLOB_FLAG);
+    let is_unsigned = mysql_col.flags().contains(ColumnFlags::UNSIGNED_FLAG);
     let col_length = mysql_col.column_length();
     match mysql_col.column_type() {
-        ColumnType::MYSQL_TYPE_TINY => Ok(RemoteType::Mysql(MysqlType::TinyInt)),
-        ColumnType::MYSQL_TYPE_SHORT => Ok(RemoteType::Mysql(MysqlType::SmallInt)),
-        ColumnType::MYSQL_TYPE_INT24 => Ok(RemoteType::Mysql(MysqlType::MediumInt)),
-        ColumnType::MYSQL_TYPE_LONG => Ok(RemoteType::Mysql(MysqlType::Integer)),
-        ColumnType::MYSQL_TYPE_LONGLONG => Ok(RemoteType::Mysql(MysqlType::BigInt)),
+        ColumnType::MYSQL_TYPE_TINY => {
+            if is_unsigned {
+                Ok(RemoteType::Mysql(MysqlType::TinyIntUnsigned))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::TinyInt))
+            }
+        }
+        ColumnType::MYSQL_TYPE_SHORT => {
+            if is_unsigned {
+                Ok(RemoteType::Mysql(MysqlType::SmallIntUnsigned))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::SmallInt))
+            }
+        }
+        ColumnType::MYSQL_TYPE_INT24 => {
+            if is_unsigned {
+                Ok(RemoteType::Mysql(MysqlType::MediumIntUnsigned))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::MediumInt))
+            }
+        }
+        ColumnType::MYSQL_TYPE_LONG => {
+            if is_unsigned {
+                Ok(RemoteType::Mysql(MysqlType::IntegerUnsigned))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::Integer))
+            }
+        }
+        ColumnType::MYSQL_TYPE_LONGLONG => {
+            if is_unsigned {
+                Ok(RemoteType::Mysql(MysqlType::BigIntUnsigned))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::BigInt))
+            }
+        }
         ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
         ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
         ColumnType::MYSQL_TYPE_NEWDECIMAL => {
@@ -321,14 +352,27 @@ fn rows_to_batch(
                 RemoteType::Mysql(MysqlType::TinyInt) => {
                     handle_primitive_type!(builder, remote_field, Int8Builder, i8, row, idx);
                 }
+                RemoteType::Mysql(MysqlType::TinyIntUnsigned) => {
+                    handle_primitive_type!(builder, remote_field, UInt8Builder, u8, row, idx);
+                }
                 RemoteType::Mysql(MysqlType::SmallInt) | RemoteType::Mysql(MysqlType::Year) => {
                     handle_primitive_type!(builder, remote_field, Int16Builder, i16, row, idx);
+                }
+                RemoteType::Mysql(MysqlType::SmallIntUnsigned) => {
+                    handle_primitive_type!(builder, remote_field, UInt16Builder, u16, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::MediumInt) | RemoteType::Mysql(MysqlType::Integer) => {
                     handle_primitive_type!(builder, remote_field, Int32Builder, i32, row, idx);
                 }
+                RemoteType::Mysql(MysqlType::MediumIntUnsigned)
+                | RemoteType::Mysql(MysqlType::IntegerUnsigned) => {
+                    handle_primitive_type!(builder, remote_field, UInt32Builder, u32, row, idx);
+                }
                 RemoteType::Mysql(MysqlType::BigInt) => {
                     handle_primitive_type!(builder, remote_field, Int64Builder, i64, row, idx);
+                }
+                RemoteType::Mysql(MysqlType::BigIntUnsigned) => {
+                    handle_primitive_type!(builder, remote_field, UInt64Builder, u64, row, idx);
                 }
                 RemoteType::Mysql(MysqlType::Float) => {
                     handle_primitive_type!(builder, remote_field, Float32Builder, f32, row, idx);

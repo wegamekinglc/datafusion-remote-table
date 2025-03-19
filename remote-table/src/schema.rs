@@ -116,10 +116,15 @@ impl PostgresType {
 #[derive(Debug, Clone)]
 pub enum MysqlType {
     TinyInt,
+    TinyIntUnsigned,
     SmallInt,
+    SmallIntUnsigned,
     MediumInt,
+    MediumIntUnsigned,
     Integer,
+    IntegerUnsigned,
     BigInt,
+    BigIntUnsigned,
     Float,
     Double,
     Decimal(u8, u8),
@@ -148,10 +153,15 @@ impl MysqlType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
             MysqlType::TinyInt => DataType::Int8,
+            MysqlType::TinyIntUnsigned => DataType::UInt8,
             MysqlType::SmallInt => DataType::Int16,
+            MysqlType::SmallIntUnsigned => DataType::UInt16,
             MysqlType::MediumInt => DataType::Int32,
+            MysqlType::MediumIntUnsigned => DataType::UInt32,
             MysqlType::Integer => DataType::Int32,
+            MysqlType::IntegerUnsigned => DataType::UInt32,
             MysqlType::BigInt => DataType::Int64,
+            MysqlType::BigIntUnsigned => DataType::UInt64,
             MysqlType::Float => DataType::Float32,
             MysqlType::Double => DataType::Float64,
             MysqlType::Decimal(precision, scale) => {
