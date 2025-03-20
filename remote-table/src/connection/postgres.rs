@@ -1,8 +1,7 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    project_remote_schema, Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema,
-    RemoteType, Transform,
+    Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform,
 };
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
@@ -16,7 +15,9 @@ use datafusion::arrow::array::{
     IntervalMonthDayNanoBuilder, LargeStringBuilder, ListBuilder, RecordBatch, StringBuilder,
     Time64NanosecondBuilder, TimestampNanosecondBuilder,
 };
-use datafusion::arrow::datatypes::{Date32Type, IntervalMonthDayNanoType, SchemaRef};
+use datafusion::arrow::datatypes::{
+    DataType, Date32Type, IntervalMonthDayNanoType, IntervalUnit, SchemaRef, TimeUnit,
+};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -139,13 +140,14 @@ impl Connection for PostgresConnection {
         let remote_schema = build_remote_schema(first_row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
-            let batch = rows_to_batch(
-                std::slice::from_ref(first_row),
-                &remote_schema,
-                arrow_schema,
+            let batch = rows_to_batch(std::slice::from_ref(first_row), &arrow_schema, None)?;
+            let transformed_batch = transform_batch(
+                batch,
+                transform.as_ref(),
+                &arrow_schema,
                 None,
+                Some(&remote_schema),
             )?;
-            let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
             Ok((remote_schema, arrow_schema))
@@ -155,9 +157,11 @@ impl Connection for PostgresConnection {
     async fn query(
         &self,
         sql: String,
+        table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
-    ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)> {
-        let mut stream = self
+    ) -> DFResult<SendableRecordBatchStream> {
+        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
+        let stream = self
             .conn
             .query_raw(&sql, Vec::<String>::new())
             .await
@@ -169,35 +173,6 @@ impl Connection for PostgresConnection {
             .chunks(2048)
             .boxed();
 
-        let Some(first_chunk) = stream.next().await else {
-            return Err(DataFusionError::Execution(
-                "No data returned from postgres".to_string(),
-            ));
-        };
-        let first_chunk: Vec<Row> = first_chunk
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| {
-                DataFusionError::Execution(format!(
-                    "Failed to collect rows from postgres due to {e}",
-                ))
-            })?;
-        let Some(first_row) = first_chunk.first() else {
-            return Err(DataFusionError::Execution(
-                "No data returned from postgres".to_string(),
-            ));
-        };
-        let remote_schema = build_remote_schema(first_row)?;
-        let projected_remote_schema = project_remote_schema(&remote_schema, projection.as_ref());
-        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        let first_chunk = rows_to_batch(
-            first_chunk.as_slice(),
-            &remote_schema,
-            arrow_schema.clone(),
-            projection.as_ref(),
-        )?;
-        let schema = first_chunk.schema();
-
         let mut stream = stream.map(move |rows| {
             let rows: Vec<Row> = rows
                 .into_iter()
@@ -207,26 +182,20 @@ impl Connection for PostgresConnection {
                         "Failed to collect rows from postgres due to {e}",
                     ))
                 })?;
-            let batch = rows_to_batch(
-                rows.as_slice(),
-                &remote_schema,
-                arrow_schema.clone(),
-                projection.as_ref(),
-            )?;
+            let batch = rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
         let output_stream = async_stream::stream! {
-           yield Ok(first_chunk);
            while let Some(batch) = stream.next().await {
                 yield batch
            }
         };
 
-        Ok((
-            Box::pin(RecordBatchStreamAdapter::new(schema, output_stream)),
-            projected_remote_schema,
-        ))
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            output_stream,
+        )))
     }
 }
 
@@ -507,39 +476,40 @@ impl<'a> FromSql<'a> for GeometryFromSql<'a> {
 
 fn rows_to_batch(
     rows: &[Row],
-    remote_schema: &RemoteSchema,
-    arrow_schema: SchemaRef,
+    table_schema: &SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
-    let projected_schema = project_schema(&arrow_schema, projection)?;
+    let projected_schema = project_schema(table_schema, projection)?;
     let mut array_builders = vec![];
-    for field in arrow_schema.fields() {
+    for field in table_schema.fields() {
         let builder = make_builder(field.data_type(), rows.len());
         array_builders.push(builder);
     }
+
     for row in rows {
-        for (idx, field) in remote_schema.fields.iter().enumerate() {
+        for (idx, field) in table_schema.fields.iter().enumerate() {
             if !projections_contains(projection, idx) {
                 continue;
             }
             let builder = &mut array_builders[idx];
-            match field.remote_type {
-                RemoteType::Postgres(PostgresType::Int2) => {
+            let col = row.columns().get(idx);
+            match field.data_type() {
+                DataType::Int16 => {
                     handle_primitive_type!(builder, field, Int16Builder, i16, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Int4) => {
+                DataType::Int32 => {
                     handle_primitive_type!(builder, field, Int32Builder, i32, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Int8) => {
+                DataType::Int64 => {
                     handle_primitive_type!(builder, field, Int64Builder, i64, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Float4) => {
+                DataType::Float32 => {
                     handle_primitive_type!(builder, field, Float32Builder, f32, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Float8) => {
+                DataType::Float64 => {
                     handle_primitive_type!(builder, field, Float64Builder, f64, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Numeric(_scale)) => {
+                DataType::Decimal128(_precision, _scale) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Decimal128Builder>()
@@ -563,35 +533,53 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::Name)
-                | RemoteType::Postgres(PostgresType::Varchar)
-                | RemoteType::Postgres(PostgresType::Text) => {
+                DataType::Utf8 => {
                     handle_primitive_type!(builder, field, StringBuilder, &str, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Bpchar) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<StringBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to StringBuilder for {field:?}")
-                        });
-                    let v: Option<&str> = row.try_get(idx).unwrap_or_else(|e| {
-                        panic!("Failed to get &str value for {field:?}: {e:?}")
-                    });
+                DataType::LargeUtf8 => {
+                    if col.is_some() && matches!(col.unwrap().type_(), &Type::JSON | &Type::JSONB) {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<LargeStringBuilder>()
+                            .unwrap_or_else(|| {
+                                panic!("Failed to downcast builder to LargeStringBuilder for {field:?}")
+                            });
+                        let v: Option<serde_json::value::Value> =
+                            row.try_get(idx).unwrap_or_else(|e| {
+                                panic!("Failed to get serde_json::value::Value value for {field:?}: {e:?}")
+                            });
 
-                    match v {
-                        Some(v) => builder.append_value(v.trim_end()),
-                        None => builder.append_null(),
+                        match v {
+                            Some(v) => builder.append_value(v.to_string()),
+                            None => builder.append_null(),
+                        }
+                    } else {
+                        handle_primitive_type!(builder, field, LargeStringBuilder, &str, row, idx);
                     }
                 }
-                RemoteType::Postgres(PostgresType::Bytea) => {
-                    handle_primitive_type!(builder, field, BinaryBuilder, Vec<u8>, row, idx);
+                DataType::Binary => {
+                    if col.is_some() && col.unwrap().type_().name().eq_ignore_ascii_case("geometry")
+                    {
+                        let builder = builder.as_any_mut().downcast_mut::<BinaryBuilder>().expect(
+                            "Failed to downcast builder to BinaryBuilder for Type::geometry",
+                        );
+                        let v: Option<GeometryFromSql> = row.try_get(idx).expect(
+                            "Failed to get GeometryFromSql value for column Type::geometry",
+                        );
+
+                        match v {
+                            Some(v) => builder.append_value(v.wkb),
+                            None => builder.append_null(),
+                        }
+                    } else {
+                        handle_primitive_type!(builder, field, BinaryBuilder, Vec<u8>, row, idx);
+                    }
                 }
-                RemoteType::Postgres(PostgresType::Timestamp) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
                     let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<TimestampNanosecondBuilder>()
-                        .unwrap_or_else(|| panic!("Failed to downcast builder to TimestampNanosecondBuilder for {field:?}"));
+                                .as_any_mut()
+                                .downcast_mut::<TimestampNanosecondBuilder>()
+                                .unwrap_or_else(|| panic!("Failed to downcast builder to TimestampNanosecondBuilder for {field:?}"));
                     let v: Option<SystemTime> = row.try_get(idx).unwrap_or_else(|e| {
                         panic!("Failed to get SystemTime value for {field:?}: {e:?}")
                     });
@@ -613,7 +601,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::TimestampTz) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, Some(_tz)) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampNanosecondBuilder>()
@@ -630,7 +618,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::Time) => {
+                DataType::Time64(TimeUnit::Nanosecond) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Time64NanosecondBuilder>()
@@ -651,7 +639,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::Date) => {
+                DataType::Date32 => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Date32Builder>()
@@ -665,11 +653,11 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::Interval) => {
+                DataType::Interval(IntervalUnit::MonthDayNano) => {
                     let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<IntervalMonthDayNanoBuilder>()
-                        .expect("Failed to downcast builder to IntervalMonthDayNanoBuilder for Type::INTERVAL");
+                                .as_any_mut()
+                                .downcast_mut::<IntervalMonthDayNanoBuilder>()
+                                .expect("Failed to downcast builder to IntervalMonthDayNanoBuilder for Type::INTERVAL");
 
                     let v: Option<IntervalFromSql> = row
                         .try_get(idx)
@@ -687,76 +675,85 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::Bool) => {
+                DataType::Boolean => {
                     handle_primitive_type!(builder, field, BooleanBuilder, bool, row, idx);
                 }
-                RemoteType::Postgres(PostgresType::Json)
-                | RemoteType::Postgres(PostgresType::Jsonb) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<LargeStringBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to LargeStringBuilder for {field:?}")
-                        });
-                    let v: Option<serde_json::value::Value> =
-                        row.try_get(idx).unwrap_or_else(|e| {
-                            panic!(
-                                "Failed to get serde_json::value::Value value for {field:?}: {e:?}"
-                            )
-                        });
-
-                    match v {
-                        Some(v) => builder.append_value(v.to_string()),
-                        None => builder.append_null(),
+                DataType::List(inner) => match inner.data_type() {
+                    DataType::Int16 => {
+                        handle_primitive_array_type!(builder, field, Int16Builder, i16, row, idx);
                     }
-                }
-                RemoteType::Postgres(PostgresType::Int2Array) => {
-                    handle_primitive_array_type!(builder, field, Int16Builder, i16, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::Int4Array) => {
-                    handle_primitive_array_type!(builder, field, Int32Builder, i32, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::Int8Array) => {
-                    handle_primitive_array_type!(builder, field, Int64Builder, i64, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::Float4Array) => {
-                    handle_primitive_array_type!(builder, field, Float32Builder, f32, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::Float8Array) => {
-                    handle_primitive_array_type!(builder, field, Float64Builder, f64, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::VarcharArray)
-                | RemoteType::Postgres(PostgresType::BpcharArray)
-                | RemoteType::Postgres(PostgresType::TextArray) => {
-                    handle_primitive_array_type!(builder, field, StringBuilder, &str, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::ByteaArray) => {
-                    handle_primitive_array_type!(builder, field, BinaryBuilder, Vec<u8>, row, idx);
-                }
-                RemoteType::Postgres(PostgresType::BoolArray) => {
-                    handle_primitive_array_type!(builder, field, BooleanBuilder, bool, row, idx);
-                }
-
-                RemoteType::Postgres(PostgresType::PostGisGeometry) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<BinaryBuilder>()
-                        .expect("Failed to downcast builder to BinaryBuilder for Type::geometry");
-                    let v: Option<GeometryFromSql> = row
-                        .try_get(idx)
-                        .expect("Failed to get GeometryFromSql value for column Type::geometry");
-
-                    match v {
-                        Some(v) => builder.append_value(v.wkb),
-                        None => builder.append_null(),
+                    DataType::Int32 => {
+                        handle_primitive_array_type!(builder, field, Int32Builder, i32, row, idx);
                     }
-                }
+                    DataType::Int64 => {
+                        handle_primitive_array_type!(builder, field, Int64Builder, i64, row, idx);
+                    }
+                    DataType::Float32 => {
+                        handle_primitive_array_type!(builder, field, Float32Builder, f32, row, idx);
+                    }
+                    DataType::Float64 => {
+                        handle_primitive_array_type!(builder, field, Float64Builder, f64, row, idx);
+                    }
+                    DataType::Utf8 => {
+                        handle_primitive_array_type!(builder, field, StringBuilder, &str, row, idx);
+                    }
+                    DataType::Binary => {
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            BinaryBuilder,
+                            Vec<u8>,
+                            row,
+                            idx
+                        );
+                    }
+                    DataType::Boolean => {
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            BooleanBuilder,
+                            bool,
+                            row,
+                            idx
+                        );
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "Unsupported list data type {:?} for col: {:?}",
+                            field.data_type(),
+                            col
+                        )));
+                    }
+                },
                 _ => {
-                    return Err(DataFusionError::Execution(format!(
-                        "Unsupported postgres type {field:?}",
+                    return Err(DataFusionError::NotImplemented(format!(
+                        "Unsupported data type {:?} for col: {:?}",
+                        field.data_type(),
+                        col
                     )));
                 }
             }
+            // match field.remote_type {
+            //     RemoteType::Postgres(PostgresType::PostGisGeometry) => {
+            //         let builder = builder
+            //             .as_any_mut()
+            //             .downcast_mut::<BinaryBuilder>()
+            //             .expect("Failed to downcast builder to BinaryBuilder for Type::geometry");
+            //         let v: Option<GeometryFromSql> = row
+            //             .try_get(idx)
+            //             .expect("Failed to get GeometryFromSql value for column Type::geometry");
+            //
+            //         match v {
+            //             Some(v) => builder.append_value(v.wkb),
+            //             None => builder.append_null(),
+            //         }
+            //     }
+            //     _ => {
+            //         return Err(DataFusionError::Execution(format!(
+            //             "Unsupported postgres type {field:?}",
+            //         )));
+            //     }
+            // }
         }
     }
     let projected_columns = array_builders

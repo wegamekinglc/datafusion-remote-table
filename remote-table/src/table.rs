@@ -1,7 +1,6 @@
 use crate::{connect, ConnectionOptions, DFResult, Pool, RemoteSchema, RemoteTableExec, Transform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
-use datafusion::common::project_schema;
 use datafusion::datasource::TableType;
 use datafusion::logical_expr::Expr;
 use datafusion::physical_plan::ExecutionPlan;
@@ -12,8 +11,8 @@ use std::sync::Arc;
 pub struct RemoteTable {
     pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
-    pub(crate) remote_schema: RemoteSchema,
-    pub(crate) schema: SchemaRef,
+    pub(crate) table_schema: SchemaRef,
+    pub(crate) remote_schema: Option<RemoteSchema>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     pub(crate) pool: Arc<dyn Pool>,
 }
@@ -23,23 +22,36 @@ impl RemoteTable {
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
         transform: Option<Arc<dyn Transform>>,
+        table_schema: Option<SchemaRef>,
     ) -> DFResult<Self> {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
         let conn = pool.get().await?;
-        let (remote_schema, arrow_schema) = conn.infer_schema(&sql, transform.clone()).await?;
+        let (table_schema, remote_schema) = match conn.infer_schema(&sql, transform.clone()).await {
+            Ok((remote_schema, inferred_table_schema)) => (
+                table_schema.unwrap_or(inferred_table_schema),
+                Some(remote_schema),
+            ),
+            Err(e) => {
+                if let Some(table_schema) = table_schema {
+                    (table_schema, None)
+                } else {
+                    return Err(e);
+                }
+            }
+        };
         Ok(RemoteTable {
             conn_options,
             sql,
+            table_schema,
             remote_schema,
-            schema: arrow_schema,
             transform,
             pool,
         })
     }
 
-    pub fn remote_schema(&self) -> &RemoteSchema {
-        &self.remote_schema
+    pub fn remote_schema(&self) -> Option<&RemoteSchema> {
+        self.remote_schema.as_ref()
     }
 }
 
@@ -50,7 +62,7 @@ impl TableProvider for RemoteTable {
     }
 
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        self.table_schema.clone()
     }
 
     fn table_type(&self) -> TableType {
@@ -64,14 +76,15 @@ impl TableProvider for RemoteTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let projected_schema = project_schema(&self.schema, projection)?;
-        Ok(Arc::new(RemoteTableExec::new(
+        Ok(Arc::new(RemoteTableExec::try_new(
             self.conn_options.clone(),
-            projected_schema,
             self.sql.clone(),
+            self.table_schema.clone(),
+            // TODO RemoteSchemaRef
+            self.remote_schema.clone(),
             projection.cloned(),
             self.transform.clone(),
             self.pool.get().await?,
-        )))
+        )?))
     }
 }

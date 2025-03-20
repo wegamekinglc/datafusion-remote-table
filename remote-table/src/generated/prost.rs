@@ -6,7 +6,7 @@ pub struct RemoteTableExec {
     #[prost(string, tag = "2")]
     pub sql: ::prost::alloc::string::String,
     #[prost(message, optional, tag = "3")]
-    pub projected_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
+    pub table_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
     #[prost(message, optional, tag = "4")]
     pub projection: ::core::option::Option<Projection>,
     #[prost(bytes = "vec", optional, tag = "5")]

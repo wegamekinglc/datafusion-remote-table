@@ -1,22 +1,22 @@
-use crate::transform::transform_batch;
-use crate::{Connection, ConnectionOptions, DFResult, RemoteSchema, Transform};
-use datafusion::arrow::array::RecordBatch;
+use crate::{Connection, ConnectionOptions, DFResult, RemoteSchema, Transform, TransformStream};
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext};
+use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-use datafusion::physical_plan::{DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties};
-use futures::{Stream, StreamExt, TryStreamExt};
+use datafusion::physical_plan::{
+    project_schema, DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
+};
+use futures::TryStreamExt;
 use std::any::Any;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
 #[derive(Debug)]
 pub struct RemoteTableExec {
     pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
+    pub(crate) table_schema: SchemaRef,
+    pub(crate) remote_schema: Option<RemoteSchema>,
     pub(crate) projection: Option<Vec<usize>>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     conn: Arc<dyn Connection>,
@@ -24,28 +24,32 @@ pub struct RemoteTableExec {
 }
 
 impl RemoteTableExec {
-    pub fn new(
+    pub fn try_new(
         conn_options: ConnectionOptions,
-        projected_schema: SchemaRef,
         sql: String,
+        table_schema: SchemaRef,
+        remote_schema: Option<RemoteSchema>,
         projection: Option<Vec<usize>>,
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
-    ) -> Self {
+    ) -> DFResult<Self> {
+        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
         let plan_properties = PlanProperties::new(
             EquivalenceProperties::new(projected_schema),
             Partitioning::UnknownPartitioning(1),
             EmissionType::Incremental,
             Boundedness::Bounded,
         );
-        Self {
+        Ok(Self {
             conn_options,
             sql,
+            table_schema,
+            remote_schema,
             projection,
             transform,
             conn,
             plan_properties,
-        }
+        })
     }
 }
 
@@ -83,9 +87,10 @@ impl ExecutionPlan for RemoteTableExec {
         let fut = build_and_transform_stream(
             self.conn.clone(),
             self.sql.clone(),
+            self.table_schema.clone(),
+            self.remote_schema.clone(),
             self.projection.clone(),
             self.transform.clone(),
-            schema.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
@@ -95,51 +100,24 @@ impl ExecutionPlan for RemoteTableExec {
 async fn build_and_transform_stream(
     conn: Arc<dyn Connection>,
     sql: String,
+    table_schema: SchemaRef,
+    remote_schema: Option<RemoteSchema>,
     projection: Option<Vec<usize>>,
     transform: Option<Arc<dyn Transform>>,
-    projected_schema: SchemaRef,
 ) -> DFResult<SendableRecordBatchStream> {
-    let (stream, remote_schema) = conn.query(sql, projection).await?;
-    assert_eq!(projected_schema.fields().len(), remote_schema.fields.len());
+    let stream = conn
+        .query(sql, table_schema.clone(), projection.clone())
+        .await?;
     if let Some(transform) = transform.as_ref() {
-        Ok(Box::pin(TransformStream {
-            input: stream,
-            transform: transform.clone(),
-            schema: projected_schema,
+        Ok(Box::pin(TransformStream::try_new(
+            stream,
+            transform.clone(),
+            table_schema,
+            projection,
             remote_schema,
-        }))
+        )?))
     } else {
         Ok(stream)
-    }
-}
-
-pub(crate) struct TransformStream {
-    input: SendableRecordBatchStream,
-    transform: Arc<dyn Transform>,
-    schema: SchemaRef,
-    remote_schema: RemoteSchema,
-}
-
-impl Stream for TransformStream {
-    type Item = DFResult<RecordBatch>;
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.input.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok(batch))) => {
-                match transform_batch(batch, self.transform.as_ref(), &self.remote_schema) {
-                    Ok(result) => Poll::Ready(Some(Ok(result))),
-                    Err(e) => Poll::Ready(Some(Err(e))),
-                }
-            }
-            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(None) => Poll::Ready(None),
-            Poll::Pending => Poll::Pending,
-        }
-    }
-}
-
-impl RecordBatchStream for TransformStream {
-    fn schema(&self) -> SchemaRef {
-        self.schema.clone()
     }
 }
 

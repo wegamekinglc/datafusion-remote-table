@@ -33,8 +33,9 @@ pub trait Connection: Debug + Send + Sync {
     async fn query(
         &self,
         sql: String,
+        table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
-    ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)>;
+    ) -> DFResult<SendableRecordBatchStream>;
 }
 
 pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {

@@ -13,7 +13,7 @@ pub async fn supported_mysql_types() {
         MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")
             .with_database(Some("test".to_string())),
     );
-    let table = RemoteTable::try_new(options, "select * from supported_data_types", None)
+    let table = RemoteTable::try_new(options, "select * from supported_data_types", None, None)
         .await
         .unwrap();
     println!("remote schema: {:#?}", table.remote_schema());
@@ -50,7 +50,7 @@ pub async fn describe_table() {
         MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")
             .with_database(Some("test".to_string())),
     );
-    let table = RemoteTable::try_new(options, "describe simple_table", None)
+    let table = RemoteTable::try_new(options, "describe simple_table", None, None)
         .await
         .unwrap();
     println!("remote schema: {:#?}", table.remote_schema());

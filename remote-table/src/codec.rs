@@ -55,7 +55,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             None
         };
 
-        let projected_schema: SchemaRef = Arc::new(convert_required!(&proto.projected_schema)?);
+        let table_schema: SchemaRef = Arc::new(convert_required!(&proto.table_schema)?);
 
         let projection: Option<Vec<usize>> = proto
             .projection
@@ -70,14 +70,16 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             })
         })?;
 
-        Ok(Arc::new(RemoteTableExec::new(
+        Ok(Arc::new(RemoteTableExec::try_new(
             conn_options,
-            projected_schema,
             proto.sql,
+            table_schema,
+            // TODO fix
+            None,
             projection,
             transform,
             conn,
-        )))
+        )?))
     }
 
     fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> DFResult<()> {
@@ -99,7 +101,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             let proto = protobuf::RemoteTableExec {
                 conn_options: Some(serialized_connection_options),
                 sql: exec.sql.clone(),
-                projected_schema: Some(exec.schema().as_ref().try_into()?),
+                table_schema: Some(exec.table_schema.as_ref().try_into()?),
                 projection: exec
                     .projection
                     .as_ref()

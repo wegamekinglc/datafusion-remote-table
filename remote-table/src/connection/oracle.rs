@@ -1,15 +1,14 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    project_remote_schema, Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
-    RemoteType, Transform,
+    Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
     make_builder, ArrayRef, Decimal128Builder, RecordBatch, StringBuilder,
     TimestampNanosecondBuilder, TimestampSecondBuilder,
 };
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -99,8 +98,14 @@ impl Connection for OracleConnection {
         let remote_schema = build_remote_schema(&row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
-            let batch = rows_to_batch(&[row], arrow_schema, None)?;
-            let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
+            let batch = rows_to_batch(&[row], &arrow_schema, None)?;
+            let transformed_batch = transform_batch(
+                batch,
+                transform.as_ref(),
+                &arrow_schema,
+                None,
+                Some(&remote_schema),
+            )?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
             Ok((remote_schema, arrow_schema))
@@ -110,39 +115,14 @@ impl Connection for OracleConnection {
     async fn query(
         &self,
         sql: String,
+        table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
-    ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)> {
+    ) -> DFResult<SendableRecordBatchStream> {
+        // todo!()
+        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
+        // TODO handle err
         let result_set = self.conn.query(&sql, &[]).unwrap();
-        let mut stream = futures::stream::iter(result_set).chunks(2000).boxed();
-
-        let Some(first_chunk) = stream.next().await else {
-            return Err(DataFusionError::Execution(
-                "No data returned from oracle".to_string(),
-            ));
-        };
-        let first_chunk: Vec<Row> = first_chunk
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| {
-                DataFusionError::Execution(
-                    format!("Failed to collect rows from oracle due to {e}",),
-                )
-            })?;
-        let Some(first_row) = first_chunk.first() else {
-            return Err(DataFusionError::Execution(
-                "No data returned from oracle".to_string(),
-            ));
-        };
-
-        let remote_schema = build_remote_schema(first_row)?;
-        let projected_remote_schema = project_remote_schema(&remote_schema, projection.as_ref());
-        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        let first_chunk = rows_to_batch(
-            first_chunk.as_slice(),
-            arrow_schema.clone(),
-            projection.as_ref(),
-        )?;
-        let schema = first_chunk.schema();
+        let stream = futures::stream::iter(result_set).chunks(2000).boxed();
 
         let mut stream = stream.map(move |rows| {
             let rows: Vec<Row> = rows
@@ -153,21 +133,20 @@ impl Connection for OracleConnection {
                         "Failed to collect rows from oracle due to {e}",
                     ))
                 })?;
-            let batch = rows_to_batch(rows.as_slice(), arrow_schema.clone(), projection.as_ref())?;
+            let batch = rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
         let output_stream = async_stream::stream! {
-           yield Ok(first_chunk);
            while let Some(batch) = stream.next().await {
                 yield batch
            }
         };
 
-        Ok((
-            Box::pin(RecordBatchStreamAdapter::new(schema, output_stream)),
-            projected_remote_schema,
-        ))
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            output_stream,
+        )))
     }
 }
 
@@ -232,24 +211,28 @@ macro_rules! handle_primitive_type {
 
 fn rows_to_batch(
     rows: &[Row],
-    arrow_schema: SchemaRef,
+    table_schema: &SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
-    let projected_schema = project_schema(&arrow_schema, projection)?;
+    let projected_schema = project_schema(table_schema, projection)?;
     let mut array_builders = vec![];
-    for field in arrow_schema.fields() {
+    for field in table_schema.fields() {
         let builder = make_builder(field.data_type(), rows.len());
         array_builders.push(builder);
     }
 
     for row in rows {
-        for (i, col) in row.column_info().iter().enumerate() {
-            let builder = &mut array_builders[i];
-            match col.oracle_type() {
-                ColumnType::Varchar2(_size) | ColumnType::Char(_size) => {
-                    handle_primitive_type!(builder, col, StringBuilder, String, row, i);
+        for (idx, field) in table_schema.fields.iter().enumerate() {
+            if !projections_contains(projection, idx) {
+                continue;
+            }
+            let builder = &mut array_builders[idx];
+            let col = row.column_info().get(idx);
+            match field.data_type() {
+                DataType::Utf8 => {
+                    handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
                 }
-                ColumnType::Number(_precision, scale) => {
+                DataType::Decimal128(_precision, scale) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Decimal128Builder>()
@@ -257,7 +240,7 @@ fn rows_to_batch(
                             panic!("Failed to downcast builder to Decimal128Builder for {col:?}")
                         });
 
-                    let v = row.get::<usize, Option<String>>(i).unwrap_or_else(|e| {
+                    let v = row.get::<usize, Option<String>>(idx).unwrap_or_else(|e| {
                         panic!("Failed to get String value for {col:?}: {e:?}")
                     });
 
@@ -278,7 +261,7 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                ColumnType::Date => {
+                DataType::Timestamp(TimeUnit::Second, None) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<TimestampSecondBuilder>()
@@ -288,7 +271,7 @@ fn rows_to_batch(
                             )
                         });
                     let v = row
-                        .get::<usize, Option<chrono::NaiveDateTime>>(i)
+                        .get::<usize, Option<chrono::NaiveDateTime>>(idx)
                         .unwrap_or_else(|e| {
                             panic!("Failed to get chrono::NaiveDateTime value for {col:?}: {e:?}")
                         });
@@ -301,15 +284,15 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                ColumnType::Timestamp(_) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
                     let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<TimestampNanosecondBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to TimestampNanosecondBuilder for {col:?}")
-                        });
+                                .as_any_mut()
+                                .downcast_mut::<TimestampNanosecondBuilder>()
+                                .unwrap_or_else(|| {
+                                    panic!("Failed to downcast builder to TimestampNanosecondBuilder for {col:?}")
+                                });
                     let v = row
-                        .get::<usize, Option<chrono::NaiveDateTime>>(i)
+                        .get::<usize, Option<chrono::NaiveDateTime>>(idx)
                         .unwrap_or_else(|e| {
                             panic!("Failed to get chrono::NaiveDateTime value for {col:?}: {e:?}")
                         });
@@ -317,10 +300,10 @@ fn rows_to_batch(
                     match v {
                         Some(v) => {
                             let t = v.and_utc().timestamp_nanos_opt().ok_or_else(|| {
-                                DataFusionError::Execution(format!(
-                                "Failed to convert chrono::NaiveDateTime {v} to nanos timestamp"
-                            ))
-                            })?;
+                                        DataFusionError::Execution(format!(
+                                        "Failed to convert chrono::NaiveDateTime {v} to nanos timestamp"
+                                    ))
+                                    })?;
                             builder.append_value(t);
                         }
                         None => builder.append_null(),
@@ -328,8 +311,10 @@ fn rows_to_batch(
                 }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
-                        "Unsupported oracle type: {col:?}",
-                    )))
+                        "Unsupported data type {:?} for col: {:?}",
+                        field.data_type(),
+                        col
+                    )));
                 }
             }
         }

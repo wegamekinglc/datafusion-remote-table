@@ -14,6 +14,7 @@ pub async fn supported_sqlite_types() {
         options,
         "SELECT * from supported_data_types",
         None,
+        None,
     )
     .await
     .unwrap();

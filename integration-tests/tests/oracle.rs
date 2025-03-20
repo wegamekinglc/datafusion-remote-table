@@ -19,6 +19,7 @@ pub async fn supported_oracle_types() {
         options,
         "SELECT * from SYS.supported_data_types",
         None,
+        None,
     )
     .await
     .unwrap();

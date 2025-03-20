@@ -1,8 +1,7 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    project_remote_schema, Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema,
-    RemoteType, Transform,
+    Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
 };
 use async_stream::stream;
 use bigdecimal::num_bigint;
@@ -13,7 +12,7 @@ use datafusion::arrow::array::{
     LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder,
     TimestampMicrosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
 };
-use datafusion::arrow::datatypes::{i256, Date32Type, SchemaRef};
+use datafusion::arrow::datatypes::{i256, DataType, Date32Type, SchemaRef, TimeUnit};
 use datafusion::common::{project_schema, DataFusionError};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
@@ -103,8 +102,14 @@ impl Connection for MysqlConnection {
         let remote_schema = build_remote_schema(&row)?;
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
-            let batch = rows_to_batch(&[row], &remote_schema, arrow_schema.clone(), None)?;
-            let transformed_batch = transform_batch(batch, transform.as_ref(), &remote_schema)?;
+            let batch = rows_to_batch(&[row], &arrow_schema, None)?;
+            let transformed_batch = transform_batch(
+                batch,
+                transform.as_ref(),
+                &arrow_schema,
+                None,
+                Some(&remote_schema),
+            )?;
             Ok((remote_schema, transformed_batch.schema()))
         } else {
             Ok((remote_schema, arrow_schema))
@@ -114,10 +119,12 @@ impl Connection for MysqlConnection {
     async fn query(
         &self,
         sql: String,
+        table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
-    ) -> DFResult<(SendableRecordBatchStream, RemoteSchema)> {
+    ) -> DFResult<SendableRecordBatchStream> {
+        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
         let conn = Arc::clone(&self.conn);
-        let mut stream = Box::pin(stream! {
+        let stream = Box::pin(stream! {
             let mut conn = conn.lock().await;
             let mut query_iter = conn
                 .query_iter(sql)
@@ -149,52 +156,22 @@ impl Connection for MysqlConnection {
             }
         });
 
-        let Some(first_chunk) = stream.next().await else {
-            return Err(DataFusionError::Execution(
-                "No data returned from mysql".to_string(),
-            ));
-        };
-        let first_chunk = first_chunk?;
-
-        let Some(first_row) = first_chunk.first() else {
-            return Err(DataFusionError::Execution(
-                "No data returned from mysql".to_string(),
-            ));
-        };
-
-        let remote_schema = build_remote_schema(first_row)?;
-        let projected_remote_schema = project_remote_schema(&remote_schema, projection.as_ref());
-        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        let first_chunk = rows_to_batch(
-            first_chunk.as_slice(),
-            &remote_schema,
-            arrow_schema.clone(),
-            projection.as_ref(),
-        )?;
-        let schema = first_chunk.schema();
-
         let mut stream = stream.map(move |rows| {
             let rows = rows?;
-            let batch = rows_to_batch(
-                rows.as_slice(),
-                &remote_schema,
-                arrow_schema.clone(),
-                projection.as_ref(),
-            )?;
+            let batch = rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())?;
             Ok::<RecordBatch, DataFusionError>(batch)
         });
 
         let output_stream = async_stream::stream! {
-           yield Ok(first_chunk);
            while let Some(batch) = stream.next().await {
                 yield batch
            }
         };
 
-        Ok((
-            Box::pin(RecordBatchStreamAdapter::new(schema, output_stream)),
-            projected_remote_schema,
-        ))
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            output_stream,
+        )))
     }
 }
 
@@ -312,107 +289,96 @@ macro_rules! handle_primitive_type {
 
 fn rows_to_batch(
     rows: &[Row],
-    remote_schema: &RemoteSchema,
-    arrow_schema: SchemaRef,
+    table_schema: &SchemaRef,
     projection: Option<&Vec<usize>>,
 ) -> DFResult<RecordBatch> {
-    let projected_schema = project_schema(&arrow_schema, projection)?;
+    let projected_schema = project_schema(table_schema, projection)?;
     let mut array_builders = vec![];
-    for field in arrow_schema.fields() {
+    for field in table_schema.fields() {
         let builder = make_builder(field.data_type(), rows.len());
         array_builders.push(builder);
     }
 
     for row in rows {
-        for (idx, remote_field) in remote_schema.fields.iter().enumerate() {
+        for (idx, field) in table_schema.fields.iter().enumerate() {
             if !projections_contains(projection, idx) {
                 continue;
             }
             let builder = &mut array_builders[idx];
-            match remote_field.remote_type {
-                RemoteType::Mysql(MysqlType::TinyInt) => {
-                    handle_primitive_type!(builder, remote_field, Int8Builder, i8, row, idx);
+            let col = row.columns_ref().get(idx);
+            match field.data_type() {
+                DataType::Int8 => {
+                    handle_primitive_type!(builder, col, Int8Builder, i8, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::TinyIntUnsigned) => {
-                    handle_primitive_type!(builder, remote_field, UInt8Builder, u8, row, idx);
+                DataType::Int16 => {
+                    handle_primitive_type!(builder, col, Int16Builder, i16, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::SmallInt) | RemoteType::Mysql(MysqlType::Year) => {
-                    handle_primitive_type!(builder, remote_field, Int16Builder, i16, row, idx);
+                DataType::Int32 => {
+                    handle_primitive_type!(builder, col, Int32Builder, i32, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::SmallIntUnsigned) => {
-                    handle_primitive_type!(builder, remote_field, UInt16Builder, u16, row, idx);
+                DataType::Int64 => {
+                    handle_primitive_type!(builder, col, Int64Builder, i64, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::MediumInt) | RemoteType::Mysql(MysqlType::Integer) => {
-                    handle_primitive_type!(builder, remote_field, Int32Builder, i32, row, idx);
+                DataType::UInt8 => {
+                    handle_primitive_type!(builder, col, UInt8Builder, u8, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::MediumIntUnsigned)
-                | RemoteType::Mysql(MysqlType::IntegerUnsigned) => {
-                    handle_primitive_type!(builder, remote_field, UInt32Builder, u32, row, idx);
+                DataType::UInt16 => {
+                    handle_primitive_type!(builder, col, UInt16Builder, u16, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::BigInt) => {
-                    handle_primitive_type!(builder, remote_field, Int64Builder, i64, row, idx);
+                DataType::UInt32 => {
+                    handle_primitive_type!(builder, col, UInt32Builder, u32, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::BigIntUnsigned) => {
-                    handle_primitive_type!(builder, remote_field, UInt64Builder, u64, row, idx);
+                DataType::UInt64 => {
+                    handle_primitive_type!(builder, col, UInt64Builder, u64, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Float) => {
-                    handle_primitive_type!(builder, remote_field, Float32Builder, f32, row, idx);
+                DataType::Float32 => {
+                    handle_primitive_type!(builder, col, Float32Builder, f32, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Double) => {
-                    handle_primitive_type!(builder, remote_field, Float64Builder, f64, row, idx);
+                DataType::Float64 => {
+                    handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Decimal(precision, scale)) => {
-                    if precision > 38 {
-                        let builder = builder
-                            .as_any_mut()
-                            .downcast_mut::<Decimal256Builder>()
-                            .unwrap_or_else(|| {
-                                panic!(
-                                    "Failed to downcast builder to Decimal256Builder for {:?}",
-                                    remote_field
-                                )
-                            });
-                        let v = row.get::<Option<bigdecimal::BigDecimal>, usize>(idx);
+                DataType::Decimal128(_precision, scale) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Decimal128Builder>()
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to Decimal128Builder for {field:?}")
+                        });
+                    let v = row.get::<Option<bigdecimal::BigDecimal>, usize>(idx);
 
-                        match v {
-                            Some(Some(v)) => builder.append_value(to_decimal_256(&v)),
-                            _ => builder.append_null(),
+                    match v {
+                        Some(Some(v)) => {
+                            let Some(v) = big_decimal_to_i128(&v, Some(*scale as u32)) else {
+                                return Err(DataFusionError::Execution(format!(
+                                    "Failed to convert BigDecimal {v:?} to i128"
+                                )));
+                            };
+                            builder.append_value(v)
                         }
-                    } else {
-                        let builder = builder
-                            .as_any_mut()
-                            .downcast_mut::<Decimal128Builder>()
-                            .unwrap_or_else(|| {
-                                panic!(
-                                    "Failed to downcast builder to Decimal128Builder for {:?}",
-                                    remote_field
-                                )
-                            });
-                        let v = row.get::<Option<bigdecimal::BigDecimal>, usize>(idx);
-
-                        match v {
-                            Some(Some(v)) => {
-                                let Some(v) = big_decimal_to_i128(&v, Some(scale as u32)) else {
-                                    return Err(DataFusionError::Execution(format!(
-                                        "Failed to convert BigDecimal {v:?} to i128"
-                                    )));
-                                };
-                                builder.append_value(v)
-                            }
-                            _ => builder.append_null(),
-                        }
+                        _ => builder.append_null(),
                     }
                 }
-                RemoteType::Mysql(MysqlType::Date) => {
+                DataType::Decimal256(_precision, _scale) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Decimal256Builder>()
+                        .unwrap_or_else(|| {
+                            panic!("Failed to downcast builder to Decimal256Builder for {field:?}")
+                        });
+                    let v = row.get::<Option<bigdecimal::BigDecimal>, usize>(idx);
+
+                    match v {
+                        Some(Some(v)) => builder.append_value(to_decimal_256(&v)),
+                        _ => builder.append_null(),
+                    }
+                }
+                DataType::Date32 => {
                     // TODO this could also be simplified by macro
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Date32Builder>()
                         .unwrap_or_else(|| {
-                            panic!(
-                                "Failed to downcast builder to Date32Builder for {:?}",
-                                remote_field
-                            )
+                            panic!("Failed to downcast builder to Date32Builder for {field:?}")
                         });
                     let v = row.get::<Option<chrono::NaiveDate>, usize>(idx);
 
@@ -421,17 +387,13 @@ fn rows_to_batch(
                         _ => builder.append_null(),
                     }
                 }
-                RemoteType::Mysql(MysqlType::Datetime)
-                | RemoteType::Mysql(MysqlType::Timestamp) => {
+                DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<TimestampMicrosecondBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!(
-                            "Failed to downcast builder to TimestampMicrosecondBuilder for {:?}",
-                            remote_field
-                        )
-                        });
+                                .as_any_mut()
+                                .downcast_mut::<TimestampMicrosecondBuilder>()
+                                .unwrap_or_else(|| {
+                                    panic!("Failed to downcast builder to TimestampMicrosecondBuilder for {field:?}")
+                                });
                     let v = row.get::<Option<time::PrimitiveDateTime>, usize>(idx);
 
                     match v {
@@ -443,15 +405,31 @@ fn rows_to_batch(
                         _ => builder.append_null(),
                     }
                 }
-                RemoteType::Mysql(MysqlType::Time) => {
+                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                    let builder = builder
+                                .as_any_mut()
+                                .downcast_mut::<Time64NanosecondBuilder>()
+                                .unwrap_or_else(|| {
+                                    panic!("Failed to downcast builder to Time64NanosecondBuilder for {field:?}")
+                                });
+                    let v = row.get::<Option<chrono::NaiveTime>, usize>(idx);
+
+                    match v {
+                        Some(Some(v)) => {
+                            builder.append_value(
+                                i64::from(v.num_seconds_from_midnight()) * 1_000_000_000
+                                    + i64::from(v.nanosecond()),
+                            );
+                        }
+                        _ => builder.append_null(),
+                    }
+                }
+                DataType::Time64(TimeUnit::Nanosecond) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Time64NanosecondBuilder>()
                         .unwrap_or_else(|| {
-                            panic!(
-                                "Failed to downcast builder to Time64NanosecondBuilder for {:?}",
-                                remote_field
-                            )
+                            panic!("Failed to downcast builder to Time64NanosecondBuilder for {field:?}")
                         });
                     let v = row.get::<Option<chrono::NaiveTime>, usize>(idx);
 
@@ -465,75 +443,25 @@ fn rows_to_batch(
                         _ => builder.append_null(),
                     }
                 }
-                RemoteType::Mysql(MysqlType::Char) | RemoteType::Mysql(MysqlType::Varchar) => {
-                    handle_primitive_type!(builder, remote_field, StringBuilder, String, row, idx);
+                DataType::Utf8 => {
+                    handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Text(col_len)) => {
-                    if (col_len as usize) > (i32::MAX as usize) {
-                        handle_primitive_type!(
-                            builder,
-                            remote_field,
-                            LargeStringBuilder,
-                            String,
-                            row,
-                            idx
-                        );
-                    } else {
-                        handle_primitive_type!(
-                            builder,
-                            remote_field,
-                            StringBuilder,
-                            String,
-                            row,
-                            idx
-                        );
-                    }
+                DataType::LargeUtf8 => {
+                    handle_primitive_type!(builder, col, LargeStringBuilder, String, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Json) => {
-                    handle_primitive_type!(
-                        builder,
-                        remote_field,
-                        LargeStringBuilder,
-                        String,
-                        row,
-                        idx
-                    );
+                DataType::Binary => {
+                    handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Binary) | RemoteType::Mysql(MysqlType::Varbinary) => {
-                    handle_primitive_type!(builder, remote_field, BinaryBuilder, Vec<u8>, row, idx);
+                DataType::LargeBinary => {
+                    handle_primitive_type!(builder, col, LargeBinaryBuilder, Vec<u8>, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::Blob(col_len)) => {
-                    if (col_len as usize) > (i32::MAX as usize) {
-                        handle_primitive_type!(
-                            builder,
-                            remote_field,
-                            LargeBinaryBuilder,
-                            Vec<u8>,
-                            row,
-                            idx
-                        );
-                    } else {
-                        handle_primitive_type!(
-                            builder,
-                            remote_field,
-                            BinaryBuilder,
-                            Vec<u8>,
-                            row,
-                            idx
-                        );
-                    }
+                _ => {
+                    return Err(DataFusionError::NotImplemented(format!(
+                        "Unsupported data type {:?} for col: {:?}",
+                        field.data_type(),
+                        col
+                    )));
                 }
-                RemoteType::Mysql(MysqlType::Geometry) => {
-                    handle_primitive_type!(
-                        builder,
-                        remote_field,
-                        LargeBinaryBuilder,
-                        Vec<u8>,
-                        row,
-                        idx
-                    );
-                }
-                _ => panic!("Invalid mysql type: {:?}", remote_field.remote_type),
             }
         }
     }
