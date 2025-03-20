@@ -118,13 +118,13 @@ impl Connection for OracleConnection {
         table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
     ) -> DFResult<SendableRecordBatchStream> {
-        // todo!()
         let projected_schema = project_schema(&table_schema, projection.as_ref())?;
-        // TODO handle err
-        let result_set = self.conn.query(&sql, &[]).unwrap();
+        let result_set = self.conn.query(&sql, &[]).map_err(|e| {
+            DataFusionError::Execution(format!("Failed to execute query on oracle: {e:?}"))
+        })?;
         let stream = futures::stream::iter(result_set).chunks(2000).boxed();
 
-        let mut stream = stream.map(move |rows| {
+        let stream = stream.map(move |rows| {
             let rows: Vec<Row> = rows
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
@@ -133,19 +133,12 @@ impl Connection for OracleConnection {
                         "Failed to collect rows from oracle due to {e}",
                     ))
                 })?;
-            let batch = rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())?;
-            Ok::<RecordBatch, DataFusionError>(batch)
+            rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())
         });
-
-        let output_stream = async_stream::stream! {
-           while let Some(batch) = stream.next().await {
-                yield batch
-           }
-        };
 
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             projected_schema,
-            output_stream,
+            stream,
         )))
     }
 }

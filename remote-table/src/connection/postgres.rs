@@ -173,7 +173,7 @@ impl Connection for PostgresConnection {
             .chunks(2048)
             .boxed();
 
-        let mut stream = stream.map(move |rows| {
+        let stream = stream.map(move |rows| {
             let rows: Vec<Row> = rows
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()
@@ -182,19 +182,12 @@ impl Connection for PostgresConnection {
                         "Failed to collect rows from postgres due to {e}",
                     ))
                 })?;
-            let batch = rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())?;
-            Ok::<RecordBatch, DataFusionError>(batch)
+            rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())
         });
-
-        let output_stream = async_stream::stream! {
-           while let Some(batch) = stream.next().await {
-                yield batch
-           }
-        };
 
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             projected_schema,
-            output_stream,
+            stream,
         )))
     }
 }

@@ -21,8 +21,8 @@ impl RemoteTable {
     pub async fn try_new(
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
-        transform: Option<Arc<dyn Transform>>,
         table_schema: Option<SchemaRef>,
+        transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<Self> {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
