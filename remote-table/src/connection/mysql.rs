@@ -260,29 +260,11 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
             Ok(RemoteType::Mysql(MysqlType::Varbinary))
         }
         ColumnType::MYSQL_TYPE_VARCHAR => Ok(RemoteType::Mysql(MysqlType::Varchar)),
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 1020 && is_blob && !is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::TinyText))
+        ColumnType::MYSQL_TYPE_BLOB if is_blob && !is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::Text(col_length)))
         }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 262140 && is_blob && !is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::Text))
-        }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 67108860 && is_blob && !is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::MediumText))
-        }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 4294967295 && is_blob && !is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::LongText))
-        }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 255 && is_blob && is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::TinyBlob))
-        }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 65535 && is_blob && is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::Blob))
-        }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 16777215 && is_blob && is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::MediumBlob))
-        }
-        ColumnType::MYSQL_TYPE_BLOB if col_length == 4294967295 && is_blob && is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::LongBlob))
+        ColumnType::MYSQL_TYPE_BLOB if is_blob && is_binary => {
+            Ok(RemoteType::Mysql(MysqlType::Blob(col_length)))
         }
         ColumnType::MYSQL_TYPE_JSON => Ok(RemoteType::Mysql(MysqlType::Json)),
         ColumnType::MYSQL_TYPE_GEOMETRY => Ok(RemoteType::Mysql(MysqlType::Geometry)),
@@ -483,14 +465,31 @@ fn rows_to_batch(
                         _ => builder.append_null(),
                     }
                 }
-                RemoteType::Mysql(MysqlType::Char)
-                | RemoteType::Mysql(MysqlType::Varchar)
-                | RemoteType::Mysql(MysqlType::TinyText)
-                | RemoteType::Mysql(MysqlType::Text)
-                | RemoteType::Mysql(MysqlType::MediumText) => {
+                RemoteType::Mysql(MysqlType::Char) | RemoteType::Mysql(MysqlType::Varchar) => {
                     handle_primitive_type!(builder, remote_field, StringBuilder, String, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::LongText) | RemoteType::Mysql(MysqlType::Json) => {
+                RemoteType::Mysql(MysqlType::Text(col_len)) => {
+                    if (col_len as usize) > (i32::MAX as usize) {
+                        handle_primitive_type!(
+                            builder,
+                            remote_field,
+                            LargeStringBuilder,
+                            String,
+                            row,
+                            idx
+                        );
+                    } else {
+                        handle_primitive_type!(
+                            builder,
+                            remote_field,
+                            StringBuilder,
+                            String,
+                            row,
+                            idx
+                        );
+                    }
+                }
+                RemoteType::Mysql(MysqlType::Json) => {
                     handle_primitive_type!(
                         builder,
                         remote_field,
@@ -500,14 +499,31 @@ fn rows_to_batch(
                         idx
                     );
                 }
-                RemoteType::Mysql(MysqlType::Binary)
-                | RemoteType::Mysql(MysqlType::Varbinary)
-                | RemoteType::Mysql(MysqlType::TinyBlob)
-                | RemoteType::Mysql(MysqlType::Blob)
-                | RemoteType::Mysql(MysqlType::MediumBlob) => {
+                RemoteType::Mysql(MysqlType::Binary) | RemoteType::Mysql(MysqlType::Varbinary) => {
                     handle_primitive_type!(builder, remote_field, BinaryBuilder, Vec<u8>, row, idx);
                 }
-                RemoteType::Mysql(MysqlType::LongBlob) | RemoteType::Mysql(MysqlType::Geometry) => {
+                RemoteType::Mysql(MysqlType::Blob(col_len)) => {
+                    if (col_len as usize) > (i32::MAX as usize) {
+                        handle_primitive_type!(
+                            builder,
+                            remote_field,
+                            LargeBinaryBuilder,
+                            Vec<u8>,
+                            row,
+                            idx
+                        );
+                    } else {
+                        handle_primitive_type!(
+                            builder,
+                            remote_field,
+                            BinaryBuilder,
+                            Vec<u8>,
+                            row,
+                            idx
+                        );
+                    }
+                }
+                RemoteType::Mysql(MysqlType::Geometry) => {
                     handle_primitive_type!(
                         builder,
                         remote_field,

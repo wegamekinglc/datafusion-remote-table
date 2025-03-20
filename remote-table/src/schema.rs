@@ -137,14 +137,10 @@ pub enum MysqlType {
     Varchar,
     Binary,
     Varbinary,
-    TinyText,
-    Text,
-    MediumText,
-    LongText,
-    TinyBlob,
-    Blob,
-    MediumBlob,
-    LongBlob,
+    // TinyText, Text, MediumText, LongText
+    Text(u32),
+    // TinyBlob, Blob, MediumBlob, LongBlob
+    Blob(u32),
     Json,
     Geometry,
 }
@@ -181,14 +177,20 @@ impl MysqlType {
             MysqlType::Varchar => DataType::Utf8,
             MysqlType::Binary => DataType::Binary,
             MysqlType::Varbinary => DataType::Binary,
-            MysqlType::TinyText => DataType::Utf8,
-            MysqlType::Text => DataType::Utf8,
-            MysqlType::MediumText => DataType::Utf8,
-            MysqlType::LongText => DataType::LargeUtf8,
-            MysqlType::TinyBlob => DataType::Binary,
-            MysqlType::Blob => DataType::Binary,
-            MysqlType::MediumBlob => DataType::Binary,
-            MysqlType::LongBlob => DataType::LargeBinary,
+            MysqlType::Text(col_len) => {
+                if (*col_len as usize) > (i32::MAX as usize) {
+                    DataType::LargeUtf8
+                } else {
+                    DataType::Utf8
+                }
+            }
+            MysqlType::Blob(col_len) => {
+                if (*col_len as usize) > (i32::MAX as usize) {
+                    DataType::LargeBinary
+                } else {
+                    DataType::Binary
+                }
+            }
             MysqlType::Json => DataType::LargeUtf8,
             MysqlType::Geometry => DataType::LargeBinary,
         }
