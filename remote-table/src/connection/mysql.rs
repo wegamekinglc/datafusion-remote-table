@@ -199,7 +199,6 @@ impl Connection for MysqlConnection {
 }
 
 fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
-    let empty_flags = mysql_col.flags().is_empty();
     let is_binary = mysql_col.flags().contains(ColumnFlags::BINARY_FLAG);
     let is_blob = mysql_col.flags().contains(ColumnFlags::BLOB_FLAG);
     let is_unsigned = mysql_col.flags().contains(ColumnFlags::UNSIGNED_FLAG);
@@ -252,9 +251,9 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_TIME => Ok(RemoteType::Mysql(MysqlType::Time)),
         ColumnType::MYSQL_TYPE_TIMESTAMP => Ok(RemoteType::Mysql(MysqlType::Timestamp)),
         ColumnType::MYSQL_TYPE_YEAR => Ok(RemoteType::Mysql(MysqlType::Year)),
-        ColumnType::MYSQL_TYPE_STRING if empty_flags => Ok(RemoteType::Mysql(MysqlType::Char)),
+        ColumnType::MYSQL_TYPE_STRING if !is_binary => Ok(RemoteType::Mysql(MysqlType::Char)),
         ColumnType::MYSQL_TYPE_STRING if is_binary => Ok(RemoteType::Mysql(MysqlType::Binary)),
-        ColumnType::MYSQL_TYPE_VAR_STRING if empty_flags => {
+        ColumnType::MYSQL_TYPE_VAR_STRING if !is_binary => {
             Ok(RemoteType::Mysql(MysqlType::Varchar))
         }
         ColumnType::MYSQL_TYPE_VAR_STRING if is_binary => {
