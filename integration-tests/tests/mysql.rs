@@ -40,3 +40,40 @@ pub async fn supported_mysql_types() {
 +-------------+----------------------+--------------+-----------------------+-------------+----------------------+---------------+------------------------+------------+---------------------+-----------+------------+--------------+------------+---------------------+----------+---------------------+----------+----------+-------------+----------------------+---------------+--------------+----------+----------------+--------------+--------------+----------+----------------+--------------+------------------+----------------------------------------------------+"#,
     )
 }
+
+#[tokio::test]
+pub async fn describe_table() {
+    setup_shared_containers();
+    // Wait for the database to be ready to connect
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+    let options = ConnectionOptions::Mysql(
+        MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")
+            .with_database(Some("test".to_string())),
+    );
+    let table = RemoteTable::try_new(options, "describe simple_table", None)
+        .await
+        .unwrap();
+    println!("remote schema: {:#?}", table.remote_schema());
+
+    let ctx = SessionContext::new();
+    ctx.register_table("remote_table", Arc::new(table)).unwrap();
+
+    let result = ctx
+        .sql("SELECT * FROM remote_table")
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+
+    assert_eq!(
+        &pretty_format_batches(&result).unwrap().to_string(),
+        r#"+-------+--------------------------+------+--------+---------+-------+
+| Field | Type                     | Null | Key    | Default | Extra |
++-------+--------------------------+------+--------+---------+-------+
+| id    | 696e74                   | NO   | 505249 |         |       |
+| name  | 766172636861722832353529 | NO   |        |         |       |
++-------+--------------------------+------+--------+---------+-------+"#,
+    )
+}

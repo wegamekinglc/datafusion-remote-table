@@ -40,3 +40,10 @@ CREATE TABLE supported_data_types
 INSERT INTO supported_data_types values
 (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.1, 2.2, 3.33, '2025-03-14', '2025-03-14 17:36:25', '11:11:11', '2025-03-14 11:11:11', '1999', 'char', 'varchar', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}', Point(15, 20)),
 (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+
+CREATE TABLE simple_table (
+    id INT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+INSERT INTO simple_table VALUES (1, 'Tom');

@@ -100,3 +100,60 @@ pub async fn exec_plan_serialization() {
 +----+------+"
     )
 }
+
+#[tokio::test]
+pub async fn table_columns() {
+    setup_shared_containers();
+    let options = ConnectionOptions::Postgres(
+        PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
+            .with_database(Some("postgres".to_string())),
+    );
+    let sql = format!(
+        r#"
+        SELECT
+    a.attname AS column_name,
+    pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
+    CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
+    t.typname AS udt_name
+FROM
+    pg_catalog.pg_attribute a
+JOIN
+    pg_catalog.pg_class c ON a.attrelid = c.oid
+JOIN
+    pg_catalog.pg_type t ON a.atttypid = t.oid
+WHERE
+    c.relname = '{}'
+    AND c.relkind IN ('r', 'v', 'm')
+    AND a.attnum > 0
+    AND NOT a.attisdropped
+ORDER BY
+    a.attnum
+        "#,
+        "simple_table"
+    );
+    let table = RemoteTable::try_new(options, sql, None).await.unwrap();
+
+    println!("remote schema: {:#?}", table.remote_schema());
+
+    let ctx = SessionContext::new();
+    ctx.register_table("remote_table", Arc::new(table)).unwrap();
+
+    let result = ctx
+        .sql("SELECT * FROM remote_table")
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+
+    assert_eq!(
+        pretty_format_batches(&result).unwrap().to_string(),
+        r#"+-------------+------------------------+-------------+----------+
+| column_name | data_type              | is_nullable | udt_name |
++-------------+------------------------+-------------+----------+
+| id          | integer                | NO          | int4     |
+| name        | character varying(255) | NO          | varchar  |
++-------------+------------------------+-------------+----------+"#
+    )
+}

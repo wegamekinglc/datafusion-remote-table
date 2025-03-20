@@ -250,6 +250,7 @@ fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<Rem
                 scale.try_into().unwrap_or_default(),
             )))
         }
+        &Type::NAME => Ok(RemoteType::Postgres(PostgresType::Name)),
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
         &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
@@ -562,7 +563,8 @@ fn rows_to_batch(
                         None => builder.append_null(),
                     }
                 }
-                RemoteType::Postgres(PostgresType::Varchar)
+                RemoteType::Postgres(PostgresType::Name)
+                | RemoteType::Postgres(PostgresType::Varchar)
                 | RemoteType::Postgres(PostgresType::Text) => {
                     handle_primitive_type!(builder, field, StringBuilder, &str, row, idx);
                 }
