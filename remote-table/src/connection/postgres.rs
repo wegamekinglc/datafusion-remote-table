@@ -451,7 +451,7 @@ impl<'a> FromSql<'a> for IntervalFromSql {
     }
 }
 
-pub struct GeometryFromSql<'a> {
+struct GeometryFromSql<'a> {
     wkb: &'a [u8],
 }
 

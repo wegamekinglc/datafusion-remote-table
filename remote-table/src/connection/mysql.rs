@@ -10,8 +10,9 @@ use chrono::Timelike;
 use datafusion::arrow::array::{
     make_builder, ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder,
     Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
-    LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, Time64NanosecondBuilder,
-    TimestampMicrosecondBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
+    LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, Time32SecondBuilder,
+    Time64NanosecondBuilder, TimestampMicrosecondBuilder, UInt16Builder, UInt32Builder,
+    UInt64Builder, UInt8Builder,
 };
 use datafusion::arrow::datatypes::{i256, DataType, Date32Type, SchemaRef, TimeUnit};
 use datafusion::common::{project_schema, DataFusionError};
@@ -55,7 +56,7 @@ pub struct MysqlPool {
     pool: mysql_async::Pool,
 }
 
-pub fn connect_mysql(options: &MysqlConnectionOptions) -> DFResult<MysqlPool> {
+pub(crate) fn connect_mysql(options: &MysqlConnectionOptions) -> DFResult<MysqlPool> {
     let opts_builder = mysql_async::OptsBuilder::default()
         .ip_or_hostname(options.host.clone())
         .tcp_port(options.port)
@@ -414,6 +415,24 @@ fn rows_to_batch(
                                 i64::from(v.num_seconds_from_midnight()) * 1_000_000_000
                                     + i64::from(v.nanosecond()),
                             );
+                        }
+                        _ => builder.append_null(),
+                    }
+                }
+                DataType::Time32(TimeUnit::Second) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Time32SecondBuilder>()
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Failed to downcast builder to Time32SecondBuilder for {field:?}"
+                            )
+                        });
+                    let v = row.get::<Option<chrono::NaiveTime>, usize>(idx);
+
+                    match v {
+                        Some(Some(v)) => {
+                            builder.append_value(v.num_seconds_from_midnight() as i32);
                         }
                         _ => builder.append_null(),
                     }

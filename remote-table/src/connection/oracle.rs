@@ -50,7 +50,7 @@ pub struct OraclePool {
     pool: bb8::Pool<OracleConnectionManager>,
 }
 
-pub async fn connect_oracle(options: &OracleConnectionOptions) -> DFResult<OraclePool> {
+pub(crate) async fn connect_oracle(options: &OracleConnectionOptions) -> DFResult<OraclePool> {
     let connect_string = format!(
         "//{}:{}/{}",
         options.host, options.port, options.service_name
