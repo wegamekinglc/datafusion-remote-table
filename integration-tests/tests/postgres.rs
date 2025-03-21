@@ -45,7 +45,7 @@ pub async fn supported_postgres_types() {
     );
 
     let result = ctx
-        .sql("SELECT integer_col, char_col FROM remote_table")
+        .sql("SELECT integer_col, varchar_col FROM remote_table")
         .await
         .unwrap()
         .collect()
@@ -55,12 +55,12 @@ pub async fn supported_postgres_types() {
 
     assert_eq!(
         &pretty_format_batches(&result).unwrap().to_string(),
-        "+-------------+----------+
-| integer_col | char_col |
-+-------------+----------+
-| 2           | char     |
-|             |          |
-+-------------+----------+"
+        r#"+-------------+-------------+
+| integer_col | varchar_col |
++-------------+-------------+
+| 2           | varchar     |
+|             |             |
++-------------+-------------+"#,
     );
 }
 
