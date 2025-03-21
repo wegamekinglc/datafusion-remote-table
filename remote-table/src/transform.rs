@@ -1,4 +1,4 @@
-use crate::{DFResult, RemoteField, RemoteSchema};
+use crate::{DFResult, RemoteField, RemoteSchemaRef};
 use datafusion::arrow::array::{
     ArrayRef, BinaryArray, BooleanArray, Date32Array, Float16Array, Float32Array, Float64Array,
     Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray,
@@ -197,7 +197,7 @@ pub(crate) struct TransformStream {
     table_schema: SchemaRef,
     projection: Option<Vec<usize>>,
     projected_schema: SchemaRef,
-    remote_schema: Option<RemoteSchema>,
+    remote_schema: Option<RemoteSchemaRef>,
 }
 
 impl TransformStream {
@@ -206,7 +206,7 @@ impl TransformStream {
         transform: Arc<dyn Transform>,
         table_schema: SchemaRef,
         projection: Option<Vec<usize>>,
-        remote_schema: Option<RemoteSchema>,
+        remote_schema: Option<RemoteSchemaRef>,
     ) -> DFResult<Self> {
         let projected_schema = project_schema(&table_schema, projection.as_ref())?;
         Ok(Self {
@@ -254,7 +254,7 @@ pub(crate) fn transform_batch(
     transform: &dyn Transform,
     table_schema: &SchemaRef,
     projection: Option<&Vec<usize>>,
-    remote_schema: Option<&RemoteSchema>,
+    remote_schema: Option<&RemoteSchemaRef>,
 ) -> DFResult<RecordBatch> {
     let mut new_arrays: Vec<ArrayRef> = Vec::with_capacity(batch.schema().fields.len());
     let mut new_fields: Vec<Field> = Vec::with_capacity(batch.schema().fields.len());

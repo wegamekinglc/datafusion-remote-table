@@ -1,4 +1,6 @@
-use crate::{connect, ConnectionOptions, DFResult, Pool, RemoteSchema, RemoteTableExec, Transform};
+use crate::{
+    connect, ConnectionOptions, DFResult, Pool, RemoteSchemaRef, RemoteTableExec, Transform,
+};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::datasource::TableType;
@@ -12,7 +14,7 @@ pub struct RemoteTable {
     pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
     pub(crate) table_schema: SchemaRef,
-    pub(crate) remote_schema: Option<RemoteSchema>,
+    pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     pub(crate) pool: Arc<dyn Pool>,
 }
@@ -50,8 +52,8 @@ impl RemoteTable {
         })
     }
 
-    pub fn remote_schema(&self) -> Option<&RemoteSchema> {
-        self.remote_schema.as_ref()
+    pub fn remote_schema(&self) -> Option<RemoteSchemaRef> {
+        self.remote_schema.clone()
     }
 }
 
@@ -80,7 +82,6 @@ impl TableProvider for RemoteTable {
             self.conn_options.clone(),
             self.sql.clone(),
             self.table_schema.clone(),
-            // TODO RemoteSchemaRef
             self.remote_schema.clone(),
             projection.cloned(),
             self.transform.clone(),

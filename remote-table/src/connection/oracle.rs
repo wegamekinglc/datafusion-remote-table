@@ -1,7 +1,8 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
+    Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteType,
+    Transform,
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
@@ -91,11 +92,11 @@ impl Connection for OracleConnection {
         &self,
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchema, SchemaRef)> {
+    ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let row = self.conn.query_row(sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to query one row to infer schema: {e:?}"))
         })?;
-        let remote_schema = build_remote_schema(&row)?;
+        let remote_schema = Arc::new(build_remote_schema(&row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
             let batch = rows_to_batch(&[row], &arrow_schema, None)?;

@@ -270,6 +270,8 @@ impl RemoteField {
     }
 }
 
+pub type RemoteSchemaRef = Arc<RemoteSchema>;
+
 #[derive(Debug, Clone)]
 pub struct RemoteSchema {
     pub fields: Vec<RemoteField>,

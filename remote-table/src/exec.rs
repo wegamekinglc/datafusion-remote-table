@@ -1,4 +1,4 @@
-use crate::{Connection, ConnectionOptions, DFResult, RemoteSchema, Transform, TransformStream};
+use crate::{Connection, ConnectionOptions, DFResult, RemoteSchemaRef, Transform, TransformStream};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
@@ -16,7 +16,7 @@ pub struct RemoteTableExec {
     pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
     pub(crate) table_schema: SchemaRef,
-    pub(crate) remote_schema: Option<RemoteSchema>,
+    pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) projection: Option<Vec<usize>>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     conn: Arc<dyn Connection>,
@@ -28,7 +28,7 @@ impl RemoteTableExec {
         conn_options: ConnectionOptions,
         sql: String,
         table_schema: SchemaRef,
-        remote_schema: Option<RemoteSchema>,
+        remote_schema: Option<RemoteSchemaRef>,
         projection: Option<Vec<usize>>,
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
@@ -101,7 +101,7 @@ async fn build_and_transform_stream(
     conn: Arc<dyn Connection>,
     sql: String,
     table_schema: SchemaRef,
-    remote_schema: Option<RemoteSchema>,
+    remote_schema: Option<RemoteSchemaRef>,
     projection: Option<Vec<usize>>,
     transform: Option<Arc<dyn Transform>>,
 ) -> DFResult<SendableRecordBatchStream> {

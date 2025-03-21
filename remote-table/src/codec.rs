@@ -2,7 +2,7 @@ use crate::generated::prost as protobuf;
 use crate::{
     connect, ConnectionOptions, DFResult, MysqlConnectionOptions, MysqlType,
     OracleConnectionOptions, OracleType, PostgresConnectionOptions, PostgresType, RemoteField,
-    RemoteSchema, RemoteTableExec, RemoteType, SqliteType, Transform,
+    RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
@@ -59,7 +59,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
         let table_schema: SchemaRef = Arc::new(convert_required!(&proto.table_schema)?);
         let remote_schema = proto
             .remote_schema
-            .map(|schema| parse_remote_schema(&schema));
+            .map(|schema| Arc::new(parse_remote_schema(&schema)));
 
         let projection: Option<Vec<usize>> = proto
             .projection
@@ -216,7 +216,7 @@ fn serialize_projection(projection: &[usize]) -> protobuf::Projection {
     }
 }
 
-fn serialize_remote_schema(remote_schema: &RemoteSchema) -> protobuf::RemoteSchema {
+fn serialize_remote_schema(remote_schema: &RemoteSchemaRef) -> protobuf::RemoteSchema {
     let fields = remote_schema
         .fields
         .iter()

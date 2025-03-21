@@ -8,7 +8,7 @@ pub use oracle::*;
 pub use postgres::*;
 
 use crate::connection::sqlite::connect_sqlite;
-use crate::{DFResult, RemoteSchema, Transform};
+use crate::{DFResult, RemoteSchemaRef, Transform};
 use bigdecimal::ToPrimitive;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
@@ -28,7 +28,7 @@ pub trait Connection: Debug + Send + Sync {
         &self,
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchema, SchemaRef)>;
+    ) -> DFResult<(RemoteSchemaRef, SchemaRef)>;
 
     async fn query(
         &self,

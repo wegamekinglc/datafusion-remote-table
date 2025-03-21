@@ -1,7 +1,8 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteType, Transform,
+    Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteType,
+    Transform,
 };
 use async_stream::stream;
 use bigdecimal::num_bigint;
@@ -88,7 +89,7 @@ impl Connection for MysqlConnection {
         &self,
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchema, SchemaRef)> {
+    ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
         let row: Option<Row> = conn.query_first(sql).await.map_err(|e| {
@@ -99,7 +100,7 @@ impl Connection for MysqlConnection {
                 "No rows returned to infer schema".to_string(),
             ));
         };
-        let remote_schema = build_remote_schema(&row)?;
+        let remote_schema = Arc::new(build_remote_schema(&row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
             let batch = rows_to_batch(&[row], &arrow_schema, None)?;

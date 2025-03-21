@@ -1,7 +1,8 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema, RemoteType, Transform,
+    Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema, RemoteSchemaRef,
+    RemoteType, Transform,
 };
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
@@ -106,7 +107,7 @@ impl Connection for PostgresConnection {
         &self,
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchema, SchemaRef)> {
+    ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let mut stream = self
             .conn
             .query_raw(sql, Vec::<String>::new())
@@ -137,7 +138,7 @@ impl Connection for PostgresConnection {
                 "No data returned from postgres".to_string(),
             ));
         };
-        let remote_schema = build_remote_schema(first_row)?;
+        let remote_schema = Arc::new(build_remote_schema(first_row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
             let batch = rows_to_batch(std::slice::from_ref(first_row), &arrow_schema, None)?;

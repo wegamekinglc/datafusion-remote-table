@@ -1,7 +1,8 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, Pool, RemoteField, RemoteSchema, RemoteType, SqliteType, Transform,
+    Connection, DFResult, Pool, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteType, SqliteType,
+    Transform,
 };
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder,
@@ -46,7 +47,7 @@ impl Connection for SqliteConnection {
         &self,
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchema, SchemaRef)> {
+    ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let sql = sql.to_string();
         self.conn
             .call(move |conn| {
@@ -54,8 +55,10 @@ impl Connection for SqliteConnection {
                 let columns: Vec<OwnedColumn> =
                     stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
 
-                let remote_schema = build_remote_schema(columns.as_slice())
-                    .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?;
+                let remote_schema = Arc::new(
+                    build_remote_schema(columns.as_slice())
+                        .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?,
+                );
                 let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
 
                 if let Some(transform) = transform {
