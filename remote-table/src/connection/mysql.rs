@@ -22,7 +22,7 @@ use futures::lock::Mutex;
 use futures::StreamExt;
 use mysql_async::consts::{ColumnFlags, ColumnType};
 use mysql_async::prelude::Queryable;
-use mysql_async::{Column, Row};
+use mysql_async::{Column, FromValueError, Row, Value};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, derive_with::With)]
@@ -273,11 +273,20 @@ macro_rules! handle_primitive_type {
                     $field, $mysql_col
                 )
             });
-        let v = $row.get::<Option<$value_ty>, usize>($index);
+        let v = $row.get_opt::<$value_ty, usize>($index);
 
         match v {
-            Some(Some(v)) => builder.append_value($convert(v)?),
-            _ => builder.append_null(),
+            None => builder.append_null(),
+            Some(Ok(v)) => builder.append_value($convert(v)?),
+            Some(Err(FromValueError(Value::NULL))) => builder.append_null(),
+            Some(Err(e)) => {
+                return Err(DataFusionError::Execution(format!(
+                    "Failed to get optional {:?} value for {:?} and {:?}: {e:?}",
+                    stringify!($value_ty),
+                    $field,
+                    $mysql_col,
+                )))
+            }
         }
     }};
 }
