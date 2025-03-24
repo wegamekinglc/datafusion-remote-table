@@ -86,6 +86,7 @@ impl ExecutionPlan for RemoteTableExec {
         let schema = self.schema();
         let fut = build_and_transform_stream(
             self.conn.clone(),
+            self.conn_options.clone(),
             self.sql.clone(),
             self.table_schema.clone(),
             self.remote_schema.clone(),
@@ -99,6 +100,7 @@ impl ExecutionPlan for RemoteTableExec {
 
 async fn build_and_transform_stream(
     conn: Arc<dyn Connection>,
+    conn_options: ConnectionOptions,
     sql: String,
     table_schema: SchemaRef,
     remote_schema: Option<RemoteSchemaRef>,
@@ -106,7 +108,12 @@ async fn build_and_transform_stream(
     transform: Option<Arc<dyn Transform>>,
 ) -> DFResult<SendableRecordBatchStream> {
     let stream = conn
-        .query(sql, table_schema.clone(), projection.clone())
+        .query(
+            &conn_options,
+            &sql,
+            table_schema.clone(),
+            projection.as_ref(),
+        )
         .await?;
     if let Some(transform) = transform.as_ref() {
         Ok(Box::pin(TransformStream::try_new(

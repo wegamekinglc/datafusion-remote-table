@@ -1,8 +1,8 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, Pool, PostgresType, RemoteField, RemoteSchema, RemoteSchemaRef,
-    RemoteType, Transform,
+    Connection, ConnectionOptions, DFResult, Pool, PostgresType, RemoteField, RemoteSchema,
+    RemoteSchemaRef, RemoteType, Transform,
 };
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
@@ -37,6 +37,7 @@ pub struct PostgresConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) database: Option<String>,
+    pub(crate) chunk_size: Option<usize>,
 }
 
 impl PostgresConnectionOptions {
@@ -52,6 +53,7 @@ impl PostgresConnectionOptions {
             username: username.into(),
             password: password.into(),
             database: None,
+            chunk_size: None,
         }
     }
 }
@@ -158,21 +160,24 @@ impl Connection for PostgresConnection {
 
     async fn query(
         &self,
-        sql: String,
+        conn_options: &ConnectionOptions,
+        sql: &str,
         table_schema: SchemaRef,
-        projection: Option<Vec<usize>>,
+        projection: Option<&Vec<usize>>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
+        let projected_schema = project_schema(&table_schema, projection)?;
+        let projection = projection.cloned();
+        let chunk_size = conn_options.chunk_size();
         let stream = self
             .conn
-            .query_raw(&sql, Vec::<String>::new())
+            .query_raw(sql, Vec::<String>::new())
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
                     "Failed to execute query {sql} on postgres due to {e}",
                 ))
             })?
-            .chunks(2048)
+            .chunks(chunk_size.unwrap_or(2048))
             .boxed();
 
         let stream = stream.map(move |rows| {

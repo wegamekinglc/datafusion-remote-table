@@ -1,8 +1,8 @@
 use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, Pool, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteType, SqliteType,
-    Transform,
+    Connection, ConnectionOptions, DFResult, Pool, RemoteField, RemoteSchema, RemoteSchemaRef,
+    RemoteType, SqliteType, Transform,
 };
 use datafusion::arrow::array::{
     make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder,
@@ -89,12 +89,14 @@ impl Connection for SqliteConnection {
 
     async fn query(
         &self,
-        sql: String,
+        _conn_options: &ConnectionOptions,
+        sql: &str,
         table_schema: SchemaRef,
-        projection: Option<Vec<usize>>,
+        projection: Option<&Vec<usize>>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
-        let projection_clone = projection.clone();
+        let projected_schema = project_schema(&table_schema, projection)?;
+        let projection = projection.cloned();
+        let sql = sql.to_string();
         let batch = self
             .conn
             .call(move |conn| {
@@ -103,7 +105,7 @@ impl Connection for SqliteConnection {
                     stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
                 let rows = stmt.query([])?;
 
-                let batch = rows_to_batch(rows, &table_schema, columns, projection_clone.as_ref())
+                let batch = rows_to_batch(rows, &table_schema, columns, projection.as_ref())
                     .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
                 Ok(batch)
             })

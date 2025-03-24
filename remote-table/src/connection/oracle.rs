@@ -1,8 +1,8 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, OracleType, Pool, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteType,
-    Transform,
+    Connection, ConnectionOptions, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
+    RemoteSchemaRef, RemoteType, Transform,
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
@@ -20,11 +20,12 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct OracleConnectionOptions {
-    pub host: String,
-    pub port: u16,
-    pub username: String,
-    pub password: String,
-    pub service_name: String,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) username: String,
+    pub(crate) password: String,
+    pub(crate) service_name: String,
+    pub(crate) chunk_size: Option<usize>,
 }
 
 impl OracleConnectionOptions {
@@ -41,6 +42,7 @@ impl OracleConnectionOptions {
             username: username.into(),
             password: password.into(),
             service_name: service_name.into(),
+            chunk_size: None,
         }
     }
 }
@@ -115,15 +117,20 @@ impl Connection for OracleConnection {
 
     async fn query(
         &self,
-        sql: String,
+        conn_options: &ConnectionOptions,
+        sql: &str,
         table_schema: SchemaRef,
-        projection: Option<Vec<usize>>,
+        projection: Option<&Vec<usize>>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
-        let result_set = self.conn.query(&sql, &[]).map_err(|e| {
+        let projected_schema = project_schema(&table_schema, projection)?;
+        let projection = projection.cloned();
+        let chunk_size = conn_options.chunk_size();
+        let result_set = self.conn.query(sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query on oracle: {e:?}"))
         })?;
-        let stream = futures::stream::iter(result_set).chunks(2000).boxed();
+        let stream = futures::stream::iter(result_set)
+            .chunks(chunk_size.unwrap_or(2048))
+            .boxed();
 
         let stream = stream.map(move |rows| {
             let rows: Vec<Row> = rows

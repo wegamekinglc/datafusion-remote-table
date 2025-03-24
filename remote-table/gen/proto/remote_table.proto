@@ -28,6 +28,7 @@ message PostgresConnectionOptions {
   string username = 3;
   string password = 4;
   optional string database = 5;
+  optional uint32 chunk_size = 6;
 }
 
 message MysqlConnectionOptions {
@@ -36,6 +37,7 @@ message MysqlConnectionOptions {
   string username = 3;
   string password = 4;
   optional string database = 5;
+  optional uint32 chunk_size = 6;
 }
 
 message OracleConnectionOptions {
@@ -44,6 +46,7 @@ message OracleConnectionOptions {
   string username = 3;
   string password = 4;
   string service_name = 5;
+  optional uint32 chunk_size = 6;
 }
 
 message SqliteConnectionOptions {

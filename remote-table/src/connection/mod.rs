@@ -32,9 +32,10 @@ pub trait Connection: Debug + Send + Sync {
 
     async fn query(
         &self,
-        sql: String,
+        conn_options: &ConnectionOptions,
+        sql: &str,
         table_schema: SchemaRef,
-        projection: Option<Vec<usize>>,
+        projection: Option<&Vec<usize>>,
     ) -> DFResult<SendableRecordBatchStream>;
 }
 
@@ -65,6 +66,17 @@ pub enum ConnectionOptions {
     Oracle(OracleConnectionOptions),
     Mysql(MysqlConnectionOptions),
     Sqlite(PathBuf),
+}
+
+impl ConnectionOptions {
+    pub fn chunk_size(&self) -> Option<usize> {
+        match self {
+            ConnectionOptions::Postgres(options) => options.chunk_size,
+            ConnectionOptions::Oracle(options) => options.chunk_size,
+            ConnectionOptions::Mysql(options) => options.chunk_size,
+            ConnectionOptions::Sqlite(_) => None,
+        }
+    }
 }
 
 pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usize) -> bool {

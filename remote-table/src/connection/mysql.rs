@@ -1,8 +1,8 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
-    Connection, DFResult, MysqlType, Pool, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteType,
-    Transform,
+    Connection, ConnectionOptions, DFResult, MysqlType, Pool, RemoteField, RemoteSchema,
+    RemoteSchemaRef, RemoteType, Transform,
 };
 use async_stream::stream;
 use bigdecimal::{num_bigint, BigDecimal};
@@ -32,6 +32,7 @@ pub struct MysqlConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) database: Option<String>,
+    pub(crate) chunk_size: Option<usize>,
 }
 
 impl MysqlConnectionOptions {
@@ -47,6 +48,7 @@ impl MysqlConnectionOptions {
             username: username.into(),
             password: password.into(),
             database: None,
+            chunk_size: None,
         }
     }
 }
@@ -120,11 +122,15 @@ impl Connection for MysqlConnection {
 
     async fn query(
         &self,
-        sql: String,
+        conn_options: &ConnectionOptions,
+        sql: &str,
         table_schema: SchemaRef,
-        projection: Option<Vec<usize>>,
+        projection: Option<&Vec<usize>>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
+        let projected_schema = project_schema(&table_schema, projection)?;
+        let sql = sql.to_string();
+        let projection = projection.cloned();
+        let chunk_size = conn_options.chunk_size();
         let conn = Arc::clone(&self.conn);
         let stream = Box::pin(stream! {
             let mut conn = conn.lock().await;
@@ -142,7 +148,7 @@ impl Connection for MysqlConnection {
                 return;
             };
 
-            let mut chunked_stream = stream.chunks(4_000).boxed();
+            let mut chunked_stream = stream.chunks(chunk_size.unwrap_or(2048)).boxed();
 
             while let Some(chunk) = chunked_stream.next().await {
                 let rows = chunk

@@ -45,6 +45,8 @@ pub struct PostgresConnectionOptions {
     pub password: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]
     pub database: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(uint32, optional, tag = "6")]
+    pub chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MysqlConnectionOptions {
@@ -58,6 +60,8 @@ pub struct MysqlConnectionOptions {
     pub password: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]
     pub database: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(uint32, optional, tag = "6")]
+    pub chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OracleConnectionOptions {
@@ -71,6 +75,8 @@ pub struct OracleConnectionOptions {
     pub password: ::prost::alloc::string::String,
     #[prost(string, tag = "5")]
     pub service_name: ::prost::alloc::string::String,
+    #[prost(uint32, optional, tag = "6")]
+    pub chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SqliteConnectionOptions {
