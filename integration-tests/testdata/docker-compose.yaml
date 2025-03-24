@@ -21,6 +21,7 @@ services:
 
   oracle:
     image: wnameless/oracle-xe-11g-r2
+#    image: softwareplant/oracle:latest
     environment:
       - ORACLE_ALLOW_REMOTE=true
     ports:

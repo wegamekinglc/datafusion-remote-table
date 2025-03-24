@@ -259,7 +259,7 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
 }
 
 macro_rules! handle_primitive_type {
-    ($builder:expr, $field:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+    ($builder:expr, $field:expr, $col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
@@ -268,21 +268,17 @@ macro_rules! handle_primitive_type {
                     concat!(
                         "Failed to downcast builder to ",
                         stringify!($builder_ty),
-                        " for {:?}"
+                        " for {:?} and {:?}"
                     ),
-                    $field
+                    $field, $col
                 )
             });
-        let v: Option<$value_ty> = $row.try_get($index).unwrap_or_else(|e| {
-            panic!(
-                concat!(
-                    "Failed to get ",
-                    stringify!($value_ty),
-                    " value for {:?}: {:?}"
-                ),
-                $field, e
-            )
-        });
+        let v: Option<$value_ty> = $row.try_get($index).map_err(|e| {
+            DataFusionError::Execution(format!(
+                "Failed to get BigDecimal value for {:?} and {:?}: {e:?}",
+                $field, $col
+            ))
+        })?;
 
         match v {
             Some(v) => builder.append_value(v),
@@ -490,37 +486,38 @@ fn rows_to_batch(
             let col = row.columns().get(idx);
             match field.data_type() {
                 DataType::Int16 => {
-                    handle_primitive_type!(builder, field, Int16Builder, i16, row, idx);
+                    handle_primitive_type!(builder, field, col, Int16Builder, i16, row, idx);
                 }
                 DataType::Int32 => {
-                    handle_primitive_type!(builder, field, Int32Builder, i32, row, idx);
+                    handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx);
                 }
                 DataType::Int64 => {
-                    handle_primitive_type!(builder, field, Int64Builder, i64, row, idx);
+                    handle_primitive_type!(builder, field, col, Int64Builder, i64, row, idx);
                 }
                 DataType::Float32 => {
-                    handle_primitive_type!(builder, field, Float32Builder, f32, row, idx);
+                    handle_primitive_type!(builder, field, col, Float32Builder, f32, row, idx);
                 }
                 DataType::Float64 => {
-                    handle_primitive_type!(builder, field, Float64Builder, f64, row, idx);
+                    handle_primitive_type!(builder, field, col, Float64Builder, f64, row, idx);
                 }
                 DataType::Decimal128(_precision, _scale) => {
                     let builder = builder
                         .as_any_mut()
                         .downcast_mut::<Decimal128Builder>()
                         .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to Decimal128Builder for {field:?}")
+                            panic!("Failed to downcast builder to Decimal128Builder for {field:?} and {col:?}")
                         });
                     let v: Option<BigDecimalFromSql> = row.try_get(idx).map_err(|e| {
-                        DataFusionError::Execution(format!("Failed to get BigDecimal value: {e:?}"))
+                        DataFusionError::Execution(format!(
+                            "Failed to get BigDecimal value for {field:?} and {col:?}: {e:?}"
+                        ))
                     })?;
 
                     match v {
                         Some(v) => {
                             let Some(v) = v.to_decimal_128() else {
                                 return Err(DataFusionError::Execution(format!(
-                                    "Failed to convert BigDecimal {:?} to i128",
-                                    v
+                                    "Failed to convert BigDecimal {v:?} to i128",
                                 )));
                             };
                             builder.append_value(v)
@@ -529,7 +526,7 @@ fn rows_to_batch(
                     }
                 }
                 DataType::Utf8 => {
-                    handle_primitive_type!(builder, field, StringBuilder, &str, row, idx);
+                    handle_primitive_type!(builder, field, col, StringBuilder, &str, row, idx);
                 }
                 DataType::LargeUtf8 => {
                     if col.is_some() && matches!(col.unwrap().type_(), &Type::JSON | &Type::JSONB) {
@@ -537,11 +534,11 @@ fn rows_to_batch(
                             .as_any_mut()
                             .downcast_mut::<LargeStringBuilder>()
                             .unwrap_or_else(|| {
-                                panic!("Failed to downcast builder to LargeStringBuilder for {field:?}")
+                                panic!("Failed to downcast builder to LargeStringBuilder for {field:?} and {col:?}")
                             });
                         let v: Option<serde_json::value::Value> =
                             row.try_get(idx).unwrap_or_else(|e| {
-                                panic!("Failed to get serde_json::value::Value value for {field:?}: {e:?}")
+                                panic!("Failed to get serde_json::value::Value value for {field:?} and {col:?}: {e:?}")
                             });
 
                         match v {
@@ -549,7 +546,15 @@ fn rows_to_batch(
                             None => builder.append_null(),
                         }
                     } else {
-                        handle_primitive_type!(builder, field, LargeStringBuilder, &str, row, idx);
+                        handle_primitive_type!(
+                            builder,
+                            field,
+                            col,
+                            LargeStringBuilder,
+                            &str,
+                            row,
+                            idx
+                        );
                     }
                 }
                 DataType::Binary => {
@@ -582,7 +587,15 @@ fn rows_to_batch(
                             None => builder.append_null(),
                         }
                     } else {
-                        handle_primitive_type!(builder, field, BinaryBuilder, Vec<u8>, row, idx);
+                        handle_primitive_type!(
+                            builder,
+                            field,
+                            col,
+                            BinaryBuilder,
+                            Vec<u8>,
+                            row,
+                            idx
+                        );
                     }
                 }
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
@@ -732,7 +745,7 @@ fn rows_to_batch(
                     }
                 }
                 DataType::Boolean => {
-                    handle_primitive_type!(builder, field, BooleanBuilder, bool, row, idx);
+                    handle_primitive_type!(builder, field, col, BooleanBuilder, bool, row, idx);
                 }
                 DataType::List(inner) => match inner.data_type() {
                     DataType::Int16 => {

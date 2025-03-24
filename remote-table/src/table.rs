@@ -4,6 +4,7 @@ use crate::{
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::datasource::TableType;
+use datafusion::error::DataFusionError;
 use datafusion::logical_expr::Expr;
 use datafusion::physical_plan::ExecutionPlan;
 use std::any::Any;
@@ -38,7 +39,9 @@ impl RemoteTable {
                 if let Some(table_schema) = table_schema {
                     (table_schema, None)
                 } else {
-                    return Err(e);
+                    return Err(DataFusionError::Execution(format!(
+                        "Failed to infer schema: {e}"
+                    )));
                 }
             }
         };

@@ -202,6 +202,7 @@ impl MysqlType {
 }
 
 // https://docs.oracle.com/cd/B28359_01/server.111/b28286/sql_elements001.htm#i54330
+// https://docs.oracle.com/en/database/oracle/oracle-database/21/lnoci/data-types.html
 #[derive(Debug, Clone)]
 pub enum OracleType {
     Varchar2(u32),
