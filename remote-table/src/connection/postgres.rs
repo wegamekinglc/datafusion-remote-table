@@ -259,7 +259,7 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
 }
 
 macro_rules! handle_primitive_type {
-    ($builder:expr, $field:expr, $col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+    ($builder:expr, $field:expr, $col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr, $convert:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
@@ -281,7 +281,7 @@ macro_rules! handle_primitive_type {
         })?;
 
         match v {
-            Some(v) => builder.append_value(v),
+            Some(v) => builder.append_value($convert(v)?),
             None => builder.append_null(),
         }
     }};
@@ -486,65 +486,88 @@ fn rows_to_batch(
             let col = row.columns().get(idx);
             match field.data_type() {
                 DataType::Int16 => {
-                    handle_primitive_type!(builder, field, col, Int16Builder, i16, row, idx);
+                    handle_primitive_type!(builder, field, col, Int16Builder, i16, row, idx, |v| {
+                        Ok::<_, DataFusionError>(v)
+                    });
                 }
                 DataType::Int32 => {
-                    handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx);
+                    handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx, |v| {
+                        Ok::<_, DataFusionError>(v)
+                    });
                 }
                 DataType::Int64 => {
-                    handle_primitive_type!(builder, field, col, Int64Builder, i64, row, idx);
+                    handle_primitive_type!(builder, field, col, Int64Builder, i64, row, idx, |v| {
+                        Ok::<_, DataFusionError>(v)
+                    });
                 }
                 DataType::Float32 => {
-                    handle_primitive_type!(builder, field, col, Float32Builder, f32, row, idx);
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Float32Builder,
+                        f32,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
                 }
                 DataType::Float64 => {
-                    handle_primitive_type!(builder, field, col, Float64Builder, f64, row, idx);
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Float64Builder,
+                        f64,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
                 }
                 DataType::Decimal128(_precision, _scale) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<Decimal128Builder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to Decimal128Builder for {field:?} and {col:?}")
-                        });
-                    let v: Option<BigDecimalFromSql> = row.try_get(idx).map_err(|e| {
-                        DataFusionError::Execution(format!(
-                            "Failed to get BigDecimal value for {field:?} and {col:?}: {e:?}"
-                        ))
-                    })?;
-
-                    match v {
-                        Some(v) => {
-                            let Some(v) = v.to_decimal_128() else {
-                                return Err(DataFusionError::Execution(format!(
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Decimal128Builder,
+                        BigDecimalFromSql,
+                        row,
+                        idx,
+                        |v: BigDecimalFromSql| {
+                            v.to_decimal_128().ok_or_else(|| {
+                                DataFusionError::Execution(format!(
                                     "Failed to convert BigDecimal {v:?} to i128",
-                                )));
-                            };
-                            builder.append_value(v)
+                                ))
+                            })
                         }
-                        None => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Utf8 => {
-                    handle_primitive_type!(builder, field, col, StringBuilder, &str, row, idx);
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        StringBuilder,
+                        &str,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
                 }
                 DataType::LargeUtf8 => {
                     if col.is_some() && matches!(col.unwrap().type_(), &Type::JSON | &Type::JSONB) {
-                        let builder = builder
-                            .as_any_mut()
-                            .downcast_mut::<LargeStringBuilder>()
-                            .unwrap_or_else(|| {
-                                panic!("Failed to downcast builder to LargeStringBuilder for {field:?} and {col:?}")
-                            });
-                        let v: Option<serde_json::value::Value> =
-                            row.try_get(idx).unwrap_or_else(|e| {
-                                panic!("Failed to get serde_json::value::Value value for {field:?} and {col:?}: {e:?}")
-                            });
-
-                        match v {
-                            Some(v) => builder.append_value(v.to_string()),
-                            None => builder.append_null(),
-                        }
+                        handle_primitive_type!(
+                            builder,
+                            field,
+                            col,
+                            LargeStringBuilder,
+                            serde_json::value::Value,
+                            row,
+                            idx,
+                            |v: serde_json::value::Value| {
+                                Ok::<_, DataFusionError>(v.to_string())
+                            }
+                        );
                     } else {
                         handle_primitive_type!(
                             builder,
@@ -553,39 +576,39 @@ fn rows_to_batch(
                             LargeStringBuilder,
                             &str,
                             row,
-                            idx
+                            idx,
+                            |v| { Ok::<_, DataFusionError>(v) }
                         );
                     }
                 }
                 DataType::Binary => {
                     if col.is_some() && col.unwrap().type_().name().eq_ignore_ascii_case("geometry")
                     {
-                        let builder = builder.as_any_mut().downcast_mut::<BinaryBuilder>().expect(
-                            "Failed to downcast builder to BinaryBuilder for Type::geometry",
+                        handle_primitive_type!(
+                            builder,
+                            field,
+                            col,
+                            BinaryBuilder,
+                            GeometryFromSql,
+                            row,
+                            idx,
+                            |v: GeometryFromSql| { Ok::<_, DataFusionError>(v.wkb.to_vec()) }
                         );
-                        let v: Option<GeometryFromSql> = row.try_get(idx).expect(
-                            "Failed to get GeometryFromSql value for column Type::geometry",
-                        );
-
-                        match v {
-                            Some(v) => builder.append_value(v.wkb),
-                            None => builder.append_null(),
-                        }
                     } else if col.is_some()
                         && matches!(col.unwrap().type_(), &Type::JSON | &Type::JSONB)
                     {
-                        let builder = builder.as_any_mut().downcast_mut::<BinaryBuilder>().expect(
-                            "Failed to downcast builder to BinaryBuilder for Type::JSON or Type::JSONB",
+                        handle_primitive_type!(
+                            builder,
+                            field,
+                            col,
+                            BinaryBuilder,
+                            serde_json::value::Value,
+                            row,
+                            idx,
+                            |v: serde_json::value::Value| {
+                                Ok::<_, DataFusionError>(v.to_string().as_bytes().to_vec())
+                            }
                         );
-                        let v: Option<serde_json::value::Value> =
-                            row.try_get(idx).unwrap_or_else(|e| {
-                                panic!("Failed to get serde_json::value::Value value for {field:?}: {e:?}")
-                            });
-
-                        match v {
-                            Some(v) => builder.append_value(v.to_string().as_bytes()),
-                            None => builder.append_null(),
-                        }
                     } else {
                         handle_primitive_type!(
                             builder,
@@ -594,158 +617,149 @@ fn rows_to_batch(
                             BinaryBuilder,
                             Vec<u8>,
                             row,
-                            idx
+                            idx,
+                            |v| { Ok::<_, DataFusionError>(v) }
                         );
                     }
                 }
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<TimestampMicrosecondBuilder>()
-                        .unwrap_or_else(|| panic!("Failed to downcast builder to TimestampMicrosecondBuilder for {field:?}"));
-                    let v: Option<SystemTime> = row.try_get(idx).unwrap_or_else(|e| {
-                        panic!("Failed to get SystemTime value for {field:?}: {e:?}")
-                    });
-
-                    match v {
-                        Some(v) => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        TimestampMicrosecondBuilder,
+                        SystemTime,
+                        row,
+                        idx,
+                        |v: SystemTime| {
                             if let Ok(v) = v.duration_since(UNIX_EPOCH) {
                                 let timestamp: i64 = v
                                     .as_micros()
                                     .try_into()
                                     .expect("Failed to convert SystemTime to i64");
-                                builder.append_value(timestamp);
+                                Ok(timestamp)
                             } else {
-                                return Err(DataFusionError::Execution(format!(
-                                    "Failed to convert SystemTime {v:?} to i64 for {field:?}"
-                                )));
+                                Err(DataFusionError::Execution(format!(
+                                    "Failed to convert SystemTime {v:?} to i64 for {field:?} and {col:?}"
+                                )))
                             }
                         }
-                        None => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                    let builder = builder
-                                .as_any_mut()
-                                .downcast_mut::<TimestampNanosecondBuilder>()
-                                .unwrap_or_else(|| panic!("Failed to downcast builder to TimestampNanosecondBuilder for {field:?}"));
-                    let v: Option<SystemTime> = row.try_get(idx).unwrap_or_else(|e| {
-                        panic!("Failed to get SystemTime value for {field:?}: {e:?}")
-                    });
-
-                    match v {
-                        Some(v) => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        TimestampNanosecondBuilder,
+                        SystemTime,
+                        row,
+                        idx,
+                        |v: SystemTime| {
                             if let Ok(v) = v.duration_since(UNIX_EPOCH) {
                                 let timestamp: i64 = v
                                     .as_nanos()
                                     .try_into()
                                     .expect("Failed to convert SystemTime to i64");
-                                builder.append_value(timestamp);
+                                Ok(timestamp)
                             } else {
-                                return Err(DataFusionError::Execution(format!(
-                                    "Failed to convert SystemTime {v:?} to i64 for {field:?}"
-                                )));
+                                Err(DataFusionError::Execution(format!(
+                                "Failed to convert SystemTime {v:?} to i64 for {field:?} and {col:?}"
+                            )))
                             }
                         }
-                        None => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Timestamp(TimeUnit::Nanosecond, Some(_tz)) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<TimestampNanosecondBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to TimestampTz for {field:?}")
-                        });
-                    let v: Option<chrono::DateTime<chrono::Utc>> = row.try_get(idx).unwrap_or_else(|e| panic!("Failed to get chrono::DateTime<chrono::Utc> value for {field:?}: {e:?}"));
-
-                    match v {
-                        Some(v) => {
-                            let timestamp: i64 = v.timestamp_nanos_opt().unwrap_or_else(|| panic!("Failed to get timestamp in nanoseconds from {v} for Type::TIMESTAMP"));
-                            builder.append_value(timestamp);
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        TimestampNanosecondBuilder,
+                        chrono::DateTime<chrono::Utc>,
+                        row,
+                        idx,
+                        |v: chrono::DateTime<chrono::Utc>| {
+                            let timestamp: i64 = v.timestamp_nanos_opt().unwrap_or_else(|| panic!("Failed to get timestamp in nanoseconds from {v} for {field:?} and {col:?}"));
+                            Ok::<_, DataFusionError>(timestamp)
                         }
-                        None => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Time64(TimeUnit::Microsecond) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<Time64MicrosecondBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to Time64NanosecondBuilder for {field:?}")
-                        });
-                    let v: Option<chrono::NaiveTime> = row
-                        .try_get(idx)
-                        .expect("Failed to get chrono::NaiveTime value for column Type::TIME");
-
-                    match v {
-                        Some(v) => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Time64MicrosecondBuilder,
+                        chrono::NaiveTime,
+                        row,
+                        idx,
+                        |v: chrono::NaiveTime| {
                             let seconds = i64::from(v.num_seconds_from_midnight());
                             let microseconds = i64::from(v.nanosecond()) / 1000;
-                            builder.append_value(seconds * 1_000_000 + microseconds);
+                            Ok::<_, DataFusionError>(seconds * 1_000_000 + microseconds)
                         }
-                        _ => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Time64(TimeUnit::Nanosecond) => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<Time64NanosecondBuilder>()
-                        .expect(
-                            "Failed to downcast builder to Time64NanosecondBuilder for Type::TIME",
-                        );
-                    let v: Option<chrono::NaiveTime> = row
-                        .try_get(idx)
-                        .expect("Failed to get chrono::NaiveTime value for column Type::TIME");
-
-                    match v {
-                        Some(v) => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Time64NanosecondBuilder,
+                        chrono::NaiveTime,
+                        row,
+                        idx,
+                        |v: chrono::NaiveTime| {
                             let timestamp: i64 = i64::from(v.num_seconds_from_midnight())
                                 * 1_000_000_000
                                 + i64::from(v.nanosecond());
-                            builder.append_value(timestamp);
+                            Ok::<_, DataFusionError>(timestamp)
                         }
-                        None => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Date32 => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<Date32Builder>()
-                        .expect("Failed to downcast builder to Date32Builder for Type::DATE");
-                    let v: Option<chrono::NaiveDate> = row
-                        .try_get(idx)
-                        .expect("Failed to get chrono::NaiveDate value for column Type::DATE");
-
-                    match v {
-                        Some(v) => builder.append_value(Date32Type::from_naive_date(v)),
-                        None => builder.append_null(),
-                    }
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Date32Builder,
+                        chrono::NaiveDate,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(Date32Type::from_naive_date(v)) }
+                    );
                 }
                 DataType::Interval(IntervalUnit::MonthDayNano) => {
-                    let builder = builder
-                                .as_any_mut()
-                                .downcast_mut::<IntervalMonthDayNanoBuilder>()
-                                .expect("Failed to downcast builder to IntervalMonthDayNanoBuilder for Type::INTERVAL");
-
-                    let v: Option<IntervalFromSql> = row
-                        .try_get(idx)
-                        .expect("Failed to get IntervalFromSql value for column Type::INTERVAL");
-
-                    match v {
-                        Some(v) => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        IntervalMonthDayNanoBuilder,
+                        IntervalFromSql,
+                        row,
+                        idx,
+                        |v: IntervalFromSql| {
                             let interval_month_day_nano = IntervalMonthDayNanoType::make_value(
                                 v.month,
                                 v.day,
                                 v.time * 1_000,
                             );
-                            builder.append_value(interval_month_day_nano);
+                            Ok::<_, DataFusionError>(interval_month_day_nano)
                         }
-                        None => builder.append_null(),
-                    }
+                    );
                 }
                 DataType::Boolean => {
-                    handle_primitive_type!(builder, field, col, BooleanBuilder, bool, row, idx);
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        BooleanBuilder,
+                        bool,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
                 }
                 DataType::List(inner) => match inner.data_type() {
                     DataType::Int16 => {
