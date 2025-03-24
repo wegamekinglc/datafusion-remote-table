@@ -1,6 +1,6 @@
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::prelude::SessionContext;
-use datafusion_remote_table::{ConnectionOptions, OracleConnectionOptions};
+use datafusion_remote_table::{ConnectionOptions, OracleConnectionOptions, RemoteTable};
 use integration_tests::shared_containers::setup_shared_containers;
 use std::sync::Arc;
 
@@ -15,14 +15,9 @@ pub async fn supported_oracle_types() {
         "oracle",
         "xe",
     ));
-    let table = datafusion_remote_table::RemoteTable::try_new(
-        options,
-        "SELECT * from SYS.supported_data_types",
-        None,
-        None,
-    )
-    .await
-    .unwrap();
+    let table = RemoteTable::try_new(options, "SELECT * from SYS.supported_data_types")
+        .await
+        .unwrap();
     println!("remote schema: {:#?}", table.remote_schema());
 
     let ctx = SessionContext::new();

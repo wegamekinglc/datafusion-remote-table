@@ -13,8 +13,6 @@ pub async fn supported_sqlite_types() {
     let table = datafusion_remote_table::RemoteTable::try_new(
         options,
         "SELECT * from supported_data_types",
-        None,
-        None,
     )
     .await
     .unwrap();

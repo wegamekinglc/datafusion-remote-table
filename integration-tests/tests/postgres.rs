@@ -16,7 +16,7 @@ pub async fn supported_postgres_types() {
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
             .with_database(Some("postgres".to_string())),
     );
-    let table = RemoteTable::try_new(options, "select * from supported_data_types", None, None)
+    let table = RemoteTable::try_new(options, "select * from supported_data_types")
         .await
         .unwrap();
 
@@ -71,7 +71,7 @@ pub async fn exec_plan_serialization() {
         PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
             .with_database(Some("postgres".to_string())),
     );
-    let table = RemoteTable::try_new(options, "select * from simple_table", None, None)
+    let table = RemoteTable::try_new(options, "select * from simple_table")
         .await
         .unwrap();
 
@@ -131,9 +131,7 @@ ORDER BY
         "#,
         "simple_table"
     );
-    let table = RemoteTable::try_new(options, sql, None, None)
-        .await
-        .unwrap();
+    let table = RemoteTable::try_new(options, sql).await.unwrap();
 
     println!("remote schema: {:#?}", table.remote_schema());
 
