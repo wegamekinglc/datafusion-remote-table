@@ -42,3 +42,43 @@ pub async fn supported_oracle_types() {
 +-------------+--------------+-------------+------------------+-------------------+------------+-----------+--------------+---------------+------------+------------+---------+------------------+----------+---------------------+----------------------------+"#,
     );
 }
+
+// ORA-01754: a table may contain only one column of type LONG
+#[tokio::test]
+pub async fn supported_oracle_types2() {
+    setup_shared_containers();
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+    let options = ConnectionOptions::Oracle(OracleConnectionOptions::new(
+        "127.0.0.1",
+        49161,
+        "system",
+        "oracle",
+        "free",
+    ));
+    let table = RemoteTable::try_new(options, "SELECT * from SYS.supported_data_types2")
+        .await
+        .unwrap();
+    println!("remote schema: {:#?}", table.remote_schema());
+
+    let ctx = SessionContext::new();
+    ctx.register_table("remote_table", Arc::new(table)).unwrap();
+
+    let result = ctx
+        .sql("SELECT * FROM remote_table")
+        .await
+        .unwrap()
+        .collect()
+        .await
+        .unwrap();
+    println!("{}", pretty_format_batches(&result).unwrap());
+
+    assert_eq!(
+        pretty_format_batches(&result).unwrap().to_string(),
+        r#"+----------+
+| LONG_COL |
++----------+
+| long     |
+|          |
++----------+"#,
+    );
+}

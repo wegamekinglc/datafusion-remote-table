@@ -164,6 +164,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::NVarchar2(size) => Ok(RemoteType::Oracle(OracleType::NVarchar2(*size))),
         ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
         ColumnType::NChar(size) => Ok(RemoteType::Oracle(OracleType::NChar(*size))),
+        ColumnType::Long => Ok(RemoteType::Oracle(OracleType::Long)),
         ColumnType::Raw(size) => Ok(RemoteType::Oracle(OracleType::Raw(*size))),
         ColumnType::LongRaw => Ok(RemoteType::Oracle(OracleType::LongRaw)),
         ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),

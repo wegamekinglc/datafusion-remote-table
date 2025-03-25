@@ -139,6 +139,7 @@ message RemoteType {
     OracleNVarchar2 oracle_nvarchar2 = 212;
     OracleRaw oracle_raw = 213;
     OracleLongRaw oracle_long_raw = 214;
+    OracleLong oracle_long = 215;
     SqliteNull sqlite_null = 301;
     SqliteInteger sqlite_integer = 302;
     SqliteReal sqlite_real = 303;
@@ -245,6 +246,7 @@ message OracleRaw {
   uint32 length = 1;
 }
 message OracleLongRaw {}
+message OracleLong {}
 
 
 message SqliteNull {}
