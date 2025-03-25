@@ -270,18 +270,18 @@ macro_rules! handle_primitive_type {
             .downcast_mut::<$builder_ty>()
             .unwrap_or_else(|| {
                 panic!(
-                    concat!(
-                        "Failed to downcast builder to ",
-                        stringify!($builder_ty),
-                        " for {:?} and {:?}"
-                    ),
-                    $field, $col
+                    "Failed to downcast builder to {} for {:?} and {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                    $col
                 )
             });
         let v: Option<$value_ty> = $row.try_get($index).map_err(|e| {
             DataFusionError::Execution(format!(
-                "Failed to get BigDecimal value for {:?} and {:?}: {e:?}",
-                $field, $col
+                "Failed to get {} value for {:?} and {:?}: {e:?}",
+                stringify!($value_ty),
+                $field,
+                $col
             ))
         })?;
 
@@ -293,14 +293,14 @@ macro_rules! handle_primitive_type {
 }
 
 macro_rules! handle_primitive_array_type {
-    ($builder:expr, $field:expr, $values_builder_ty:ty, $primitive_value_ty:ty, $row:expr, $index:expr) => {{
+    ($builder:expr, $field:expr, $col:expr, $values_builder_ty:ty, $primitive_value_ty:ty, $row:expr, $index:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<ListBuilder<Box<dyn ArrayBuilder>>>()
             .unwrap_or_else(|| {
                 panic!(
-                    "Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for {:?}",
-                    $field
+                    "Failed to downcast builder to ListBuilder<Box<dyn ArrayBuilder>> for {:?} and {:?}",
+                    $field, $col
                 )
             });
         let values_builder = builder
@@ -309,24 +309,20 @@ macro_rules! handle_primitive_array_type {
             .downcast_mut::<$values_builder_ty>()
             .unwrap_or_else(|| {
                 panic!(
-                    concat!(
-                        "Failed to downcast values builder to ",
-                        stringify!($builder_ty),
-                        " for {:?}"
-                    ),
-                    $field
+                    "Failed to downcast values builder to {} for {:?} and {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                    $col,
                 )
             });
-        let v: Option<Vec<$primitive_value_ty>> = $row.try_get($index).unwrap_or_else(|e| {
-            panic!(
-                concat!(
-                    "Failed to get ",
-                    stringify!($value_ty),
-                    " array value for {:?}: {:?}"
-                ),
-                $field, e
-            )
-        });
+        let v: Option<Vec<$primitive_value_ty>> = $row.try_get($index).map_err(|e| {
+            DataFusionError::Execution(format!(
+                "Failed to get {} array value for {:?} and {:?}: {e:?}",
+                stringify!($value_ty),
+                $field,
+                $col,
+            ))
+        })?;
 
         match v {
             Some(v) => {
@@ -768,27 +764,76 @@ fn rows_to_batch(
                 }
                 DataType::List(inner) => match inner.data_type() {
                     DataType::Int16 => {
-                        handle_primitive_array_type!(builder, field, Int16Builder, i16, row, idx);
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            col,
+                            Int16Builder,
+                            i16,
+                            row,
+                            idx
+                        );
                     }
                     DataType::Int32 => {
-                        handle_primitive_array_type!(builder, field, Int32Builder, i32, row, idx);
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            col,
+                            Int32Builder,
+                            i32,
+                            row,
+                            idx
+                        );
                     }
                     DataType::Int64 => {
-                        handle_primitive_array_type!(builder, field, Int64Builder, i64, row, idx);
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            col,
+                            Int64Builder,
+                            i64,
+                            row,
+                            idx
+                        );
                     }
                     DataType::Float32 => {
-                        handle_primitive_array_type!(builder, field, Float32Builder, f32, row, idx);
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            col,
+                            Float32Builder,
+                            f32,
+                            row,
+                            idx
+                        );
                     }
                     DataType::Float64 => {
-                        handle_primitive_array_type!(builder, field, Float64Builder, f64, row, idx);
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            col,
+                            Float64Builder,
+                            f64,
+                            row,
+                            idx
+                        );
                     }
                     DataType::Utf8 => {
-                        handle_primitive_array_type!(builder, field, StringBuilder, &str, row, idx);
+                        handle_primitive_array_type!(
+                            builder,
+                            field,
+                            col,
+                            StringBuilder,
+                            &str,
+                            row,
+                            idx
+                        );
                     }
                     DataType::Binary => {
                         handle_primitive_array_type!(
                             builder,
                             field,
+                            col,
                             BinaryBuilder,
                             Vec<u8>,
                             row,
@@ -799,6 +844,7 @@ fn rows_to_batch(
                         handle_primitive_array_type!(
                             builder,
                             field,
+                            col,
                             BooleanBuilder,
                             bool,
                             row,

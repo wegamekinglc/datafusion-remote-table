@@ -265,18 +265,16 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
 }
 
 macro_rules! handle_primitive_type {
-    ($builder:expr, $field:expr, $mysql_col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr, $convert:expr) => {{
+    ($builder:expr, $field:expr, $col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr, $convert:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
             .unwrap_or_else(|| {
                 panic!(
-                    concat!(
-                        "Failed to downcast builder to ",
-                        stringify!($builder_ty),
-                        " for {:?} and {:?}"
-                    ),
-                    $field, $mysql_col
+                    "Failed to downcast builder to {} for {:?} and {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                    $col
                 )
             });
         let v = $row.get_opt::<$value_ty, usize>($index);
@@ -290,7 +288,7 @@ macro_rules! handle_primitive_type {
                     "Failed to get optional {:?} value for {:?} and {:?}: {e:?}",
                     stringify!($value_ty),
                     $field,
-                    $mysql_col,
+                    $col,
                 )));
             }
         }
