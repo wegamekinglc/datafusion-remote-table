@@ -562,6 +562,16 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::OracleBoolean {},
             )),
         },
+        RemoteType::Oracle(OracleType::BinaryFloat) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::OracleBinaryFloat(
+                protobuf::OracleBinaryFloat {},
+            )),
+        },
+        RemoteType::Oracle(OracleType::BinaryDouble) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::OracleBinaryDouble(
+                protobuf::OracleBinaryDouble {},
+            )),
+        },
         RemoteType::Sqlite(SqliteType::Null) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::SqliteNull(
                 protobuf::SqliteNull {},
@@ -734,6 +744,12 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
             RemoteType::Oracle(OracleType::Timestamp)
         }
         protobuf::remote_type::Type::OracleBoolean(_) => RemoteType::Oracle(OracleType::Boolean),
+        protobuf::remote_type::Type::OracleBinaryFloat(_) => {
+            RemoteType::Oracle(OracleType::BinaryFloat)
+        }
+        protobuf::remote_type::Type::OracleBinaryDouble(_) => {
+            RemoteType::Oracle(OracleType::BinaryDouble)
+        }
         protobuf::remote_type::Type::SqliteNull(_) => RemoteType::Sqlite(SqliteType::Null),
         protobuf::remote_type::Type::SqliteInteger(_) => RemoteType::Sqlite(SqliteType::Integer),
         protobuf::remote_type::Type::SqliteReal(_) => RemoteType::Sqlite(SqliteType::Real),

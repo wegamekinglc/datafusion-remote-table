@@ -211,6 +211,8 @@ pub enum OracleType {
     Date,
     Timestamp,
     Boolean,
+    BinaryFloat,
+    BinaryDouble,
 }
 
 impl OracleType {
@@ -222,6 +224,8 @@ impl OracleType {
             OracleType::Date => DataType::Timestamp(TimeUnit::Second, None),
             OracleType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
             OracleType::Boolean => DataType::Boolean,
+            OracleType::BinaryFloat => DataType::Float32,
+            OracleType::BinaryDouble => DataType::Float64,
         }
     }
 }

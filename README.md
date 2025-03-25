@@ -47,7 +47,10 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
   - [x] TinyBlob / Blob / MediumBlob / LongBlob
   - [x] Json / Geometry
 - [x] Oracle
-  - [x] Varchar2 / Char / Number / Date / Timestamp
+  - [x] Number / BinaryFloat / BinaryDouble
+  - [x] Varchar2 / Char
+  - [x] Date / Timestamp
+  - [x] Boolean 
 - [x] SQLite
   - [x] Null / Integer / Real / Text / Blob
 

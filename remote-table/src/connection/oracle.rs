@@ -6,8 +6,8 @@ use crate::{
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanBuilder, Decimal128Builder, RecordBatch, StringBuilder,
-    TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
+    ArrayRef, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder, RecordBatch,
+    StringBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
@@ -161,6 +161,8 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
         ColumnType::Timestamp(_) => Ok(RemoteType::Oracle(OracleType::Timestamp)),
         ColumnType::Boolean => Ok(RemoteType::Oracle(OracleType::Boolean)),
+        ColumnType::BinaryFloat => Ok(RemoteType::Oracle(OracleType::BinaryFloat)),
+        ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -312,19 +314,13 @@ fn rows_to_batch(
                     }
                 }
                 DataType::Boolean => {
-                    let builder = builder
-                        .as_any_mut()
-                        .downcast_mut::<BooleanBuilder>()
-                        .unwrap_or_else(|| {
-                            panic!("Failed to downcast builder to BooleanBuilder for {col:?}")
-                        });
-                    let v = row
-                        .get::<usize, Option<bool>>(idx)
-                        .unwrap_or_else(|e| panic!("Failed to get bool value for {col:?}: {e:?}"));
-                    match v {
-                        Some(v) => builder.append_value(v),
-                        None => builder.append_null(),
-                    }
+                    handle_primitive_type!(builder, col, BooleanBuilder, bool, row, idx);
+                }
+                DataType::Float32 => {
+                    handle_primitive_type!(builder, col, Float32Builder, f32, row, idx);
+                }
+                DataType::Float64 => {
+                    handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
                 }
                 _ => {
                     return Err(DataFusionError::NotImplemented(format!(
