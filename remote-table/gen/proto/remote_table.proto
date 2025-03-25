@@ -136,6 +136,7 @@ message RemoteType {
     OracleBlob oracle_blob = 209;
     OracleFloat oracle_float = 210;
     OracleNChar oracle_nchar = 211;
+    OracleNVarchar2 oracle_nvarchar2 = 212;
     SqliteNull sqlite_null = 301;
     SqliteInteger sqlite_integer = 302;
     SqliteReal sqlite_real = 303;
@@ -233,6 +234,9 @@ message OracleFloat {
   uint32 precision = 1;
 }
 message OracleNChar {
+  uint32 length = 1;
+}
+message OracleNVarchar2 {
   uint32 length = 1;
 }
 

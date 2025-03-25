@@ -161,6 +161,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
         ColumnType::Float(precision) => Ok(RemoteType::Oracle(OracleType::Float(*precision))),
         ColumnType::Varchar2(size) => Ok(RemoteType::Oracle(OracleType::Varchar2(*size))),
+        ColumnType::NVarchar2(size) => Ok(RemoteType::Oracle(OracleType::NVarchar2(*size))),
         ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
         ColumnType::NChar(size) => Ok(RemoteType::Oracle(OracleType::NChar(*size))),
         ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),
