@@ -3,8 +3,8 @@ members = ["integration-tests", "remote-table", "remote-table/gen"]
 resolver = "2"
 
 [workspace.dependencies]
-datafusion = "44"
-datafusion-proto = "44"
+datafusion = "46"
+datafusion-proto = "46"
 tokio = { version = "1", features = ["full"] }
 prost = "0.13"
 prost-build = "0.13"
