@@ -7,7 +7,7 @@ use crate::{
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
     ArrayRef, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder,
-    LargeBinaryBuilder, RecordBatch, StringBuilder, TimestampNanosecondBuilder,
+    LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, TimestampNanosecondBuilder,
     TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
@@ -154,18 +154,19 @@ impl Connection for OracleConnection {
 
 fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> {
     match oracle_type {
-        ColumnType::Varchar2(size) => Ok(RemoteType::Oracle(OracleType::Varchar2(*size))),
-        ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
         ColumnType::Number(precision, scale) => {
             Ok(RemoteType::Oracle(OracleType::Number(*precision, *scale)))
         }
-        ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
-        ColumnType::Timestamp(_) => Ok(RemoteType::Oracle(OracleType::Timestamp)),
-        ColumnType::Boolean => Ok(RemoteType::Oracle(OracleType::Boolean)),
         ColumnType::BinaryFloat => Ok(RemoteType::Oracle(OracleType::BinaryFloat)),
         ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
         ColumnType::Float(precision) => Ok(RemoteType::Oracle(OracleType::Float(*precision))),
+        ColumnType::Varchar2(size) => Ok(RemoteType::Oracle(OracleType::Varchar2(*size))),
+        ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
+        ColumnType::NChar(size) => Ok(RemoteType::Oracle(OracleType::NChar(*size))),
         ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),
+        ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
+        ColumnType::Timestamp(_) => Ok(RemoteType::Oracle(OracleType::Timestamp)),
+        ColumnType::Boolean => Ok(RemoteType::Oracle(OracleType::Boolean)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -236,6 +237,18 @@ fn rows_to_batch(
                         field,
                         col,
                         StringBuilder,
+                        String,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
+                }
+                DataType::LargeUtf8 => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        LargeStringBuilder,
                         String,
                         row,
                         idx,

@@ -35,7 +35,7 @@ impl RemoteTable {
     ) -> Self {
         Self::try_new_inner(conn_options, sql, Some(table_schema), None)
             .await
-            .unwrap()
+            .expect("Won't fail")
     }
 
     pub async fn try_new_with_transform(
