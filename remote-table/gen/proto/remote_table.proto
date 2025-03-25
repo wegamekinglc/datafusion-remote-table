@@ -134,6 +134,7 @@ message RemoteType {
     OracleBinaryFloat oracle_binary_float = 207;
     OracleBinaryDouble oracle_binary_double = 208;
     OracleBlob oracle_blob = 209;
+    OracleFloat oracle_float = 210;
     SqliteNull sqlite_null = 301;
     SqliteInteger sqlite_integer = 302;
     SqliteReal sqlite_real = 303;
@@ -227,6 +228,9 @@ message OracleBoolean {}
 message OracleBinaryFloat {}
 message OracleBinaryDouble {}
 message OracleBlob {}
+message OracleFloat {
+  uint32 precision = 1;
+}
 
 
 message SqliteNull {}

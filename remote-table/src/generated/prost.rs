@@ -106,7 +106,7 @@ pub struct RemoteField {
 pub struct RemoteType {
     #[prost(
         oneof = "remote_type::Type",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 301, 302, 303, 304, 305"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 301, 302, 303, 304, 305"
     )]
     pub r#type: ::core::option::Option<remote_type::Type>,
 }
@@ -244,6 +244,8 @@ pub mod remote_type {
         OracleBinaryDouble(super::OracleBinaryDouble),
         #[prost(message, tag = "209")]
         OracleBlob(super::OracleBlob),
+        #[prost(message, tag = "210")]
+        OracleFloat(super::OracleFloat),
         #[prost(message, tag = "301")]
         SqliteNull(super::SqliteNull),
         #[prost(message, tag = "302")]
@@ -411,6 +413,11 @@ pub struct OracleBinaryFloat {}
 pub struct OracleBinaryDouble {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct OracleBlob {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct OracleFloat {
+    #[prost(uint32, tag = "1")]
+    pub precision: u32,
+}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SqliteNull {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]

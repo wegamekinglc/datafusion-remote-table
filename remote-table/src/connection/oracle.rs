@@ -164,6 +164,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::Boolean => Ok(RemoteType::Oracle(OracleType::Boolean)),
         ColumnType::BinaryFloat => Ok(RemoteType::Oracle(OracleType::BinaryFloat)),
         ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
+        ColumnType::Float(precision) => Ok(RemoteType::Oracle(OracleType::Float(*precision))),
         ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
