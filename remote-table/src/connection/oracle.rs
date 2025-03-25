@@ -6,8 +6,9 @@ use crate::{
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder, RecordBatch,
-    StringBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
+    ArrayRef, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder,
+    LargeBinaryBuilder, RecordBatch, StringBuilder, TimestampNanosecondBuilder,
+    TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
@@ -163,6 +164,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::Boolean => Ok(RemoteType::Oracle(OracleType::Boolean)),
         ColumnType::BinaryFloat => Ok(RemoteType::Oracle(OracleType::BinaryFloat)),
         ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
+        ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -326,6 +328,18 @@ fn rows_to_batch(
                         col,
                         Float64Builder,
                         f64,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
+                }
+                DataType::LargeBinary => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        LargeBinaryBuilder,
+                        Vec<u8>,
                         row,
                         idx,
                         |v| { Ok::<_, DataFusionError>(v) }

@@ -205,27 +205,29 @@ impl MysqlType {
 // https://docs.oracle.com/en/database/oracle/oracle-database/21/lnoci/data-types.html
 #[derive(Debug, Clone)]
 pub enum OracleType {
+    BinaryFloat,
+    BinaryDouble,
+    Number(u8, i8),
     Varchar2(u32),
     Char(u32),
-    Number(u8, i8),
+    Blob,
     Date,
     Timestamp,
     Boolean,
-    BinaryFloat,
-    BinaryDouble,
 }
 
 impl OracleType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
+            OracleType::BinaryFloat => DataType::Float32,
+            OracleType::BinaryDouble => DataType::Float64,
+            OracleType::Number(precision, scale) => DataType::Decimal128(*precision, *scale),
             OracleType::Varchar2(_) => DataType::Utf8,
             OracleType::Char(_) => DataType::Utf8,
-            OracleType::Number(precision, scale) => DataType::Decimal128(*precision, *scale),
+            OracleType::Blob => DataType::LargeBinary,
             OracleType::Date => DataType::Timestamp(TimeUnit::Second, None),
             OracleType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
             OracleType::Boolean => DataType::Boolean,
-            OracleType::BinaryFloat => DataType::Float32,
-            OracleType::BinaryDouble => DataType::Float64,
         }
     }
 }

@@ -49,6 +49,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [x] Oracle
   - [x] Number / BinaryFloat / BinaryDouble
   - [x] Varchar2 / Char
+  - [x] Blob
   - [x] Date / Timestamp
   - [x] Boolean 
 - [x] SQLite
