@@ -106,7 +106,7 @@ pub struct RemoteField {
 pub struct RemoteType {
     #[prost(
         oneof = "remote_type::Type",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 301, 302, 303, 304, 305"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 301, 302, 303, 304, 305"
     )]
     pub r#type: ::core::option::Option<remote_type::Type>,
 }
@@ -236,6 +236,8 @@ pub mod remote_type {
         OracleDate(super::OracleDate),
         #[prost(message, tag = "205")]
         OracleTimestamp(super::OracleTimestamp),
+        #[prost(message, tag = "206")]
+        OracleBoolean(super::OracleBoolean),
         #[prost(message, tag = "301")]
         SqliteNull(super::SqliteNull),
         #[prost(message, tag = "302")]
@@ -395,6 +397,8 @@ pub struct OracleNumber {
 pub struct OracleDate {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct OracleTimestamp {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct OracleBoolean {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SqliteNull {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]

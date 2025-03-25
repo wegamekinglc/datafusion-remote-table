@@ -1,5 +1,5 @@
 use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::physical_plan::{collect, ExecutionPlan};
+use datafusion::physical_plan::{ExecutionPlan, collect};
 use datafusion::prelude::SessionContext;
 use datafusion_proto::physical_plan::AsExecutionPlan;
 use datafusion_proto::protobuf::PhysicalPlanNode;

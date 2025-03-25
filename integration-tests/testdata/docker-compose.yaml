@@ -20,12 +20,10 @@ services:
       - ./mysql_init.sql:/docker-entrypoint-initdb.d/init.sql
 
   oracle:
-    image: wnameless/oracle-xe-11g-r2
-#    image: softwareplant/oracle:latest
+    image: container-registry.oracle.com/database/free:latest-lite
     environment:
-      - ORACLE_ALLOW_REMOTE=true
+      - ORACLE_PWD=oracle
     ports:
-      - "49160:22"
       - "49161:1521"
     volumes:
-      - ./oracle_init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./oracle_init:/opt/oracle/scripts/startup

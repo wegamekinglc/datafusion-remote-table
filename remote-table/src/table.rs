@@ -1,5 +1,5 @@
 use crate::{
-    connect, ConnectionOptions, DFResult, Pool, RemoteSchemaRef, RemoteTableExec, Transform,
+    ConnectionOptions, DFResult, Pool, RemoteSchemaRef, RemoteTableExec, Transform, connect,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};

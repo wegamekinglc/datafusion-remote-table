@@ -5,21 +5,21 @@ use crate::{
     RemoteSchemaRef, RemoteType, Transform,
 };
 use async_stream::stream;
-use bigdecimal::{num_bigint, BigDecimal};
+use bigdecimal::{BigDecimal, num_bigint};
 use chrono::Timelike;
 use datafusion::arrow::array::{
-    make_builder, ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder,
-    Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
-    LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, Time32SecondBuilder,
-    Time64NanosecondBuilder, TimestampMicrosecondBuilder, TimestampNanosecondBuilder,
-    UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder,
+    ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder, Float32Builder,
+    Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder, LargeBinaryBuilder,
+    LargeStringBuilder, RecordBatch, StringBuilder, Time32SecondBuilder, Time64NanosecondBuilder,
+    TimestampMicrosecondBuilder, TimestampNanosecondBuilder, UInt8Builder, UInt16Builder,
+    UInt32Builder, UInt64Builder, make_builder,
 };
-use datafusion::arrow::datatypes::{i256, DataType, Date32Type, SchemaRef, TimeUnit};
-use datafusion::common::{project_schema, DataFusionError};
+use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit, i256};
+use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-use futures::lock::Mutex;
 use futures::StreamExt;
+use futures::lock::Mutex;
 use mysql_async::consts::{ColumnFlags, ColumnType};
 use mysql_async::prelude::Queryable;
 use mysql_async::{Column, FromValueError, Row, Value};
@@ -291,7 +291,7 @@ macro_rules! handle_primitive_type {
                     stringify!($value_ty),
                     $field,
                     $mysql_col,
-                )))
+                )));
             }
         }
     }};

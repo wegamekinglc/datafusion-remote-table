@@ -1,9 +1,9 @@
 [package]
 name = "datafusion-remote-table"
 version = "0.8.0"
-edition = "2021"
+edition = "2024"
 authors = ["lewiszlw <lewiszlw520@gmail.com>"]
-description = "Execute SQL queries on remote databases and make results as datafusion table provider"
+description = "A DataFusion table provider for executing SQL queries on remote databases"
 keywords = ["SQL", "database", "datafusion", "postgres", "mysql"]
 license = "MIT"
 repository = "https://github.com/systemxlabs/datafusion-remote-table"

@@ -4,18 +4,18 @@ use crate::{
     Connection, ConnectionOptions, DFResult, Pool, PostgresType, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType, Transform,
 };
+use bb8_postgres::PostgresConnectionManager;
 use bb8_postgres::tokio_postgres::types::{FromSql, Type};
 use bb8_postgres::tokio_postgres::{NoTls, Row};
-use bb8_postgres::PostgresConnectionManager;
 use bigdecimal::BigDecimal;
 use byteorder::{BigEndian, ReadBytesExt};
 use chrono::Timelike;
 use datafusion::arrow::array::{
-    make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder,
-    Decimal128Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
+    ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder,
+    Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
     IntervalMonthDayNanoBuilder, LargeStringBuilder, ListBuilder, RecordBatch, StringBuilder,
     Time64MicrosecondBuilder, Time64NanosecondBuilder, TimestampMicrosecondBuilder,
-    TimestampNanosecondBuilder,
+    TimestampNanosecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{
     DataType, Date32Type, IntervalMonthDayNanoType, IntervalUnit, SchemaRef, TimeUnit,
@@ -669,8 +669,8 @@ fn rows_to_batch(
                                 Ok(timestamp)
                             } else {
                                 Err(DataFusionError::Execution(format!(
-                                "Failed to convert SystemTime {v:?} to i64 for {field:?} and {col:?}"
-                            )))
+                                    "Failed to convert SystemTime {v:?} to i64 for {field:?} and {col:?}"
+                                )))
                             }
                         }
                     );

@@ -130,6 +130,7 @@ message RemoteType {
     OracleNumber oracle_number = 203;
     OracleDate oracle_date = 204;
     OracleTimestamp oracle_timestamp = 205;
+    OracleBoolean oracle_boolean = 206;
     SqliteNull sqlite_null = 301;
     SqliteInteger sqlite_integer = 302;
     SqliteReal sqlite_real = 303;
@@ -219,6 +220,7 @@ message OracleNumber {
 }
 message OracleDate {}
 message OracleTimestamp {}
+message OracleBoolean {}
 
 
 message SqliteNull {}

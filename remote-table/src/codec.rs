@@ -1,8 +1,8 @@
 use crate::generated::prost as protobuf;
 use crate::{
-    connect, ConnectionOptions, DFResult, MysqlConnectionOptions, MysqlType,
-    OracleConnectionOptions, OracleType, PostgresConnectionOptions, PostgresType, RemoteField,
-    RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform,
+    ConnectionOptions, DFResult, MysqlConnectionOptions, MysqlType, OracleConnectionOptions,
+    OracleType, PostgresConnectionOptions, PostgresType, RemoteField, RemoteSchema,
+    RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
@@ -557,6 +557,11 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::OracleTimestamp {},
             )),
         },
+        RemoteType::Oracle(OracleType::Boolean) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::OracleBoolean(
+                protobuf::OracleBoolean {},
+            )),
+        },
         RemoteType::Sqlite(SqliteType::Null) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::SqliteNull(
                 protobuf::SqliteNull {},
@@ -728,6 +733,7 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::OracleTimestamp(_) => {
             RemoteType::Oracle(OracleType::Timestamp)
         }
+        protobuf::remote_type::Type::OracleBoolean(_) => RemoteType::Oracle(OracleType::Boolean),
         protobuf::remote_type::Type::SqliteNull(_) => RemoteType::Sqlite(SqliteType::Null),
         protobuf::remote_type::Type::SqliteInteger(_) => RemoteType::Sqlite(SqliteType::Integer),
         protobuf::remote_type::Type::SqliteReal(_) => RemoteType::Sqlite(SqliteType::Real),

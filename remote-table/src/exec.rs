@@ -5,7 +5,7 @@ use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    project_schema, DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
+    DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, project_schema,
 };
 use futures::TryStreamExt;
 use std::any::Any;

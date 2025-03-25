@@ -5,11 +5,11 @@ use crate::{
     RemoteType, SqliteType, Transform,
 };
 use datafusion::arrow::array::{
-    make_builder, ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder,
-    RecordBatch, StringBuilder,
+    ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder, RecordBatch,
+    StringBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
-use datafusion::common::{project_schema, DataFusionError};
+use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::memory::MemoryStream;
 use rusqlite::{Column, Row, Rows};

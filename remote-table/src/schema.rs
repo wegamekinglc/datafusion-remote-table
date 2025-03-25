@@ -210,6 +210,7 @@ pub enum OracleType {
     Number(u8, i8),
     Date,
     Timestamp,
+    Boolean,
 }
 
 impl OracleType {
@@ -220,6 +221,7 @@ impl OracleType {
             OracleType::Number(precision, scale) => DataType::Decimal128(*precision, *scale),
             OracleType::Date => DataType::Timestamp(TimeUnit::Second, None),
             OracleType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
+            OracleType::Boolean => DataType::Boolean,
         }
     }
 }

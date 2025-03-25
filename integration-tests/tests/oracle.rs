@@ -13,7 +13,7 @@ pub async fn supported_oracle_types() {
         49161,
         "system",
         "oracle",
-        "xe",
+        "free",
     ));
     let table = RemoteTable::try_new(options, "SELECT * from SYS.supported_data_types")
         .await
@@ -30,17 +30,15 @@ pub async fn supported_oracle_types() {
         .collect()
         .await
         .unwrap();
-    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+    println!("{}", pretty_format_batches(&result).unwrap());
 
     assert_eq!(
-        pretty_format_batches(result.as_slice())
-            .unwrap()
-            .to_string(),
-        r#"+--------------+------------+------------+---------------------+----------------------------+
-| VARCHAR2_COL | CHAR_COL   | NUMBER_COL | DATE_COL            | TIMESTAMP_COL              |
-+--------------+------------+------------+---------------------+----------------------------+
-| varchar2     | char       | 1.10       | 2003-05-03T21:02:44 | 2023-10-01T14:30:45.123456 |
-|              |            |            |                     |                            |
-+--------------+------------+------------+---------------------+----------------------------+"#,
+        pretty_format_batches(&result).unwrap().to_string(),
+        r#"+-------------+--------------+------------+------------+---------------------+----------------------------+
+| BOOLEAN_COL | VARCHAR2_COL | CHAR_COL   | NUMBER_COL | DATE_COL            | TIMESTAMP_COL              |
++-------------+--------------+------------+------------+---------------------+----------------------------+
+| true        | varchar2     | char       | 1.10       | 2003-05-03T21:02:44 | 2023-10-01T14:30:45.123456 |
+|             |              |            |            |                     |                            |
++-------------+--------------+------------+------------+---------------------+----------------------------+"#,
     );
 }

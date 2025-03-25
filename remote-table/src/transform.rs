@@ -1,13 +1,13 @@
 use crate::{DFResult, RemoteField, RemoteSchemaRef};
 use datafusion::arrow::array::{
     ArrayRef, BinaryArray, BooleanArray, Date32Array, Float16Array, Float32Array, Float64Array,
-    Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray,
+    Int8Array, Int16Array, Int32Array, Int64Array, ListArray, RecordBatch, StringArray,
     Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-    TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
-    UInt8Array,
+    TimestampNanosecondArray, TimestampSecondArray, UInt8Array, UInt16Array, UInt32Array,
+    UInt64Array,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
-use datafusion::common::{project_schema, DataFusionError};
+use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use futures::{Stream, StreamExt};
 use std::fmt::Debug;
@@ -442,7 +442,7 @@ pub(crate) fn transform_batch(
             data_type => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported arrow type {data_type:?}",
-                )))
+                )));
             }
         };
         new_arrays.push(new_array);
