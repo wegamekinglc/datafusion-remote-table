@@ -594,6 +594,16 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::OracleNVarchar2 { length: *len },
             )),
         },
+        RemoteType::Oracle(OracleType::Raw(len)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::OracleRaw(
+                protobuf::OracleRaw { length: *len },
+            )),
+        },
+        RemoteType::Oracle(OracleType::LongRaw) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::OracleLongRaw(
+                protobuf::OracleLongRaw {},
+            )),
+        },
         RemoteType::Sqlite(SqliteType::Null) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::SqliteNull(
                 protobuf::SqliteNull {},
@@ -781,6 +791,10 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::OracleNvarchar2(protobuf::OracleNVarchar2 { length }) => {
             RemoteType::Oracle(OracleType::NVarchar2(*length))
         }
+        protobuf::remote_type::Type::OracleRaw(protobuf::OracleRaw { length }) => {
+            RemoteType::Oracle(OracleType::Raw(*length))
+        }
+        protobuf::remote_type::Type::OracleLongRaw(_) => RemoteType::Oracle(OracleType::LongRaw),
         protobuf::remote_type::Type::OracleBlob(_) => RemoteType::Oracle(OracleType::Blob),
         protobuf::remote_type::Type::SqliteNull(_) => RemoteType::Sqlite(SqliteType::Null),
         protobuf::remote_type::Type::SqliteInteger(_) => RemoteType::Sqlite(SqliteType::Integer),

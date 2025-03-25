@@ -6,7 +6,7 @@ use crate::{
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
-    ArrayRef, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder,
+    ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder,
     LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, TimestampNanosecondBuilder,
     TimestampSecondBuilder, make_builder,
 };
@@ -164,6 +164,8 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
         ColumnType::NVarchar2(size) => Ok(RemoteType::Oracle(OracleType::NVarchar2(*size))),
         ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
         ColumnType::NChar(size) => Ok(RemoteType::Oracle(OracleType::NChar(*size))),
+        ColumnType::Raw(size) => Ok(RemoteType::Oracle(OracleType::Raw(*size))),
+        ColumnType::LongRaw => Ok(RemoteType::Oracle(OracleType::LongRaw)),
         ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),
         ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
         ColumnType::Timestamp(_) => Ok(RemoteType::Oracle(OracleType::Timestamp)),
@@ -343,6 +345,18 @@ fn rows_to_batch(
                         col,
                         Float64Builder,
                         f64,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
+                }
+                DataType::Binary => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        BinaryBuilder,
+                        Vec<u8>,
                         row,
                         idx,
                         |v| { Ok::<_, DataFusionError>(v) }
