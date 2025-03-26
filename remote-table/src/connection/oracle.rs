@@ -6,9 +6,9 @@ use crate::{
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
-    ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder,
-    LargeBinaryBuilder, LargeStringBuilder, RecordBatch, StringBuilder, TimestampNanosecondBuilder,
-    TimestampSecondBuilder, make_builder,
+    ArrayRef, BinaryBuilder, BooleanBuilder, Date64Builder, Decimal128Builder, Float32Builder,
+    Float64Builder, Int16Builder, Int32Builder, LargeBinaryBuilder, LargeStringBuilder,
+    RecordBatch, StringBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
@@ -237,6 +237,40 @@ fn rows_to_batch(
             let builder = &mut array_builders[idx];
             let col = row.column_info().get(idx);
             match field.data_type() {
+                DataType::Int16 => {
+                    handle_primitive_type!(builder, field, col, Int16Builder, i16, row, idx, |v| {
+                        Ok::<_, DataFusionError>(v)
+                    });
+                }
+                DataType::Int32 => {
+                    handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx, |v| {
+                        Ok::<_, DataFusionError>(v)
+                    });
+                }
+                DataType::Float32 => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Float32Builder,
+                        f32,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
+                }
+                DataType::Float64 => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Float64Builder,
+                        f64,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
+                }
                 DataType::Utf8 => {
                     handle_primitive_type!(
                         builder,
@@ -317,6 +351,20 @@ fn rows_to_batch(
                         }
                     );
                 }
+                DataType::Date64 => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Date64Builder,
+                        chrono::NaiveDateTime,
+                        row,
+                        idx,
+                        |v: chrono::NaiveDateTime| {
+                            Ok::<_, DataFusionError>(v.and_utc().timestamp_millis())
+                        }
+                    );
+                }
                 DataType::Boolean => {
                     handle_primitive_type!(
                         builder,
@@ -324,30 +372,6 @@ fn rows_to_batch(
                         col,
                         BooleanBuilder,
                         bool,
-                        row,
-                        idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
-                    );
-                }
-                DataType::Float32 => {
-                    handle_primitive_type!(
-                        builder,
-                        field,
-                        col,
-                        Float32Builder,
-                        f32,
-                        row,
-                        idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
-                    );
-                }
-                DataType::Float64 => {
-                    handle_primitive_type!(
-                        builder,
-                        field,
-                        col,
-                        Float64Builder,
-                        f64,
                         row,
                         idx,
                         |v| { Ok::<_, DataFusionError>(v) }
