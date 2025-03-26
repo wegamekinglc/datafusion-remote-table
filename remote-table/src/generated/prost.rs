@@ -106,7 +106,7 @@ pub struct RemoteField {
 pub struct RemoteType {
     #[prost(
         oneof = "remote_type::Type",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 301, 302, 303, 304, 305"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305"
     )]
     pub r#type: ::core::option::Option<remote_type::Type>,
 }
@@ -256,6 +256,10 @@ pub mod remote_type {
         OracleLongRaw(super::OracleLongRaw),
         #[prost(message, tag = "215")]
         OracleLong(super::OracleLong),
+        #[prost(message, tag = "216")]
+        OracleClob(super::OracleClob),
+        #[prost(message, tag = "217")]
+        OracleNclob(super::OracleNClob),
         #[prost(message, tag = "301")]
         SqliteNull(super::SqliteNull),
         #[prost(message, tag = "302")]
@@ -447,6 +451,10 @@ pub struct OracleRaw {
 pub struct OracleLongRaw {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct OracleLong {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct OracleClob {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct OracleNClob {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SqliteNull {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
