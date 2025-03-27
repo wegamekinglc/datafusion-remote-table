@@ -256,7 +256,11 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
             Ok(RemoteType::Mysql(MysqlType::Text(col_length)))
         }
         ColumnType::MYSQL_TYPE_BLOB if is_blob && is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::Blob(col_length)))
+            if is_utf8_bin_character_set {
+                Ok(RemoteType::Mysql(MysqlType::Text(col_length)))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::Blob(col_length)))
+            }
         }
         ColumnType::MYSQL_TYPE_JSON => Ok(RemoteType::Mysql(MysqlType::Json)),
         ColumnType::MYSQL_TYPE_GEOMETRY => Ok(RemoteType::Mysql(MysqlType::Geometry)),
