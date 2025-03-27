@@ -42,11 +42,5 @@ pub async fn various_sqls() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
 
-    assert_sqls(
-        "oracle",
-        vec![
-            // "select * from USER_TABLES"
-        ],
-    )
-    .await;
+    assert_sqls("oracle", vec!["select * from USER_TABLES"]).await;
 }

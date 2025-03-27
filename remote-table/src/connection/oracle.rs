@@ -1,10 +1,11 @@
-use crate::connection::{big_decimal_to_i128, projections_contains};
+use crate::connection::projections_contains;
 use crate::transform::transform_batch;
 use crate::{
     Connection, ConnectionOptions, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType, Transform,
 };
 use bb8_oracle::OracleConnectionManager;
+use bigdecimal::ToPrimitive;
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, BooleanBuilder, Date64Builder, Decimal128Builder, Float32Builder,
     Float64Builder, Int16Builder, Int32Builder, LargeBinaryBuilder, LargeStringBuilder,
@@ -297,7 +298,7 @@ fn rows_to_batch(
                         |v| { Ok::<_, DataFusionError>(v) }
                     );
                 }
-                DataType::Decimal128(_precision, scale) => {
+                DataType::Decimal128(_precision, _scale) => {
                     handle_primitive_type!(
                         builder,
                         field,
@@ -312,7 +313,7 @@ fn rows_to_batch(
                                     "Failed to parse BigDecimal from {v:?}: {e:?}",
                                 ))
                             })?;
-                            big_decimal_to_i128(&decimal, Some(*scale as u32)).ok_or_else(|| {
+                            decimal.to_i128().ok_or_else(|| {
                                 DataFusionError::Execution(format!(
                                     "Failed to convert BigDecimal to i128 for {decimal:?}",
                                 ))
