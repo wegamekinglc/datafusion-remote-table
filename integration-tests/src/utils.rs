@@ -26,6 +26,26 @@ pub async fn assert_result(database: &str, remote_sql: &str, df_sql: &str, expec
     );
 }
 
+pub async fn assert_sqls(database: &str, remote_sqls: Vec<&str>) {
+    let options = build_conn_options(database);
+
+    for sql in remote_sqls.into_iter() {
+        println!("Testing sql: {sql}");
+        let table = RemoteTable::try_new(options.clone(), sql).await.unwrap();
+        println!("remote schema: {:#?}", table.remote_schema());
+        let ctx = SessionContext::new();
+        ctx.register_table("remote_table", Arc::new(table)).unwrap();
+        let result = ctx
+            .sql("select * from remote_table")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+    }
+}
+
 pub fn build_conn_options(database: &str) -> ConnectionOptions {
     match database.to_lowercase().as_str() {
         "mysql" => ConnectionOptions::Mysql(

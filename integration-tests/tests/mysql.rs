@@ -1,5 +1,5 @@
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::assert_result;
+use integration_tests::utils::{assert_result, assert_sqls};
 
 #[tokio::test]
 pub async fn supported_mysql_types() {
@@ -34,6 +34,21 @@ pub async fn describe_table() {
 | id    | 696e74                   | NO   | 505249 |         |       |
 | name  | 766172636861722832353529 | NO   |        |         |       |
 +-------+--------------------------+------+--------+---------+-------+"#,
+    )
+    .await;
+}
+
+#[tokio::test]
+pub async fn various_sqls() {
+    setup_shared_containers();
+    // Wait for the database to be ready to connect
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+    assert_sqls(
+        "mysql",
+        vec![
+            // "select * from mysql.innodb_table_stats"
+        ],
     )
     .await;
 }

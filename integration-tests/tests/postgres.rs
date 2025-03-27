@@ -7,7 +7,7 @@ use datafusion_remote_table::{
     ConnectionOptions, PostgresConnectionOptions, RemotePhysicalCodec, RemoteTable,
 };
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::assert_result;
+use integration_tests::utils::{assert_result, assert_sqls};
 use std::sync::Arc;
 
 #[tokio::test]
@@ -112,6 +112,19 @@ ORDER BY
 | id          | integer                | NO          | int4     |
 | name        | character varying(255) | NO          | varchar  |
 +-------------+------------------------+-------------+----------+"#,
+    )
+    .await;
+}
+
+#[tokio::test]
+pub async fn various_sqls() {
+    setup_shared_containers();
+
+    assert_sqls(
+        "postgres",
+        vec![
+            // "select * from pg_catalog.pg_stat_all_tables"
+        ],
     )
     .await;
 }

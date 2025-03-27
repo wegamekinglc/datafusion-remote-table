@@ -1,5 +1,5 @@
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::assert_result;
+use integration_tests::utils::{assert_result, assert_sqls};
 
 #[tokio::test]
 pub async fn supported_oracle_types() {
@@ -33,6 +33,20 @@ pub async fn supported_oracle_types2() {
 | long     |
 |          |
 +----------+"#,
+    )
+    .await;
+}
+
+#[tokio::test]
+pub async fn various_sqls() {
+    setup_shared_containers();
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+    assert_sqls(
+        "oracle",
+        vec![
+            // "select * from USER_TABLES"
+        ],
     )
     .await;
 }

@@ -25,17 +25,15 @@ impl RemoteTable {
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
     ) -> DFResult<Self> {
-        Self::try_new_inner(conn_options, sql, None, None).await
+        Self::try_new_with_schema_transform(conn_options, sql, None, None).await
     }
 
-    pub async fn new_with_schema(
+    pub async fn try_new_with_schema(
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
         table_schema: SchemaRef,
-    ) -> Self {
-        Self::try_new_inner(conn_options, sql, Some(table_schema), None)
-            .await
-            .expect("Won't fail")
+    ) -> DFResult<Self> {
+        Self::try_new_with_schema_transform(conn_options, sql, Some(table_schema), None).await
     }
 
     pub async fn try_new_with_transform(
@@ -43,10 +41,10 @@ impl RemoteTable {
         sql: impl Into<String>,
         transform: Arc<dyn Transform>,
     ) -> DFResult<Self> {
-        Self::try_new_inner(conn_options, sql, None, Some(transform)).await
+        Self::try_new_with_schema_transform(conn_options, sql, None, Some(transform)).await
     }
 
-    pub(crate) async fn try_new_inner(
+    pub async fn try_new_with_schema_transform(
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
         table_schema: Option<SchemaRef>,
