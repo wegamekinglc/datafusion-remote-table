@@ -1,11 +1,10 @@
-use crate::connection::projections_contains;
+use crate::connection::{big_decimal_to_i128, projections_contains};
 use crate::transform::transform_batch;
 use crate::{
     Connection, ConnectionOptions, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType, Transform,
 };
 use bb8_oracle::OracleConnectionManager;
-use bigdecimal::ToPrimitive;
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, BooleanBuilder, Date64Builder, Decimal128Builder, Float32Builder,
     Float64Builder, Int16Builder, Int32Builder, LargeBinaryBuilder, LargeStringBuilder,
@@ -158,7 +157,10 @@ impl Connection for OracleConnection {
 fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> {
     match oracle_type {
         ColumnType::Number(precision, scale) => {
-            Ok(RemoteType::Oracle(OracleType::Number(*precision, *scale)))
+            // TODO need more investigation on the precision and scale
+            let precision = if *precision == 0 { 38 } else { *precision };
+            let scale = if *scale == -127 { 0 } else { *scale };
+            Ok(RemoteType::Oracle(OracleType::Number(precision, scale)))
         }
         ColumnType::BinaryFloat => Ok(RemoteType::Oracle(OracleType::BinaryFloat)),
         ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
@@ -298,7 +300,7 @@ fn rows_to_batch(
                         |v| { Ok::<_, DataFusionError>(v) }
                     );
                 }
-                DataType::Decimal128(_precision, _scale) => {
+                DataType::Decimal128(_precision, scale) => {
                     handle_primitive_type!(
                         builder,
                         field,
@@ -313,7 +315,7 @@ fn rows_to_batch(
                                     "Failed to parse BigDecimal from {v:?}: {e:?}",
                                 ))
                             })?;
-                            decimal.to_i128().ok_or_else(|| {
+                            big_decimal_to_i128(&decimal, Some(*scale as i32)).ok_or_else(|| {
                                 DataFusionError::Execution(format!(
                                     "Failed to convert BigDecimal to i128 for {decimal:?}",
                                 ))

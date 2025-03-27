@@ -346,7 +346,7 @@ struct BigDecimalFromSql {
 
 impl BigDecimalFromSql {
     fn to_decimal_128(&self) -> Option<i128> {
-        big_decimal_to_i128(&self.inner, Some(self.scale as u32))
+        big_decimal_to_i128(&self.inner, Some(self.scale as i32))
     }
 }
 

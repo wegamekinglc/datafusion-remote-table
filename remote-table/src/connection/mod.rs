@@ -9,7 +9,7 @@ pub use postgres::*;
 
 use crate::connection::sqlite::connect_sqlite;
 use crate::{DFResult, RemoteSchemaRef, Transform};
-use bigdecimal::ToPrimitive;
+use bigdecimal::{FromPrimitive, ToPrimitive};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
 use std::fmt::Debug;
@@ -86,12 +86,13 @@ pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usi
     }
 }
 
-fn big_decimal_to_i128(decimal: &bigdecimal::BigDecimal, scale: Option<u32>) -> Option<i128> {
+fn big_decimal_to_i128(decimal: &bigdecimal::BigDecimal, scale: Option<i32>) -> Option<i128> {
     let scale = scale.unwrap_or_else(|| {
         decimal
             .fractional_digit_count()
             .try_into()
             .unwrap_or_default()
     });
-    (decimal * 10i128.pow(scale)).to_i128()
+    let scale_decimal = bigdecimal::BigDecimal::from_f32(10f32.powi(scale))?;
+    (decimal * scale_decimal).to_i128()
 }

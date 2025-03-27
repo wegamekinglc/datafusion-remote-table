@@ -428,7 +428,7 @@ fn rows_to_batch(
                         row,
                         idx,
                         |v: BigDecimal| {
-                            big_decimal_to_i128(&v, Some(*scale as u32)).ok_or_else(|| {
+                            big_decimal_to_i128(&v, Some(*scale as i32)).ok_or_else(|| {
                                 DataFusionError::Execution(format!(
                                     "Failed to convert BigDecimal {v:?} to i128"
                                 ))
