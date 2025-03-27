@@ -179,6 +179,8 @@ impl Connection for MysqlConnection {
 }
 
 fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
+    let character_set = mysql_col.character_set();
+    let is_utf8_bin_character_set = character_set == 45;
     let is_binary = mysql_col.flags().contains(ColumnFlags::BINARY_FLAG);
     let is_blob = mysql_col.flags().contains(ColumnFlags::BLOB_FLAG);
     let is_unsigned = mysql_col.flags().contains(ColumnFlags::UNSIGNED_FLAG);
@@ -232,12 +234,22 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
         ColumnType::MYSQL_TYPE_TIMESTAMP => Ok(RemoteType::Mysql(MysqlType::Timestamp)),
         ColumnType::MYSQL_TYPE_YEAR => Ok(RemoteType::Mysql(MysqlType::Year)),
         ColumnType::MYSQL_TYPE_STRING if !is_binary => Ok(RemoteType::Mysql(MysqlType::Char)),
-        ColumnType::MYSQL_TYPE_STRING if is_binary => Ok(RemoteType::Mysql(MysqlType::Binary)),
+        ColumnType::MYSQL_TYPE_STRING if is_binary => {
+            if is_utf8_bin_character_set {
+                Ok(RemoteType::Mysql(MysqlType::Char))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::Binary))
+            }
+        }
         ColumnType::MYSQL_TYPE_VAR_STRING if !is_binary => {
             Ok(RemoteType::Mysql(MysqlType::Varchar))
         }
         ColumnType::MYSQL_TYPE_VAR_STRING if is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::Varbinary))
+            if is_utf8_bin_character_set {
+                Ok(RemoteType::Mysql(MysqlType::Varchar))
+            } else {
+                Ok(RemoteType::Mysql(MysqlType::Varbinary))
+            }
         }
         ColumnType::MYSQL_TYPE_VARCHAR => Ok(RemoteType::Mysql(MysqlType::Varchar)),
         ColumnType::MYSQL_TYPE_BLOB if is_blob && !is_binary => {

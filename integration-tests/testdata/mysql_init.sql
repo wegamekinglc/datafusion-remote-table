@@ -23,6 +23,7 @@ CREATE TABLE supported_data_types
     year_col YEAR,
     char_col CHAR(10),
     varchar_col VARCHAR(255),
+    varchar_utf8_bin_col VARCHAR(255) CHARACTER SET utf8 COLLATE utf8_bin,
     binary_col BINARY(10),
     varbinary_col VARBINARY(100),
     tinytext_col TINYTEXT,
@@ -38,8 +39,8 @@ CREATE TABLE supported_data_types
 );
 
 INSERT INTO supported_data_types values
-(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.1, 2.2, 3.33, '2025-03-14', '2025-03-14 17:36:25', '11:11:11', '2025-03-14 11:11:11', '1999', 'char', 'varchar', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}', Point(15, 20)),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.1, 2.2, 3.33, '2025-03-14', '2025-03-14 17:36:25', '11:11:11', '2025-03-14 11:11:11', '1999', 'char', 'varchar', 'varchar_utf8_bin', X'01', X'02', 'tinytext', 'text', 'mediumtext', 'longtext', X'01', X'02', X'03', X'04', '{"key": "value"}', Point(15, 20)),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id INT PRIMARY KEY,
