@@ -122,9 +122,7 @@ pub async fn various_sqls() {
 
     assert_sqls(
         "postgres",
-        vec![
-            // "select * from pg_catalog.pg_stat_all_tables"
-        ],
+        vec!["select * from pg_catalog.pg_stat_all_tables"],
     )
     .await;
 }

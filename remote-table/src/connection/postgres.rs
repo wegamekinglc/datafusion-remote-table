@@ -15,7 +15,7 @@ use datafusion::arrow::array::{
     Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
     IntervalMonthDayNanoBuilder, LargeStringBuilder, ListBuilder, RecordBatch, StringBuilder,
     Time64MicrosecondBuilder, Time64NanosecondBuilder, TimestampMicrosecondBuilder,
-    TimestampNanosecondBuilder, make_builder,
+    TimestampNanosecondBuilder, UInt32Builder, make_builder,
 };
 use datafusion::arrow::datatypes::{
     DataType, Date32Type, IntervalMonthDayNanoType, IntervalUnit, SchemaRef, TimeUnit,
@@ -221,6 +221,7 @@ fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<Rem
                 scale.try_into().unwrap_or_default(),
             )))
         }
+        &Type::OID => Ok(RemoteType::Postgres(PostgresType::Oid)),
         &Type::NAME => Ok(RemoteType::Postgres(PostgresType::Name)),
         &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
         &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
@@ -497,6 +498,18 @@ fn rows_to_batch(
                     handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx, |v| {
                         Ok::<_, DataFusionError>(v)
                     });
+                }
+                DataType::UInt32 => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        UInt32Builder,
+                        u32,
+                        row,
+                        idx,
+                        |v| { Ok::<_, DataFusionError>(v) }
+                    );
                 }
                 DataType::Int64 => {
                     handle_primitive_type!(builder, field, col, Int64Builder, i64, row, idx, |v| {

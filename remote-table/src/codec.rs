@@ -394,6 +394,11 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::PostgresPostGisGeometry {},
             )),
         },
+        RemoteType::Postgres(PostgresType::Oid) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::PostgresOid(
+                protobuf::PostgresOid {},
+            )),
+        },
 
         RemoteType::Mysql(MysqlType::TinyInt) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::MysqlTinyInt(
@@ -735,6 +740,7 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::PostgresPostgisGeometry(_) => {
             RemoteType::Postgres(PostgresType::PostGisGeometry)
         }
+        protobuf::remote_type::Type::PostgresOid(_) => RemoteType::Postgres(PostgresType::Oid),
         protobuf::remote_type::Type::MysqlTinyInt(_) => RemoteType::Mysql(MysqlType::TinyInt),
         protobuf::remote_type::Type::MysqlTinyIntUnsigned(_) => {
             RemoteType::Mysql(MysqlType::TinyIntUnsigned)

@@ -31,18 +31,18 @@ pub async fn assert_sqls(database: &str, remote_sqls: Vec<&str>) {
 
     for sql in remote_sqls.into_iter() {
         println!("Testing sql: {sql}");
+
         let table = RemoteTable::try_new(options.clone(), sql).await.unwrap();
         println!("remote schema: {:#?}", table.remote_schema());
+
         let ctx = SessionContext::new();
         ctx.register_table("remote_table", Arc::new(table)).unwrap();
-        let result = ctx
-            .sql("select * from remote_table")
+        ctx.sql("select * from remote_table")
             .await
             .unwrap()
-            .collect()
+            .show()
             .await
             .unwrap();
-        println!("{}", pretty_format_batches(result.as_slice()).unwrap());
     }
 }
 

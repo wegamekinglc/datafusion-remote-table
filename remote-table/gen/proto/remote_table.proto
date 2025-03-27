@@ -99,6 +99,7 @@ message RemoteType {
     PostgresByteaArray postgres_bytea_array = 28;
     PostgresBoolArray postgres_bool_array = 29;
     PostgresPostGisGeometry postgres_postgis_geometry = 30;
+    PostgresOid postgres_oid = 31;
     MysqlTinyInt mysql_tiny_int = 101;
     MysqlTinyIntUnsigned mysql_tiny_int_unsigned = 102;
     MysqlSmallInt mysql_small_int = 103;
@@ -182,6 +183,7 @@ message PostgresTextArray {}
 message PostgresByteaArray {}
 message PostgresBoolArray {}
 message PostgresPostGisGeometry {}
+message PostgresOid {}
 
 
 message MysqlTinyInt {}

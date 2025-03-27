@@ -36,6 +36,7 @@ pub enum PostgresType {
     // numeric(p, s), decimal(p, s)
     // precision is a fixed value(38)
     Numeric(i8),
+    Oid,
     Name,
     // varchar(n)
     Varchar,
@@ -73,6 +74,7 @@ impl PostgresType {
             PostgresType::Float4 => DataType::Float32,
             PostgresType::Float8 => DataType::Float64,
             PostgresType::Numeric(scale) => DataType::Decimal128(38, *scale),
+            PostgresType::Oid => DataType::UInt32,
             PostgresType::Name
             | PostgresType::Text
             | PostgresType::Varchar

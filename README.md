@@ -34,7 +34,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
   - [x] Float4 / Float8 / Numeric
   - [x] Char / Varchar / Text / Bpchar / Bytea
   - [x] Date / Time / Timestamp / Timestamptz / Interval
-  - [x] Bool / Json / Jsonb / Geometry(PostGIS)
+  - [x] Bool / Oid / Name / Json / Jsonb / Geometry(PostGIS)
   - [x] Int2[] / Int4[] / Int8[]
   - [x] Float4[] / Float8[]
   - [x] Char[] / Varchar[] / Bpchar[] / Text[] / Bytea[]
