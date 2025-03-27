@@ -113,40 +113,16 @@ impl Connection for PostgresConnection {
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
-        let mut stream = self
-            .conn
-            .query_raw(sql, Vec::<String>::new())
-            .await
-            .map_err(|e| {
-                DataFusionError::Execution(format!(
-                    "Failed to execute query {sql} on postgres due to {e}",
-                ))
-            })?
-            .chunks(1)
-            .boxed();
-
-        let Some(first_chunk) = stream.next().await else {
-            return Err(DataFusionError::Execution(
-                "No data returned from postgres".to_string(),
-            ));
-        };
-        let first_chunk: Vec<Row> = first_chunk
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| {
-                DataFusionError::Execution(format!(
-                    "Failed to collect rows from postgres due to {e}",
-                ))
-            })?;
-        let Some(first_row) = first_chunk.first() else {
-            return Err(DataFusionError::Execution(
-                "No data returned from postgres".to_string(),
-            ));
-        };
-        let remote_schema = Arc::new(build_remote_schema(first_row)?);
+        let sql = format!("SELECT * FROM ({}) as __subquery LIMIT 1", sql);
+        let row = self.conn.query_one(&sql, &[]).await.map_err(|e| {
+            DataFusionError::Execution(format!(
+                "Failed to execute query {sql} on postgres due to {e}",
+            ))
+        })?;
+        let remote_schema = Arc::new(build_remote_schema(&row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
         if let Some(transform) = transform {
-            let batch = rows_to_batch(std::slice::from_ref(first_row), &arrow_schema, None)?;
+            let batch = rows_to_batch(&[row], &arrow_schema, None)?;
             let transformed_batch = transform_batch(
                 batch,
                 transform.as_ref(),
