@@ -14,12 +14,14 @@ use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+use derive_getters::Getters;
+use derive_with::With;
 use futures::StreamExt;
 use oracle::sql_type::OracleType as ColumnType;
 use oracle::{Connector, Row};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, With, Getters)]
 pub struct OracleConnectionOptions {
     pub(crate) host: String,
     pub(crate) port: u16,

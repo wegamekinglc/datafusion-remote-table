@@ -24,13 +24,15 @@ use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+use derive_getters::Getters;
+use derive_with::With;
 use futures::StreamExt;
 use num_bigint::{BigInt, Sign};
 use std::string::ToString;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, Clone, derive_with::With)]
+#[derive(Debug, Clone, With, Getters)]
 pub struct PostgresConnectionOptions {
     pub(crate) host: String,
     pub(crate) port: u16,

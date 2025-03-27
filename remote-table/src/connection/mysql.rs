@@ -18,6 +18,8 @@ use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit, i2
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+use derive_getters::Getters;
+use derive_with::With;
 use futures::StreamExt;
 use futures::lock::Mutex;
 use mysql_async::consts::{ColumnFlags, ColumnType};
@@ -25,7 +27,7 @@ use mysql_async::prelude::Queryable;
 use mysql_async::{Column, FromValueError, Row, Value};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, derive_with::With)]
+#[derive(Debug, Clone, With, Getters)]
 pub struct MysqlConnectionOptions {
     pub(crate) host: String,
     pub(crate) port: u16,
