@@ -39,8 +39,8 @@ pub struct PostgresConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) database: Option<String>,
-    pub(crate) pool_max_size: Option<usize>,
-    pub(crate) stream_chunk_size: Option<usize>,
+    pub(crate) pool_max_size: usize,
+    pub(crate) stream_chunk_size: usize,
 }
 
 impl PostgresConnectionOptions {
@@ -56,8 +56,8 @@ impl PostgresConnectionOptions {
             username: username.into(),
             password: password.into(),
             database: None,
-            pool_max_size: None,
-            stream_chunk_size: None,
+            pool_max_size: 10,
+            stream_chunk_size: 2048,
         }
     }
 }
@@ -91,7 +91,7 @@ pub(crate) async fn connect_postgres(
     }
     let manager = PostgresConnectionManager::new(config, NoTls);
     let pool = bb8::Pool::builder()
-        .max_size(options.pool_max_size.unwrap_or(10) as u32)
+        .max_size(options.pool_max_size as u32)
         .build(manager)
         .await
         .map_err(|e| {
@@ -155,7 +155,7 @@ impl Connection for PostgresConnection {
                     "Failed to execute query {sql} on postgres due to {e}",
                 ))
             })?
-            .chunks(chunk_size.unwrap_or(2048))
+            .chunks(chunk_size)
             .boxed();
 
         let stream = stream.map(move |rows| {

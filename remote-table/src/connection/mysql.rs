@@ -34,8 +34,8 @@ pub struct MysqlConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) database: Option<String>,
-    pub(crate) pool_max_size: Option<usize>,
-    pub(crate) stream_chunk_size: Option<usize>,
+    pub(crate) pool_max_size: usize,
+    pub(crate) stream_chunk_size: usize,
 }
 
 impl MysqlConnectionOptions {
@@ -51,8 +51,8 @@ impl MysqlConnectionOptions {
             username: username.into(),
             password: password.into(),
             database: None,
-            pool_max_size: None,
-            stream_chunk_size: None,
+            pool_max_size: 10,
+            stream_chunk_size: 2048,
         }
     }
 }
@@ -64,7 +64,7 @@ pub struct MysqlPool {
 
 pub(crate) fn connect_mysql(options: &MysqlConnectionOptions) -> DFResult<MysqlPool> {
     let pool_opts = mysql_async::PoolOpts::new().with_constraints(
-        mysql_async::PoolConstraints::new(0, options.pool_max_size.unwrap_or(10))
+        mysql_async::PoolConstraints::new(0, options.pool_max_size)
             .expect("Failed to create pool constraints"),
     );
     let opts_builder = mysql_async::OptsBuilder::default()
@@ -158,7 +158,7 @@ impl Connection for MysqlConnection {
                 return;
             };
 
-            let mut chunked_stream = stream.chunks(chunk_size.unwrap_or(2048)).boxed();
+            let mut chunked_stream = stream.chunks(chunk_size).boxed();
 
             while let Some(chunk) = chunked_stream.next().await {
                 let rows = chunk

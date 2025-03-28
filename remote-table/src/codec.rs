@@ -139,8 +139,8 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     username: options.username.clone(),
                     password: options.password.clone(),
                     database: options.database.clone(),
-                    pool_max_size: options.pool_max_size.map(|sz| sz as u32),
-                    stream_chunk_size: options.stream_chunk_size.map(|sz| sz as u32),
+                    pool_max_size: options.pool_max_size as u32,
+                    stream_chunk_size: options.stream_chunk_size as u32,
                 },
             )),
         },
@@ -152,8 +152,8 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     username: options.username.clone(),
                     password: options.password.clone(),
                     database: options.database.clone(),
-                    pool_max_size: options.pool_max_size.map(|sz| sz as u32),
-                    stream_chunk_size: options.stream_chunk_size.map(|sz| sz as u32),
+                    pool_max_size: options.pool_max_size as u32,
+                    stream_chunk_size: options.stream_chunk_size as u32,
                 },
             )),
         },
@@ -165,8 +165,8 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     username: options.username.clone(),
                     password: options.password.clone(),
                     service_name: options.service_name.clone(),
-                    pool_max_size: options.pool_max_size.map(|sz| sz as u32),
-                    stream_chunk_size: options.stream_chunk_size.map(|sz| sz as u32),
+                    pool_max_size: options.pool_max_size as u32,
+                    stream_chunk_size: options.stream_chunk_size as u32,
                 },
             )),
         },
@@ -189,8 +189,8 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 username: options.username,
                 password: options.password,
                 database: options.database,
-                pool_max_size: options.pool_max_size.map(|sz| sz as usize),
-                stream_chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
+                pool_max_size: options.pool_max_size as usize,
+                stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
         Some(protobuf::connection_options::ConnectionOptions::Mysql(options)) => {
@@ -200,8 +200,8 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 username: options.username,
                 password: options.password,
                 database: options.database,
-                pool_max_size: options.pool_max_size.map(|sz| sz as usize),
-                stream_chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
+                pool_max_size: options.pool_max_size as usize,
+                stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
         Some(protobuf::connection_options::ConnectionOptions::Oracle(options)) => {
@@ -211,8 +211,8 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 username: options.username,
                 password: options.password,
                 service_name: options.service_name,
-                pool_max_size: options.pool_max_size.map(|sz| sz as usize),
-                stream_chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
+                pool_max_size: options.pool_max_size as usize,
+                stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
         Some(protobuf::connection_options::ConnectionOptions::Sqlite(options)) => {

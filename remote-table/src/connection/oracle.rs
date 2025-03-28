@@ -28,8 +28,8 @@ pub struct OracleConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) service_name: String,
-    pub(crate) pool_max_size: Option<usize>,
-    pub(crate) stream_chunk_size: Option<usize>,
+    pub(crate) pool_max_size: usize,
+    pub(crate) stream_chunk_size: usize,
 }
 
 impl OracleConnectionOptions {
@@ -46,8 +46,8 @@ impl OracleConnectionOptions {
             username: username.into(),
             password: password.into(),
             service_name: service_name.into(),
-            pool_max_size: None,
-            stream_chunk_size: None,
+            pool_max_size: 10,
+            stream_chunk_size: 2048,
         }
     }
 }
@@ -72,7 +72,7 @@ pub(crate) async fn connect_oracle(options: &OracleConnectionOptions) -> DFResul
         .map_err(|e| DataFusionError::Internal(format!("Failed to connect to oracle: {e:?}")))?;
     let manager = OracleConnectionManager::from_connector(connector);
     let pool = bb8::Pool::builder()
-        .max_size(options.pool_max_size.unwrap_or(10) as u32)
+        .max_size(options.pool_max_size as u32)
         .build(manager)
         .await
         .map_err(|e| DataFusionError::Internal(format!("Failed to create oracle pool: {:?}", e)))?;
@@ -135,9 +135,7 @@ impl Connection for OracleConnection {
         let result_set = self.conn.query(sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query on oracle: {e:?}"))
         })?;
-        let stream = futures::stream::iter(result_set)
-            .chunks(chunk_size.unwrap_or(2048))
-            .boxed();
+        let stream = futures::stream::iter(result_set).chunks(chunk_size).boxed();
 
         let stream = stream.map(move |rows| {
             let rows: Vec<Row> = rows

@@ -68,12 +68,12 @@ pub enum ConnectionOptions {
 }
 
 impl ConnectionOptions {
-    pub fn stream_chunk_size(&self) -> Option<usize> {
+    pub fn stream_chunk_size(&self) -> usize {
         match self {
             ConnectionOptions::Postgres(options) => options.stream_chunk_size,
             ConnectionOptions::Oracle(options) => options.stream_chunk_size,
             ConnectionOptions::Mysql(options) => options.stream_chunk_size,
-            ConnectionOptions::Sqlite(_) => None,
+            ConnectionOptions::Sqlite(_) => unreachable!(),
         }
     }
 }
