@@ -153,7 +153,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     password: options.password.clone(),
                     database: options.database.clone(),
                     pool_max_size: options.pool_max_size.map(|sz| sz as u32),
-                    stream_chunk_size: options.chunk_size.map(|sz| sz as u32),
+                    stream_chunk_size: options.stream_chunk_size.map(|sz| sz as u32),
                 },
             )),
         },
@@ -166,7 +166,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     password: options.password.clone(),
                     service_name: options.service_name.clone(),
                     pool_max_size: options.pool_max_size.map(|sz| sz as u32),
-                    stream_chunk_size: options.chunk_size.map(|sz| sz as u32),
+                    stream_chunk_size: options.stream_chunk_size.map(|sz| sz as u32),
                 },
             )),
         },
@@ -201,7 +201,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 password: options.password,
                 database: options.database,
                 pool_max_size: options.pool_max_size.map(|sz| sz as usize),
-                chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
+                stream_chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
             })
         }
         Some(protobuf::connection_options::ConnectionOptions::Oracle(options)) => {
@@ -212,7 +212,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 password: options.password,
                 service_name: options.service_name,
                 pool_max_size: options.pool_max_size.map(|sz| sz as usize),
-                chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
+                stream_chunk_size: options.stream_chunk_size.map(|sz| sz as usize),
             })
         }
         Some(protobuf::connection_options::ConnectionOptions::Sqlite(options)) => {

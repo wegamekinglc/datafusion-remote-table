@@ -29,7 +29,7 @@ pub struct OracleConnectionOptions {
     pub(crate) password: String,
     pub(crate) service_name: String,
     pub(crate) pool_max_size: Option<usize>,
-    pub(crate) chunk_size: Option<usize>,
+    pub(crate) stream_chunk_size: Option<usize>,
 }
 
 impl OracleConnectionOptions {
@@ -47,7 +47,7 @@ impl OracleConnectionOptions {
             password: password.into(),
             service_name: service_name.into(),
             pool_max_size: None,
-            chunk_size: None,
+            stream_chunk_size: None,
         }
     }
 }

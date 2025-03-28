@@ -71,8 +71,8 @@ impl ConnectionOptions {
     pub fn stream_chunk_size(&self) -> Option<usize> {
         match self {
             ConnectionOptions::Postgres(options) => options.stream_chunk_size,
-            ConnectionOptions::Oracle(options) => options.chunk_size,
-            ConnectionOptions::Mysql(options) => options.chunk_size,
+            ConnectionOptions::Oracle(options) => options.stream_chunk_size,
+            ConnectionOptions::Mysql(options) => options.stream_chunk_size,
             ConnectionOptions::Sqlite(_) => None,
         }
     }

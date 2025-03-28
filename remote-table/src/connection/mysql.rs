@@ -35,7 +35,7 @@ pub struct MysqlConnectionOptions {
     pub(crate) password: String,
     pub(crate) database: Option<String>,
     pub(crate) pool_max_size: Option<usize>,
-    pub(crate) chunk_size: Option<usize>,
+    pub(crate) stream_chunk_size: Option<usize>,
 }
 
 impl MysqlConnectionOptions {
@@ -52,7 +52,7 @@ impl MysqlConnectionOptions {
             password: password.into(),
             database: None,
             pool_max_size: None,
-            chunk_size: None,
+            stream_chunk_size: None,
         }
     }
 }
