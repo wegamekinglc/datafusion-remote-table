@@ -131,7 +131,7 @@ impl Connection for OracleConnection {
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
         let projection = projection.cloned();
-        let chunk_size = conn_options.chunk_size();
+        let chunk_size = conn_options.stream_chunk_size();
         let result_set = self.conn.query(sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query on oracle: {e:?}"))
         })?;

@@ -29,7 +29,7 @@ message PostgresConnectionOptions {
   string password = 4;
   optional string database = 5;
   optional uint32 pool_max_size = 6;
-  optional uint32 chunk_size = 7;
+  optional uint32 stream_chunk_size = 7;
 }
 
 message MysqlConnectionOptions {
@@ -39,7 +39,7 @@ message MysqlConnectionOptions {
   string password = 4;
   optional string database = 5;
   optional uint32 pool_max_size = 6;
-  optional uint32 chunk_size = 7;
+  optional uint32 stream_chunk_size = 7;
 }
 
 message OracleConnectionOptions {
@@ -49,7 +49,7 @@ message OracleConnectionOptions {
   string password = 4;
   string service_name = 5;
   optional uint32 pool_max_size = 6;
-  optional uint32 chunk_size = 7;
+  optional uint32 stream_chunk_size = 7;
 }
 
 message SqliteConnectionOptions {

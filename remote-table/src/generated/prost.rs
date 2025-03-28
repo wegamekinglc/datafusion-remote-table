@@ -48,7 +48,7 @@ pub struct PostgresConnectionOptions {
     #[prost(uint32, optional, tag = "6")]
     pub pool_max_size: ::core::option::Option<u32>,
     #[prost(uint32, optional, tag = "7")]
-    pub chunk_size: ::core::option::Option<u32>,
+    pub stream_chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MysqlConnectionOptions {
@@ -65,7 +65,7 @@ pub struct MysqlConnectionOptions {
     #[prost(uint32, optional, tag = "6")]
     pub pool_max_size: ::core::option::Option<u32>,
     #[prost(uint32, optional, tag = "7")]
-    pub chunk_size: ::core::option::Option<u32>,
+    pub stream_chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OracleConnectionOptions {
@@ -82,7 +82,7 @@ pub struct OracleConnectionOptions {
     #[prost(uint32, optional, tag = "6")]
     pub pool_max_size: ::core::option::Option<u32>,
     #[prost(uint32, optional, tag = "7")]
-    pub chunk_size: ::core::option::Option<u32>,
+    pub stream_chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SqliteConnectionOptions {

@@ -40,7 +40,7 @@ pub struct PostgresConnectionOptions {
     pub(crate) password: String,
     pub(crate) database: Option<String>,
     pub(crate) pool_max_size: Option<usize>,
-    pub(crate) chunk_size: Option<usize>,
+    pub(crate) stream_chunk_size: Option<usize>,
 }
 
 impl PostgresConnectionOptions {
@@ -57,7 +57,7 @@ impl PostgresConnectionOptions {
             password: password.into(),
             database: None,
             pool_max_size: None,
-            chunk_size: None,
+            stream_chunk_size: None,
         }
     }
 }
@@ -145,7 +145,7 @@ impl Connection for PostgresConnection {
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
         let projection = projection.cloned();
-        let chunk_size = conn_options.chunk_size();
+        let chunk_size = conn_options.stream_chunk_size();
         let stream = self
             .conn
             .query_raw(sql, Vec::<String>::new())

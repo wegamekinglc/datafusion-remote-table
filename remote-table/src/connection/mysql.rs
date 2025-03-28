@@ -140,7 +140,7 @@ impl Connection for MysqlConnection {
         let projected_schema = project_schema(&table_schema, projection)?;
         let sql = sql.to_string();
         let projection = projection.cloned();
-        let chunk_size = conn_options.chunk_size();
+        let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
         let stream = Box::pin(stream! {
             let mut conn = conn.lock().await;
