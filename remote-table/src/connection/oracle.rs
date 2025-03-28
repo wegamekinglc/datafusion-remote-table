@@ -98,8 +98,9 @@ impl Connection for OracleConnection {
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
-        let row = self.conn.query_row(sql, &[]).map_err(|e| {
-            DataFusionError::Execution(format!("Failed to query one row to infer schema: {e:?}"))
+        let sql = try_limit1_query(sql).unwrap_or_else(|| sql.to_string());
+        let row = self.conn.query_row(&sql, &[]).map_err(|e| {
+            DataFusionError::Execution(format!("Failed to execute query {sql} on oracle: {e:?}"))
         })?;
         let remote_schema = Arc::new(build_remote_schema(&row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
@@ -151,6 +152,14 @@ impl Connection for OracleConnection {
             projected_schema,
             stream,
         )))
+    }
+}
+
+fn try_limit1_query(sql: &str) -> Option<String> {
+    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
+        Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= 1"))
+    } else {
+        None
     }
 }
 

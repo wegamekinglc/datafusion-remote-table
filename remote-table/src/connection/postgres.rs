@@ -113,11 +113,9 @@ impl Connection for PostgresConnection {
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
-        let sql = format!("SELECT * FROM ({}) as __subquery LIMIT 1", sql);
+        let sql = try_limit1_query(sql).unwrap_or_else(|| sql.to_string());
         let row = self.conn.query_one(&sql, &[]).await.map_err(|e| {
-            DataFusionError::Execution(format!(
-                "Failed to execute query {sql} on postgres due to {e}",
-            ))
+            DataFusionError::Execution(format!("Failed to execute query {sql} on postgres: {e:?}",))
         })?;
         let remote_schema = Arc::new(build_remote_schema(&row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
@@ -174,6 +172,14 @@ impl Connection for PostgresConnection {
             projected_schema,
             stream,
         )))
+    }
+}
+
+fn try_limit1_query(sql: &str) -> Option<String> {
+    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
+        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT 1"))
+    } else {
+        None
     }
 }
 

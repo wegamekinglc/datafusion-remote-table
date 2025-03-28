@@ -23,7 +23,6 @@ pub trait Pool: Debug + Send + Sync {
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
-    // TODO could add limit 1 to query
     async fn infer_schema(
         &self,
         sql: &str,

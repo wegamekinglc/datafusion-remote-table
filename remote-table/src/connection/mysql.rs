@@ -95,10 +95,11 @@ impl Connection for MysqlConnection {
         sql: &str,
         transform: Option<Arc<dyn Transform>>,
     ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+        let sql = try_limit1_query(sql).unwrap_or_else(|| sql.to_string());
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
-        let row: Option<Row> = conn.query_first(sql).await.map_err(|e| {
-            DataFusionError::Execution(format!("Failed to execute query on mysql: {e:?}",))
+        let row: Option<Row> = conn.query_first(&sql).await.map_err(|e| {
+            DataFusionError::Execution(format!("Failed to execute query {sql} on mysql: {e:?}",))
         })?;
         let Some(row) = row else {
             return Err(DataFusionError::Execution(
@@ -175,6 +176,14 @@ impl Connection for MysqlConnection {
             projected_schema,
             stream,
         )))
+    }
+}
+
+fn try_limit1_query(sql: &str) -> Option<String> {
+    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
+        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT 1"))
+    } else {
+        None
     }
 }
 
