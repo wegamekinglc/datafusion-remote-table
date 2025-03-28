@@ -34,6 +34,7 @@ pub struct MysqlConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) database: Option<String>,
+    pub(crate) pool_max_size: Option<usize>,
     pub(crate) chunk_size: Option<usize>,
 }
 
@@ -50,6 +51,7 @@ impl MysqlConnectionOptions {
             username: username.into(),
             password: password.into(),
             database: None,
+            pool_max_size: None,
             chunk_size: None,
         }
     }
@@ -61,12 +63,17 @@ pub struct MysqlPool {
 }
 
 pub(crate) fn connect_mysql(options: &MysqlConnectionOptions) -> DFResult<MysqlPool> {
+    let pool_opts = mysql_async::PoolOpts::new().with_constraints(
+        mysql_async::PoolConstraints::new(0, options.pool_max_size.unwrap_or(10))
+            .expect("Failed to create pool constraints"),
+    );
     let opts_builder = mysql_async::OptsBuilder::default()
         .ip_or_hostname(options.host.clone())
         .tcp_port(options.port)
         .user(Some(options.username.clone()))
         .pass(Some(options.password.clone()))
-        .db_name(options.database.clone());
+        .db_name(options.database.clone())
+        .pool_opts(pool_opts);
     let pool = mysql_async::Pool::new(opts_builder);
     Ok(MysqlPool { pool })
 }

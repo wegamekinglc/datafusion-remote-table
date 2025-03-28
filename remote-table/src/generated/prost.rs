@@ -46,6 +46,8 @@ pub struct PostgresConnectionOptions {
     #[prost(string, optional, tag = "5")]
     pub database: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint32, optional, tag = "6")]
+    pub pool_max_size: ::core::option::Option<u32>,
+    #[prost(uint32, optional, tag = "7")]
     pub chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -61,6 +63,8 @@ pub struct MysqlConnectionOptions {
     #[prost(string, optional, tag = "5")]
     pub database: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint32, optional, tag = "6")]
+    pub pool_max_size: ::core::option::Option<u32>,
+    #[prost(uint32, optional, tag = "7")]
     pub chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -76,6 +80,8 @@ pub struct OracleConnectionOptions {
     #[prost(string, tag = "5")]
     pub service_name: ::prost::alloc::string::String,
     #[prost(uint32, optional, tag = "6")]
+    pub pool_max_size: ::core::option::Option<u32>,
+    #[prost(uint32, optional, tag = "7")]
     pub chunk_size: ::core::option::Option<u32>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

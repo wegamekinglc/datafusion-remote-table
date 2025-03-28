@@ -39,6 +39,7 @@ pub struct PostgresConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) database: Option<String>,
+    pub(crate) pool_max_size: Option<usize>,
     pub(crate) chunk_size: Option<usize>,
 }
 
@@ -55,6 +56,7 @@ impl PostgresConnectionOptions {
             username: username.into(),
             password: password.into(),
             database: None,
+            pool_max_size: None,
             chunk_size: None,
         }
     }
@@ -89,7 +91,7 @@ pub(crate) async fn connect_postgres(
     }
     let manager = PostgresConnectionManager::new(config, NoTls);
     let pool = bb8::Pool::builder()
-        .max_size(5)
+        .max_size(options.pool_max_size.unwrap_or(10) as u32)
         .build(manager)
         .await
         .map_err(|e| {

@@ -28,6 +28,7 @@ pub struct OracleConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) service_name: String,
+    pub(crate) pool_max_size: Option<usize>,
     pub(crate) chunk_size: Option<usize>,
 }
 
@@ -45,6 +46,7 @@ impl OracleConnectionOptions {
             username: username.into(),
             password: password.into(),
             service_name: service_name.into(),
+            pool_max_size: None,
             chunk_size: None,
         }
     }
@@ -70,6 +72,7 @@ pub(crate) async fn connect_oracle(options: &OracleConnectionOptions) -> DFResul
         .map_err(|e| DataFusionError::Internal(format!("Failed to connect to oracle: {e:?}")))?;
     let manager = OracleConnectionManager::from_connector(connector);
     let pool = bb8::Pool::builder()
+        .max_size(options.pool_max_size.unwrap_or(10) as u32)
         .build(manager)
         .await
         .map_err(|e| DataFusionError::Internal(format!("Failed to create oracle pool: {:?}", e)))?;

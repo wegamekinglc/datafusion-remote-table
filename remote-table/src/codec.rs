@@ -139,6 +139,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     username: options.username.clone(),
                     password: options.password.clone(),
                     database: options.database.clone(),
+                    pool_max_size: options.pool_max_size.map(|sz| sz as u32),
                     chunk_size: options.chunk_size.map(|sz| sz as u32),
                 },
             )),
@@ -151,6 +152,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     username: options.username.clone(),
                     password: options.password.clone(),
                     database: options.database.clone(),
+                    pool_max_size: options.pool_max_size.map(|sz| sz as u32),
                     chunk_size: options.chunk_size.map(|sz| sz as u32),
                 },
             )),
@@ -163,6 +165,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     username: options.username.clone(),
                     password: options.password.clone(),
                     service_name: options.service_name.clone(),
+                    pool_max_size: options.pool_max_size.map(|sz| sz as u32),
                     chunk_size: options.chunk_size.map(|sz| sz as u32),
                 },
             )),
@@ -186,6 +189,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 username: options.username,
                 password: options.password,
                 database: options.database,
+                pool_max_size: options.pool_max_size.map(|sz| sz as usize),
                 chunk_size: options.chunk_size.map(|sz| sz as usize),
             })
         }
@@ -196,6 +200,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 username: options.username,
                 password: options.password,
                 database: options.database,
+                pool_max_size: options.pool_max_size.map(|sz| sz as usize),
                 chunk_size: options.chunk_size.map(|sz| sz as usize),
             })
         }
@@ -206,6 +211,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 username: options.username,
                 password: options.password,
                 service_name: options.service_name,
+                pool_max_size: options.pool_max_size.map(|sz| sz as usize),
                 chunk_size: options.chunk_size.map(|sz| sz as usize),
             })
         }
