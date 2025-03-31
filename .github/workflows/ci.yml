@@ -13,23 +13,20 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Build without default features
-        run: cargo check --no-default-features
-
       - name: Build with all features
-        run: cargo check --all-features
+        run: cargo check -p datafusion-remote-table --all-features
 
       - name: Build with only postgres
-        run: cargo check --no-default-features --features postgres
+        run: cargo check -p datafusion-remote-table --no-default-features --features postgres
 
       - name: Build with only mysql
-        run: cargo check --no-default-features --features mysql
+        run: cargo check -p datafusion-remote-table --no-default-features --features mysql
 
       - name: Build with only oracle
-        run: cargo check --no-default-features --features oracle
+        run: cargo check -p datafusion-remote-table --no-default-features --features oracle
 
       - name: Build with only sqlite
-        run: cargo check --no-default-features --features sqlite
+        run: cargo check -p datafusion-remote-table --no-default-features --features sqlite
 
   test:
     name: Tests

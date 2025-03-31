@@ -17,10 +17,10 @@ pub use postgres::*;
 pub use sqlite::*;
 
 use crate::{DFResult, RemoteSchemaRef};
-use bigdecimal::{FromPrimitive, ToPrimitive};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
 use std::fmt::Debug;
+#[cfg(feature = "sqlite")]
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -101,7 +101,9 @@ pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usi
     }
 }
 
+#[cfg(any(feature = "mysql", feature = "postgres", feature = "oracle"))]
 fn big_decimal_to_i128(decimal: &bigdecimal::BigDecimal, scale: Option<i32>) -> Option<i128> {
+    use bigdecimal::{FromPrimitive, ToPrimitive};
     let scale = scale.unwrap_or_else(|| {
         decimal
             .fractional_digit_count()

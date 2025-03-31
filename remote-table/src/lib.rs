@@ -14,3 +14,13 @@ pub use table::*;
 pub use transform::*;
 
 pub(crate) type DFResult<T> = datafusion::common::Result<T>;
+
+#[cfg(not(any(
+    feature = "mysql",
+    feature = "postgres",
+    feature = "oracle",
+    feature = "sqlite"
+)))]
+compile_error!(
+    "At least one of the following features must be enabled: postgres, mysql, oracle, sqlite"
+);

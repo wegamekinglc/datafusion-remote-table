@@ -18,6 +18,7 @@ use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 use datafusion_proto::protobuf::proto_error;
 use prost::Message;
 use std::fmt::Debug;
+#[cfg(feature = "sqlite")]
 use std::path::Path;
 use std::sync::Arc;
 
