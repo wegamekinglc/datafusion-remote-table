@@ -9,46 +9,27 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Run cargo build with all features
-        uses: actions-rs/cargo@v1
-        with:
-          command: build --all-features
+      - name: Build without default features
+        run: cargo check --no-default-features
 
-      - name: Run cargo build without any feature
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
+      - name: Build with all features
+        run: cargo check --all-features
 
-      - name: Run cargo build with postgres feature
-        uses: actions-rs/cargo@v1
-        with:
-          command: build --features postgres
+      - name: Build with only postgres
+        run: cargo check --no-default-features --features postgres
 
-      - name: Run cargo build with mysql feature
-        uses: actions-rs/cargo@v1
-        with:
-          command: build --features mysql
+      - name: Build with only mysql
+        run: cargo check --no-default-features --features mysql
 
-      - name: Run cargo build with oracle feature
-        uses: actions-rs/cargo@v1
-        with:
-          command: build --features oracle
+      - name: Build with only oracle
+        run: cargo check --no-default-features --features oracle
 
-      - name: Run cargo build with sqlite feature
-        uses: actions-rs/cargo@v1
-        with:
-          command: build --features sqlite
-
+      - name: Build with only sqlite
+        run: cargo check --no-default-features --features sqlite
 
   test:
     name: Test Suite
