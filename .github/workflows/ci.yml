@@ -5,6 +5,51 @@ on:
   pull_request:
 
 jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Run cargo build with all features
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --all-features
+
+      - name: Run cargo build without any feature
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - name: Run cargo build with postgres feature
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --features postgres
+
+      - name: Run cargo build with mysql feature
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --features mysql
+
+      - name: Run cargo build with oracle feature
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --features oracle
+
+      - name: Run cargo build with sqlite feature
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --features sqlite
+
+
   test:
     name: Test Suite
     runs-on: ubuntu-latest

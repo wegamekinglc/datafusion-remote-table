@@ -1,7 +1,12 @@
+#[cfg(feature = "mysql")]
+use crate::MysqlConnectionOptions;
+#[cfg(feature = "oracle")]
+use crate::OracleConnectionOptions;
+#[cfg(feature = "postgres")]
+use crate::PostgresConnectionOptions;
 use crate::generated::prost as protobuf;
 use crate::{
-    ConnectionOptions, DFResult, MysqlConnectionOptions, MysqlType, OracleConnectionOptions,
-    OracleType, PostgresConnectionOptions, PostgresType, RemoteField, RemoteSchema,
+    ConnectionOptions, DFResult, MysqlType, OracleType, PostgresType, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect,
 };
 use datafusion::arrow::datatypes::SchemaRef;
@@ -131,6 +136,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
 
 fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::ConnectionOptions {
     match options {
+        #[cfg(feature = "postgres")]
         ConnectionOptions::Postgres(options) => protobuf::ConnectionOptions {
             connection_options: Some(protobuf::connection_options::ConnectionOptions::Postgres(
                 protobuf::PostgresConnectionOptions {
@@ -144,6 +150,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                 },
             )),
         },
+        #[cfg(feature = "mysql")]
         ConnectionOptions::Mysql(options) => protobuf::ConnectionOptions {
             connection_options: Some(protobuf::connection_options::ConnectionOptions::Mysql(
                 protobuf::MysqlConnectionOptions {
@@ -157,6 +164,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                 },
             )),
         },
+        #[cfg(feature = "oracle")]
         ConnectionOptions::Oracle(options) => protobuf::ConnectionOptions {
             connection_options: Some(protobuf::connection_options::ConnectionOptions::Oracle(
                 protobuf::OracleConnectionOptions {
@@ -170,6 +178,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                 },
             )),
         },
+        #[cfg(feature = "sqlite")]
         ConnectionOptions::Sqlite(path) => protobuf::ConnectionOptions {
             connection_options: Some(protobuf::connection_options::ConnectionOptions::Sqlite(
                 protobuf::SqliteConnectionOptions {
@@ -182,6 +191,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
 
 fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionOptions {
     match options.connection_options {
+        #[cfg(feature = "postgres")]
         Some(protobuf::connection_options::ConnectionOptions::Postgres(options)) => {
             ConnectionOptions::Postgres(PostgresConnectionOptions {
                 host: options.host,
@@ -193,6 +203,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
+        #[cfg(feature = "mysql")]
         Some(protobuf::connection_options::ConnectionOptions::Mysql(options)) => {
             ConnectionOptions::Mysql(MysqlConnectionOptions {
                 host: options.host,
@@ -204,6 +215,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
+        #[cfg(feature = "oracle")]
         Some(protobuf::connection_options::ConnectionOptions::Oracle(options)) => {
             ConnectionOptions::Oracle(OracleConnectionOptions {
                 host: options.host,
@@ -215,6 +227,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
+        #[cfg(feature = "sqlite")]
         Some(protobuf::connection_options::ConnectionOptions::Sqlite(options)) => {
             ConnectionOptions::Sqlite(Path::new(&options.path).to_path_buf())
         }

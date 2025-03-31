@@ -1,13 +1,21 @@
+#[cfg(feature = "mysql")]
 mod mysql;
+#[cfg(feature = "oracle")]
 mod oracle;
+#[cfg(feature = "postgres")]
 mod postgres;
+#[cfg(feature = "sqlite")]
 mod sqlite;
 
+#[cfg(feature = "mysql")]
 pub use mysql::*;
+#[cfg(feature = "oracle")]
 pub use oracle::*;
+#[cfg(feature = "postgres")]
 pub use postgres::*;
+#[cfg(feature = "sqlite")]
+pub use sqlite::*;
 
-use crate::connection::sqlite::connect_sqlite;
 use crate::{DFResult, RemoteSchemaRef, Transform};
 use bigdecimal::{FromPrimitive, ToPrimitive};
 use datafusion::arrow::datatypes::SchemaRef;
@@ -40,18 +48,22 @@ pub trait Connection: Debug + Send + Sync {
 
 pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
     match options {
+        #[cfg(feature = "postgres")]
         ConnectionOptions::Postgres(options) => {
             let pool = connect_postgres(options).await?;
             Ok(Arc::new(pool))
         }
+        #[cfg(feature = "mysql")]
         ConnectionOptions::Mysql(options) => {
             let pool = connect_mysql(options)?;
             Ok(Arc::new(pool))
         }
+        #[cfg(feature = "oracle")]
         ConnectionOptions::Oracle(options) => {
             let pool = connect_oracle(options).await?;
             Ok(Arc::new(pool))
         }
+        #[cfg(feature = "sqlite")]
         ConnectionOptions::Sqlite(path) => {
             let pool = connect_sqlite(path).await?;
             Ok(Arc::new(pool))
@@ -61,18 +73,26 @@ pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
 
 #[derive(Debug, Clone)]
 pub enum ConnectionOptions {
+    #[cfg(feature = "postgres")]
     Postgres(PostgresConnectionOptions),
+    #[cfg(feature = "oracle")]
     Oracle(OracleConnectionOptions),
+    #[cfg(feature = "mysql")]
     Mysql(MysqlConnectionOptions),
+    #[cfg(feature = "sqlite")]
     Sqlite(PathBuf),
 }
 
 impl ConnectionOptions {
     pub fn stream_chunk_size(&self) -> usize {
         match self {
+            #[cfg(feature = "postgres")]
             ConnectionOptions::Postgres(options) => options.stream_chunk_size,
+            #[cfg(feature = "oracle")]
             ConnectionOptions::Oracle(options) => options.stream_chunk_size,
+            #[cfg(feature = "mysql")]
             ConnectionOptions::Mysql(options) => options.stream_chunk_size,
+            #[cfg(feature = "sqlite")]
             ConnectionOptions::Sqlite(_) => unreachable!(),
         }
     }
