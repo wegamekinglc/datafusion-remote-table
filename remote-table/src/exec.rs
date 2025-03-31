@@ -1,4 +1,7 @@
-use crate::{Connection, ConnectionOptions, DFResult, RemoteSchemaRef, Transform, TransformStream};
+use crate::{
+    Connection, ConnectionOptions, DFResult, RemoteSchemaRef, Transform, TransformStream,
+    transform_schema,
+};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
@@ -33,7 +36,16 @@ impl RemoteTableExec {
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
     ) -> DFResult<Self> {
-        let projected_schema = project_schema(&table_schema, projection.as_ref())?;
+        let transformed_table_schema = if let Some(transform) = transform.as_ref() {
+            transform_schema(
+                table_schema.clone(),
+                transform.as_ref(),
+                remote_schema.as_ref(),
+            )?
+        } else {
+            table_schema.clone()
+        };
+        let projected_schema = project_schema(&transformed_table_schema, projection.as_ref())?;
         let plan_properties = PlanProperties::new(
             EquivalenceProperties::new(projected_schema),
             Partitioning::UnknownPartitioning(1),

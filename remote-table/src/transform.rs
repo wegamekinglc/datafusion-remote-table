@@ -1,8 +1,8 @@
 use crate::{DFResult, RemoteField, RemoteSchemaRef};
 use datafusion::arrow::array::{
-    ArrayRef, BinaryArray, BooleanArray, Date32Array, Float16Array, Float32Array, Float64Array,
-    Int8Array, Int16Array, Int32Array, Int64Array, ListArray, RecordBatch, StringArray,
-    Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+    Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Float16Array, Float32Array,
+    Float64Array, Int8Array, Int16Array, Int32Array, Int64Array, ListArray, NullArray, RecordBatch,
+    StringArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
     TimestampNanosecondArray, TimestampSecondArray, UInt8Array, UInt16Array, UInt32Array,
     UInt64Array,
 };
@@ -22,6 +22,14 @@ pub struct TransformArgs<'a> {
 }
 
 pub trait Transform: Debug + Send + Sync {
+    fn transform_null(
+        &self,
+        array: &NullArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
     fn transform_boolean(
         &self,
         array: &BooleanArray,
@@ -271,6 +279,14 @@ pub(crate) fn transform_batch(
         };
 
         let (new_array, new_field) = match &field.data_type() {
+            DataType::Null => {
+                let array = batch
+                    .column(idx)
+                    .as_any()
+                    .downcast_ref::<NullArray>()
+                    .expect("Failed to downcast to NullArray");
+                transform.transform_null(array, args)?
+            }
             DataType::Boolean => {
                 let array = batch
                     .column(idx)
@@ -450,4 +466,14 @@ pub(crate) fn transform_batch(
     }
     let new_schema = Arc::new(Schema::new(new_fields));
     Ok(RecordBatch::try_new(new_schema, new_arrays)?)
+}
+
+pub fn transform_schema(
+    schema: SchemaRef,
+    transform: &dyn Transform,
+    remote_schema: Option<&RemoteSchemaRef>,
+) -> DFResult<SchemaRef> {
+    let empty_record = RecordBatch::new_empty(schema.clone());
+    transform_batch(empty_record, transform, &schema, None, remote_schema)
+        .map(|batch| batch.schema())
 }

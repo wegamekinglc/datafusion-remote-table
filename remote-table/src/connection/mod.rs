@@ -16,7 +16,7 @@ pub use postgres::*;
 #[cfg(feature = "sqlite")]
 pub use sqlite::*;
 
-use crate::{DFResult, RemoteSchemaRef, Transform};
+use crate::{DFResult, RemoteSchemaRef};
 use bigdecimal::{FromPrimitive, ToPrimitive};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
@@ -31,11 +31,7 @@ pub trait Pool: Debug + Send + Sync {
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
-    async fn infer_schema(
-        &self,
-        sql: &str,
-        transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchemaRef, SchemaRef)>;
+    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)>;
 
     async fn query(
         &self,

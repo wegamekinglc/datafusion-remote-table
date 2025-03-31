@@ -1,5 +1,6 @@
 use crate::{
     ConnectionOptions, DFResult, Pool, RemoteSchemaRef, RemoteTableExec, Transform, connect,
+    transform_schema,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
@@ -15,6 +16,7 @@ pub struct RemoteTable {
     pub(crate) conn_options: ConnectionOptions,
     pub(crate) sql: String,
     pub(crate) table_schema: SchemaRef,
+    pub(crate) transformed_table_schema: SchemaRef,
     pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     pub(crate) pool: Arc<dyn Pool>,
@@ -53,7 +55,7 @@ impl RemoteTable {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
         let conn = pool.get().await?;
-        let (table_schema, remote_schema) = match conn.infer_schema(&sql, transform.clone()).await {
+        let (table_schema, remote_schema) = match conn.infer_schema(&sql).await {
             Ok((remote_schema, inferred_table_schema)) => (
                 table_schema.unwrap_or(inferred_table_schema),
                 Some(remote_schema),
@@ -68,10 +70,20 @@ impl RemoteTable {
                 }
             }
         };
+        let transformed_table_schema = if let Some(transform) = transform.as_ref() {
+            transform_schema(
+                table_schema.clone(),
+                transform.as_ref(),
+                remote_schema.as_ref(),
+            )?
+        } else {
+            table_schema.clone()
+        };
         Ok(RemoteTable {
             conn_options,
             sql,
             table_schema,
+            transformed_table_schema,
             remote_schema,
             transform,
             pool,
@@ -90,7 +102,7 @@ impl TableProvider for RemoteTable {
     }
 
     fn schema(&self) -> SchemaRef {
-        self.table_schema.clone()
+        self.transformed_table_schema.clone()
     }
 
     fn table_type(&self) -> TableType {

@@ -1,8 +1,7 @@
 use crate::connection::{big_decimal_to_i128, projections_contains};
-use crate::transform::transform_batch;
 use crate::{
     Connection, ConnectionOptions, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
-    RemoteSchemaRef, RemoteType, Transform,
+    RemoteSchemaRef, RemoteType,
 };
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
@@ -96,30 +95,14 @@ pub struct OracleConnection {
 
 #[async_trait::async_trait]
 impl Connection for OracleConnection {
-    async fn infer_schema(
-        &self,
-        sql: &str,
-        transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let sql = try_limit1_query(sql).unwrap_or_else(|| sql.to_string());
         let row = self.conn.query_row(&sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on oracle: {e:?}"))
         })?;
         let remote_schema = Arc::new(build_remote_schema(&row)?);
         let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        if let Some(transform) = transform {
-            let batch = rows_to_batch(&[row], &arrow_schema, None)?;
-            let transformed_batch = transform_batch(
-                batch,
-                transform.as_ref(),
-                &arrow_schema,
-                None,
-                Some(&remote_schema),
-            )?;
-            Ok((remote_schema, transformed_batch.schema()))
-        } else {
-            Ok((remote_schema, arrow_schema))
-        }
+        Ok((remote_schema, arrow_schema))
     }
 
     async fn query(

@@ -1,8 +1,7 @@
 use crate::connection::projections_contains;
-use crate::transform::transform_batch;
 use crate::{
     Connection, ConnectionOptions, DFResult, Pool, RemoteField, RemoteSchema, RemoteSchemaRef,
-    RemoteType, SqliteType, Transform,
+    RemoteType, SqliteType,
 };
 use datafusion::arrow::array::{
     ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder, RecordBatch,
@@ -43,15 +42,11 @@ pub struct SqliteConnection {
 
 #[async_trait::async_trait]
 impl Connection for SqliteConnection {
-    async fn infer_schema(
-        &self,
-        sql: &str,
-        transform: Option<Arc<dyn Transform>>,
-    ) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let sql = sql.to_string();
         self.conn
             .call(move |conn| {
-                let mut stmt = conn.prepare(&sql)?;
+                let stmt = conn.prepare(&sql)?;
                 let columns: Vec<OwnedColumn> =
                     stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
 
@@ -60,28 +55,7 @@ impl Connection for SqliteConnection {
                         .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?,
                 );
                 let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-
-                if let Some(transform) = transform {
-                    let mut rows = stmt.query([])?;
-                    let Some(first_row) = rows.next()? else {
-                        return Err(tokio_rusqlite::Error::Other(Box::new(
-                            DataFusionError::Execution("No data returned from sqlite".to_string()),
-                        )));
-                    };
-                    let batch = row_to_batch(first_row, &arrow_schema, columns)
-                        .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
-                    let transformed_batch = transform_batch(
-                        batch,
-                        transform.as_ref(),
-                        &arrow_schema,
-                        None,
-                        Some(&remote_schema),
-                    )
-                    .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
-                    Ok((remote_schema, transformed_batch.schema()))
-                } else {
-                    Ok((remote_schema, arrow_schema))
-                }
+                Ok((remote_schema, arrow_schema))
             })
             .await
             .map_err(|e| DataFusionError::Execution(format!("Failed to infer schema: {e:?}")))
@@ -155,32 +129,6 @@ fn build_remote_schema(columns: &[OwnedColumn]) -> DFResult<RemoteSchema> {
     Ok(RemoteSchema::new(remote_fields))
 }
 
-fn row_to_batch(
-    row: &Row,
-    table_schema: &SchemaRef,
-    columns: Vec<OwnedColumn>,
-) -> DFResult<RecordBatch> {
-    let mut array_builders = vec![];
-    for field in table_schema.fields() {
-        let builder = make_builder(field.data_type(), 1000);
-        array_builders.push(builder);
-    }
-
-    append_rows_to_array_builders(
-        row,
-        table_schema,
-        &columns,
-        None,
-        array_builders.as_mut_slice(),
-    )?;
-
-    let columns = array_builders
-        .into_iter()
-        .map(|mut builder| builder.finish())
-        .collect::<Vec<ArrayRef>>();
-    Ok(RecordBatch::try_new(table_schema.clone(), columns)?)
-}
-
 fn rows_to_batch(
     mut rows: Rows,
     table_schema: &SchemaRef,
@@ -216,22 +164,27 @@ fn rows_to_batch(
 }
 
 macro_rules! handle_primitive_type {
-    ($builder:expr, $sqlite_type:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
+    ($builder:expr, $field:expr, $col:expr, $builder_ty:ty, $value_ty:ty, $row:expr, $index:expr) => {{
         let builder = $builder
             .as_any_mut()
             .downcast_mut::<$builder_ty>()
-            .expect(concat!(
-                "Failed to downcast builder to ",
-                stringify!($builder_ty),
-                " for ",
-                stringify!($sqlite_type)
-            ));
-        let v: Option<$value_ty> = $row.get($index).expect(concat!(
-            "Failed to get optional",
-            stringify!($value_ty),
-            " value for column ",
-            stringify!($sqlite_type)
-        ));
+            .unwrap_or_else(|| {
+                panic!(
+                    "Failed to downcast builder to {} for {:?} and {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                    $col
+                )
+            });
+
+        let v: Option<$value_ty> = $row.get($index).map_err(|e| {
+            DataFusionError::Execution(format!(
+                "Failed to get optional {} value for {:?} and {:?}: {e:?}",
+                stringify!($value_ty),
+                $field,
+                $col
+            ))
+        })?;
 
         match v {
             Some(v) => builder.append_value(v),
@@ -262,16 +215,16 @@ fn append_rows_to_array_builders(
                 builder.append_null();
             }
             DataType::Int64 => {
-                handle_primitive_type!(builder, col, Int64Builder, i64, row, idx);
+                handle_primitive_type!(builder, field, col, Int64Builder, i64, row, idx);
             }
             DataType::Float64 => {
-                handle_primitive_type!(builder, col, Float64Builder, f64, row, idx);
+                handle_primitive_type!(builder, field, col, Float64Builder, f64, row, idx);
             }
             DataType::Utf8 => {
-                handle_primitive_type!(builder, col, StringBuilder, String, row, idx);
+                handle_primitive_type!(builder, field, col, StringBuilder, String, row, idx);
             }
             DataType::Binary => {
-                handle_primitive_type!(builder, col, BinaryBuilder, Vec<u8>, row, idx);
+                handle_primitive_type!(builder, field, col, BinaryBuilder, Vec<u8>, row, idx);
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
