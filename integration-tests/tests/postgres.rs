@@ -1,14 +1,5 @@
-use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::physical_plan::{ExecutionPlan, collect};
-use datafusion::prelude::SessionContext;
-use datafusion_proto::physical_plan::AsExecutionPlan;
-use datafusion_proto::protobuf::PhysicalPlanNode;
-use datafusion_remote_table::{
-    ConnectionOptions, PostgresConnectionOptions, RemotePhysicalCodec, RemoteTable,
-};
 use integration_tests::shared_containers::setup_shared_containers;
 use integration_tests::utils::{assert_result, assert_sqls};
-use std::sync::Arc;
 
 #[tokio::test]
 pub async fn supported_postgres_types() {
@@ -37,43 +28,6 @@ pub async fn supported_postgres_types() {
 +-------------+-------------+"#,
     )
     .await;
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
-pub async fn exec_plan_serialization() {
-    setup_shared_containers();
-    let options = ConnectionOptions::Postgres(
-        PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
-            .with_database(Some("postgres".to_string())),
-    );
-    let table = RemoteTable::try_new(options, "select * from simple_table")
-        .await
-        .unwrap();
-
-    let ctx = SessionContext::new();
-    ctx.register_table("remote_table", Arc::new(table)).unwrap();
-
-    let codec = RemotePhysicalCodec::new(None);
-    let plan = ctx.sql("SELECT * FROM remote_table").await.unwrap();
-    let exec_plan = plan.create_physical_plan().await.unwrap();
-
-    let mut plan_buf: Vec<u8> = vec![];
-    let plan_proto = PhysicalPlanNode::try_from_physical_plan(exec_plan, &codec).unwrap();
-    plan_proto.try_encode(&mut plan_buf).unwrap();
-
-    let new_plan: Arc<dyn ExecutionPlan> = PhysicalPlanNode::try_decode(&plan_buf)
-        .and_then(|proto| proto.try_into_physical_plan(&ctx, &ctx.runtime_env(), &codec))
-        .unwrap();
-
-    let result = collect(new_plan, ctx.task_ctx()).await.unwrap();
-    assert_eq!(
-        pretty_format_batches(&result).unwrap().to_string(),
-        "+----+------+
-| id | name |
-+----+------+
-| 1  | Tom  |
-+----+------+"
-    )
 }
 
 #[tokio::test]

@@ -10,6 +10,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit}
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use futures::{Stream, StreamExt};
+use std::any::Any;
 use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -22,6 +23,8 @@ pub struct TransformArgs<'a> {
 }
 
 pub trait Transform: Debug + Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+
     fn transform_null(
         &self,
         array: &NullArray,
