@@ -590,7 +590,7 @@ fn rows_to_batch(
                     if col.is_some() && col.unwrap().type_().name().eq_ignore_ascii_case("geometry")
                     {
                         let convert: for<'a> fn(GeometryFromSql<'a>) -> DFResult<&'a [u8]> =
-                            |v: GeometryFromSql| Ok::<_, DataFusionError>(v.wkb);
+                            |v| Ok(v.wkb);
                         handle_primitive_type!(
                             builder,
                             field,
