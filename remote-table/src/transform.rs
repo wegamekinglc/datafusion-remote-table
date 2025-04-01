@@ -471,12 +471,22 @@ pub(crate) fn transform_batch(
     Ok(RecordBatch::try_new(new_schema, new_arrays)?)
 }
 
-pub fn transform_schema(
+pub(crate) fn transform_schema(
     schema: SchemaRef,
-    transform: &dyn Transform,
+    transform: Option<&Arc<dyn Transform>>,
     remote_schema: Option<&RemoteSchemaRef>,
 ) -> DFResult<SchemaRef> {
-    let empty_record = RecordBatch::new_empty(schema.clone());
-    transform_batch(empty_record, transform, &schema, None, remote_schema)
+    if let Some(transform) = transform {
+        let empty_record = RecordBatch::new_empty(schema.clone());
+        transform_batch(
+            empty_record,
+            transform.as_ref(),
+            &schema,
+            None,
+            remote_schema,
+        )
         .map(|batch| batch.schema())
+    } else {
+        Ok(schema)
+    }
 }

@@ -21,30 +21,29 @@ pub struct RemoteTableExec {
     pub(crate) table_schema: SchemaRef,
     pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) projection: Option<Vec<usize>>,
+    pub(crate) limit: Option<usize>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     conn: Arc<dyn Connection>,
     plan_properties: PlanProperties,
 }
 
 impl RemoteTableExec {
+    #[allow(clippy::too_many_arguments)]
     pub fn try_new(
         conn_options: ConnectionOptions,
         sql: String,
         table_schema: SchemaRef,
         remote_schema: Option<RemoteSchemaRef>,
         projection: Option<Vec<usize>>,
+        limit: Option<usize>,
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
     ) -> DFResult<Self> {
-        let transformed_table_schema = if let Some(transform) = transform.as_ref() {
-            transform_schema(
-                table_schema.clone(),
-                transform.as_ref(),
-                remote_schema.as_ref(),
-            )?
-        } else {
-            table_schema.clone()
-        };
+        let transformed_table_schema = transform_schema(
+            table_schema.clone(),
+            transform.as_ref(),
+            remote_schema.as_ref(),
+        )?;
         let projected_schema = project_schema(&transformed_table_schema, projection.as_ref())?;
         let plan_properties = PlanProperties::new(
             EquivalenceProperties::new(projected_schema),
@@ -58,6 +57,7 @@ impl RemoteTableExec {
             table_schema,
             remote_schema,
             projection,
+            limit,
             transform,
             conn,
             plan_properties,
@@ -103,13 +103,33 @@ impl ExecutionPlan for RemoteTableExec {
             self.table_schema.clone(),
             self.remote_schema.clone(),
             self.projection.clone(),
+            self.limit,
             self.transform.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
     }
+
+    fn with_fetch(&self, limit: Option<usize>) -> Option<Arc<dyn ExecutionPlan>> {
+        Some(Arc::new(Self {
+            conn_options: self.conn_options.clone(),
+            sql: self.sql.clone(),
+            table_schema: self.table_schema.clone(),
+            remote_schema: self.remote_schema.clone(),
+            projection: self.projection.clone(),
+            limit,
+            transform: self.transform.clone(),
+            conn: self.conn.clone(),
+            plan_properties: self.plan_properties.clone(),
+        }))
+    }
+
+    fn fetch(&self) -> Option<usize> {
+        self.limit
+    }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn build_and_transform_stream(
     conn: Arc<dyn Connection>,
     conn_options: ConnectionOptions,
@@ -117,6 +137,7 @@ async fn build_and_transform_stream(
     table_schema: SchemaRef,
     remote_schema: Option<RemoteSchemaRef>,
     projection: Option<Vec<usize>>,
+    limit: Option<usize>,
     transform: Option<Arc<dyn Transform>>,
 ) -> DFResult<SendableRecordBatchStream> {
     let stream = conn
@@ -125,6 +146,7 @@ async fn build_and_transform_stream(
             &sql,
             table_schema.clone(),
             projection.as_ref(),
+            limit,
         )
         .await?;
     if let Some(transform) = transform.as_ref() {
@@ -142,6 +164,6 @@ async fn build_and_transform_stream(
 
 impl DisplayAs for RemoteTableExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "RemoteTableExec")
+        write!(f, "RemoteTableExec: limit={:?}", self.limit)
     }
 }

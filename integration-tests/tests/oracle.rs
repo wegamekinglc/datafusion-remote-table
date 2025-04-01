@@ -44,3 +44,20 @@ pub async fn various_sqls() {
 
     assert_sqls("oracle", vec!["select * from USER_TABLES"]).await;
 }
+
+#[tokio::test]
+async fn pushdown_limit() {
+    setup_shared_containers();
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+    assert_result(
+        "oracle",
+        "select * from SYS.simple_table",
+        "select * from remote_table limit 1",
+        r#"+----+------+
+| ID | NAME |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}

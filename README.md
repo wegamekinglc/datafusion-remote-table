@@ -2,10 +2,11 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 [![Crates.io](https://img.shields.io/crates/v/datafusion-remote-table.svg)](https://crates.io/crates/datafusion-remote-table)
 
-## Goals
-1. Execute SQL queries on remote databases and make results as datafusion table provider
-2. Execution plan can be serialized for distributed execution
-3. Record batches can be transformed before outputting to next operator
+## Features
+1. Execute SQL queries on remote databases and stream results as datafusion table provider
+2. Support pushing down limit to remote databases
+3. Execution plan can be serialized for distributed execution
+4. Record batches can be transformed before outputting to next plan node
 
 ## Usage
 ```rust

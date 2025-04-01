@@ -10,7 +10,8 @@ message RemoteTableExec {
   datafusion_common.Schema table_schema = 3;
   RemoteSchema remote_schema = 4;
   Projection projection = 5;
-  optional bytes transform = 6;
+  optional uint32 limit = 6;
+  optional bytes transform = 7;
 }
 
 message ConnectionOptions {

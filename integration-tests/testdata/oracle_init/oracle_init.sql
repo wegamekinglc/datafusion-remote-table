@@ -31,3 +31,12 @@ CREATE TABLE supported_data_types2
 
 INSERT INTO supported_data_types2 values ('long');
 INSERT INTO supported_data_types2 values (NULL);
+
+CREATE TABLE simple_table (
+    id INTEGER,
+    name VARCHAR2(255)
+);
+
+INSERT INTO simple_table VALUES (1, 'Tom');
+INSERT INTO simple_table VALUES (2, 'Jerry');
+INSERT INTO simple_table VALUES (3, 'Spike');

@@ -39,6 +39,7 @@ pub trait Connection: Debug + Send + Sync {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream>;
 }
 

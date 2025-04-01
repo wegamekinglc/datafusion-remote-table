@@ -71,6 +71,8 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             .projection
             .map(|p| p.projection.iter().map(|n| *n as usize).collect());
 
+        let limit = proto.limit.map(|l| l as usize);
+
         let conn_options = parse_connection_options(proto.conn_options.unwrap());
         let conn = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
@@ -86,6 +88,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             table_schema,
             remote_schema,
             projection,
+            limit,
             transform,
             conn,
         )?))
@@ -117,6 +120,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
                     .projection
                     .as_ref()
                     .map(|p| serialize_projection(p.as_slice())),
+                limit: exec.limit.map(|l| l as u32),
                 transform: serialized_transform,
             };
 

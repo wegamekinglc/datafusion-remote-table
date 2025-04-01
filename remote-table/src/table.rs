@@ -70,15 +70,11 @@ impl RemoteTable {
                 }
             }
         };
-        let transformed_table_schema = if let Some(transform) = transform.as_ref() {
-            transform_schema(
-                table_schema.clone(),
-                transform.as_ref(),
-                remote_schema.as_ref(),
-            )?
-        } else {
-            table_schema.clone()
-        };
+        let transformed_table_schema = transform_schema(
+            table_schema.clone(),
+            transform.as_ref(),
+            remote_schema.as_ref(),
+        )?;
         Ok(RemoteTable {
             conn_options,
             sql,
@@ -114,15 +110,16 @@ impl TableProvider for RemoteTable {
         _state: &dyn Session,
         projection: Option<&Vec<usize>>,
         _filters: &[Expr],
-        _limit: Option<usize>,
+        limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        // TODO support limit pushdown
+        // TODO support filter pushdown
         Ok(Arc::new(RemoteTableExec::try_new(
             self.conn_options.clone(),
             self.sql.clone(),
             self.table_schema.clone(),
             self.remote_schema.clone(),
             projection.cloned(),
+            limit,
             self.transform.clone(),
             self.pool.get().await?,
         )?))

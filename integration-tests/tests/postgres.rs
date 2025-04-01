@@ -80,3 +80,19 @@ pub async fn various_sqls() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn pushdown_limit() {
+    setup_shared_containers();
+    assert_result(
+        "postgres",
+        "select * from simple_table",
+        "select * from remote_table limit 1",
+        r#"+----+------+
+| id | name |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}

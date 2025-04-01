@@ -1,4 +1,6 @@
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::physical_plan::collect;
+use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::SessionContext;
 use datafusion_remote_table::{
     ConnectionOptions, MysqlConnectionOptions, OracleConnectionOptions, PostgresConnectionOptions,
@@ -15,13 +17,18 @@ pub async fn assert_result(database: &str, remote_sql: &str, df_sql: &str, expec
     let ctx = SessionContext::new();
     ctx.register_table("remote_table", Arc::new(table)).unwrap();
 
-    let result = ctx.sql(df_sql).await.unwrap().collect().await.unwrap();
-    println!("{}", pretty_format_batches(result.as_slice()).unwrap());
+    let df = ctx.sql(df_sql).await.unwrap();
+    let exec_plan = df.create_physical_plan().await.unwrap();
+    println!(
+        "{}",
+        DisplayableExecutionPlan::new(exec_plan.as_ref()).indent(true)
+    );
+
+    let result = collect(exec_plan, ctx.task_ctx()).await.unwrap();
+    println!("{}", pretty_format_batches(&result).unwrap());
 
     assert_eq!(
-        pretty_format_batches(result.as_slice())
-            .unwrap()
-            .to_string(),
+        pretty_format_batches(&result).unwrap().to_string(),
         expected_result
     );
 }

@@ -67,8 +67,19 @@ impl Connection for SqliteConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
+        let (sql, limit_stream) = match limit {
+            Some(limit) => {
+                if let Some(limited_sql) = try_limit_query(sql, limit) {
+                    (limited_sql, false)
+                } else {
+                    (sql.to_string(), true)
+                }
+            }
+            None => (sql.to_string(), false),
+        };
         let projection = projection.cloned();
         let sql = sql.to_string();
         let batch = self
@@ -85,11 +96,21 @@ impl Connection for SqliteConnection {
             })
             .await
             .map_err(|e| DataFusionError::Execution(format!("Failed to exec query: {e:?}")))?;
-        Ok(Box::pin(MemoryStream::try_new(
-            vec![batch],
-            projected_schema,
-            None,
-        )?))
+
+        let memory_stream = MemoryStream::try_new(vec![batch], projected_schema, None)?;
+        if limit_stream {
+            Ok(Box::pin(memory_stream.with_fetch(limit)))
+        } else {
+            Ok(Box::pin(memory_stream))
+        }
+    }
+}
+
+fn try_limit_query(sql: &str, limit: usize) -> Option<String> {
+    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
+        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
+    } else {
+        None
     }
 }
 

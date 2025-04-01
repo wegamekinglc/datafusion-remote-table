@@ -47,4 +47,4 @@ CREATE TABLE simple_table (
     name VARCHAR(255) NOT NULL
 );
 
-INSERT INTO simple_table VALUES (1, 'Tom');
+INSERT INTO simple_table VALUES (1, 'Tom'), (2, 'Jerry'), (3, 'Spike');

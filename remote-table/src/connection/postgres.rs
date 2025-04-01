@@ -22,6 +22,8 @@ use datafusion::arrow::datatypes::{
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
+use datafusion::physical_plan::limit::LimitStream;
+use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet};
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
@@ -110,7 +112,7 @@ pub(crate) struct PostgresConnection {
 #[async_trait::async_trait]
 impl Connection for PostgresConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
-        let sql = try_limit1_query(sql).unwrap_or_else(|| sql.to_string());
+        let sql = try_limit_query(sql, 1).unwrap_or_else(|| sql.to_string());
         let row = self.conn.query_one(&sql, &[]).await.map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on postgres: {e:?}",))
         })?;
@@ -125,13 +127,24 @@ impl Connection for PostgresConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
+        let (sql, limit_stream) = match limit {
+            Some(limit) => {
+                if let Some(limited_sql) = try_limit_query(sql, limit) {
+                    (limited_sql, false)
+                } else {
+                    (sql.to_string(), true)
+                }
+            }
+            None => (sql.to_string(), false),
+        };
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let stream = self
             .conn
-            .query_raw(sql, Vec::<String>::new())
+            .query_raw(&sql, Vec::<String>::new())
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
@@ -153,16 +166,25 @@ impl Connection for PostgresConnection {
             rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())
         });
 
-        Ok(Box::pin(RecordBatchStreamAdapter::new(
-            projected_schema,
-            stream,
-        )))
+        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(projected_schema, stream));
+
+        if limit_stream {
+            let metrics = BaselineMetrics::new(&ExecutionPlanMetricsSet::new(), 0);
+            Ok(Box::pin(LimitStream::new(
+                sendable_stream,
+                0,
+                limit,
+                metrics,
+            )))
+        } else {
+            Ok(sendable_stream)
+        }
     }
 }
 
-fn try_limit1_query(sql: &str) -> Option<String> {
+fn try_limit_query(sql: &str, limit: usize) -> Option<String> {
     if sql.trim()[0..6].eq_ignore_ascii_case("select") {
-        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT 1"))
+        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
     } else {
         None
     }

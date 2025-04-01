@@ -46,3 +46,22 @@ pub async fn various_sqls() {
 
     assert_sqls("mysql", vec!["select * from mysql.innodb_table_stats"]).await;
 }
+
+#[tokio::test]
+async fn pushdown_limit() {
+    setup_shared_containers();
+    // Wait for the database to be ready to connect
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+    assert_result(
+        "mysql",
+        "select * from simple_table",
+        "select * from remote_table limit 1",
+        r#"+----+------+
+| id | name |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}

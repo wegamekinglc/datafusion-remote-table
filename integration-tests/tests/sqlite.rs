@@ -15,3 +15,18 @@ pub async fn supported_sqlite_types() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn pushdown_limit() {
+    assert_result(
+        "sqlite",
+        "select * from simple_table",
+        "select * from remote_table limit 1",
+        r#"+----+------+
+| id | name |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}
