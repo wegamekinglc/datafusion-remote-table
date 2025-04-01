@@ -589,6 +589,8 @@ fn rows_to_batch(
                 DataType::Binary => {
                     if col.is_some() && col.unwrap().type_().name().eq_ignore_ascii_case("geometry")
                     {
+                        let convert: for<'a> fn(GeometryFromSql<'a>) -> DFResult<&'a [u8]> =
+                            |v: GeometryFromSql| Ok::<_, DataFusionError>(v.wkb);
                         handle_primitive_type!(
                             builder,
                             field,
@@ -597,7 +599,7 @@ fn rows_to_batch(
                             GeometryFromSql,
                             row,
                             idx,
-                            |v: GeometryFromSql| { Ok::<_, DataFusionError>(v.wkb.to_vec()) }
+                            convert
                         );
                     } else if col.is_some()
                         && matches!(col.unwrap().type_(), &Type::JSON | &Type::JSONB)
@@ -611,7 +613,7 @@ fn rows_to_batch(
                             row,
                             idx,
                             |v: serde_json::value::Value| {
-                                Ok::<_, DataFusionError>(v.to_string().as_bytes().to_vec())
+                                Ok::<_, DataFusionError>(v.to_string().into_bytes())
                             }
                         );
                     } else {

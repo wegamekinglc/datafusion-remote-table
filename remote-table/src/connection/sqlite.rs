@@ -95,7 +95,7 @@ impl Connection for SqliteConnection {
                 Ok(batch)
             })
             .await
-            .map_err(|e| DataFusionError::Execution(format!("Failed to exec query: {e:?}")))?;
+            .map_err(|e| DataFusionError::Execution(format!("Failed to execute query: {e:?}")))?;
 
         let memory_stream = MemoryStream::try_new(vec![batch], projected_schema, None)?;
         if limit_stream {
