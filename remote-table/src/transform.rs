@@ -1,10 +1,11 @@
 use crate::{DFResult, RemoteField, RemoteSchemaRef};
 use datafusion::arrow::array::{
-    Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Float16Array, Float32Array,
-    Float64Array, Int8Array, Int16Array, Int32Array, Int64Array, ListArray, NullArray, RecordBatch,
-    StringArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-    TimestampNanosecondArray, TimestampSecondArray, UInt8Array, UInt16Array, UInt32Array,
-    UInt64Array,
+    Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Float16Array,
+    Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array, LargeBinaryArray,
+    LargeStringArray, ListArray, NullArray, RecordBatch, StringArray, Time32MillisecondArray,
+    Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
+    TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
+    UInt16Array, UInt32Array, UInt64Array,
 };
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
@@ -137,9 +138,25 @@ pub trait Transform: Debug + Send + Sync {
         Ok((Arc::new(array.clone()), args.field.clone()))
     }
 
+    fn transform_large_utf8(
+        &self,
+        array: &LargeStringArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
     fn transform_binary(
         &self,
         array: &BinaryArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_large_binary(
+        &self,
+        array: &LargeBinaryArray,
         args: TransformArgs,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), args.field.clone()))
@@ -177,17 +194,49 @@ pub trait Transform: Debug + Send + Sync {
         Ok((Arc::new(array.clone()), args.field.clone()))
     }
 
-    fn transform_time64_nanosecond(
+    fn transform_date32(
         &self,
-        array: &Time64NanosecondArray,
+        array: &Date32Array,
         args: TransformArgs,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), args.field.clone()))
     }
 
-    fn transform_date32(
+    fn transform_date64(
         &self,
-        array: &Date32Array,
+        array: &Date64Array,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_time32_second(
+        &self,
+        array: &Time32SecondArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_time32_millisecond(
+        &self,
+        array: &Time32MillisecondArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_time64_microsecond(
+        &self,
+        array: &Time64MicrosecondArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_time64_nanosecond(
+        &self,
+        array: &Time64NanosecondArray,
         args: TransformArgs,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), args.field.clone()))
@@ -260,6 +309,17 @@ impl RecordBatchStream for TransformStream {
     }
 }
 
+macro_rules! handle_transform {
+    ($batch:expr, $idx:expr, $array_ty:ty, $transform:expr, $transform_method:ident, $transform_args:expr) => {{
+        let array = $batch
+            .column($idx)
+            .as_any()
+            .downcast_ref::<$array_ty>()
+            .expect(concat!("Failed to downcast to ", stringify!($array_ty)));
+        $transform.$transform_method(array, $transform_args)?
+    }};
+}
+
 pub(crate) fn transform_batch(
     batch: RecordBatch,
     transform: &dyn Transform,
@@ -283,180 +343,162 @@ pub(crate) fn transform_batch(
 
         let (new_array, new_field) = match &field.data_type() {
             DataType::Null => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<NullArray>()
-                    .expect("Failed to downcast to NullArray");
-                transform.transform_null(array, args)?
+                handle_transform!(batch, idx, NullArray, transform, transform_null, args)
             }
             DataType::Boolean => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .expect("Failed to downcast to BooleanArray");
-                transform.transform_boolean(array, args)?
+                handle_transform!(batch, idx, BooleanArray, transform, transform_boolean, args)
             }
             DataType::Int8 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Int8Array>()
-                    .expect("Failed to downcast to Int8Array");
-                transform.transform_int8(array, args)?
+                handle_transform!(batch, idx, Int8Array, transform, transform_int8, args)
             }
             DataType::Int16 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Int16Array>()
-                    .expect("Failed to downcast to Int16Array");
-                transform.transform_int16(array, args)?
+                handle_transform!(batch, idx, Int16Array, transform, transform_int16, args)
             }
             DataType::Int32 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Int32Array>()
-                    .expect("Failed to downcast to Int32Array");
-                transform.transform_int32(array, args)?
+                handle_transform!(batch, idx, Int32Array, transform, transform_int32, args)
             }
             DataType::Int64 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Int64Array>()
-                    .expect("Failed to downcast to Int64Array");
-                transform.transform_int64(array, args)?
+                handle_transform!(batch, idx, Int64Array, transform, transform_int64, args)
             }
             DataType::UInt8 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<UInt8Array>()
-                    .expect("Failed to downcast to UInt8Array");
-                transform.transform_uint8(array, args)?
+                handle_transform!(batch, idx, UInt8Array, transform, transform_uint8, args)
             }
             DataType::UInt16 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<UInt16Array>()
-                    .expect("Failed to downcast to UInt16Array");
-                transform.transform_uint16(array, args)?
+                handle_transform!(batch, idx, UInt16Array, transform, transform_uint16, args)
             }
             DataType::UInt32 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<UInt32Array>()
-                    .expect("Failed to downcast to UInt32Array");
-                transform.transform_uint32(array, args)?
+                handle_transform!(batch, idx, UInt32Array, transform, transform_uint32, args)
             }
             DataType::UInt64 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<UInt64Array>()
-                    .expect("Failed to downcast to UInt64Array");
-                transform.transform_uint64(array, args)?
+                handle_transform!(batch, idx, UInt64Array, transform, transform_uint64, args)
             }
             DataType::Float16 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Float16Array>()
-                    .expect("Failed to downcast to Float16Array");
-                transform.transform_float16(array, args)?
+                handle_transform!(batch, idx, Float16Array, transform, transform_float16, args)
             }
             DataType::Float32 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Float32Array>()
-                    .expect("Failed to downcast to Float32Array");
-                transform.transform_float32(array, args)?
+                handle_transform!(batch, idx, Float32Array, transform, transform_float32, args)
             }
             DataType::Float64 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .expect("Failed to downcast to Float64Array");
-                transform.transform_float64(array, args)?
-            }
-            DataType::Utf8 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .expect("Failed to downcast to StringArray");
-                transform.transform_utf8(array, args)?
-            }
-            DataType::Binary => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<BinaryArray>()
-                    .expect("Failed to downcast to BinaryArray");
-                transform.transform_binary(array, args)?
-            }
-            DataType::Date32 => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Date32Array>()
-                    .expect("Failed to downcast to Date32Array");
-                transform.transform_date32(array, args)?
+                handle_transform!(batch, idx, Float64Array, transform, transform_float64, args)
             }
             DataType::Timestamp(TimeUnit::Second, _) => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<TimestampSecondArray>()
-                    .expect("Failed to downcast to TimestampSecondArray");
-                transform.transform_timestamp_second(array, args)?
+                handle_transform!(
+                    batch,
+                    idx,
+                    TimestampSecondArray,
+                    transform,
+                    transform_timestamp_second,
+                    args
+                )
             }
             DataType::Timestamp(TimeUnit::Millisecond, _) => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<TimestampMillisecondArray>()
-                    .expect("Failed to downcast to TimestampMillisecondArray");
-                transform.transform_timestamp_millisecond(array, args)?
+                handle_transform!(
+                    batch,
+                    idx,
+                    TimestampMillisecondArray,
+                    transform,
+                    transform_timestamp_millisecond,
+                    args
+                )
             }
             DataType::Timestamp(TimeUnit::Microsecond, _) => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<TimestampMicrosecondArray>()
-                    .expect("Failed to downcast to TimestampMicrosecondArray");
-                transform.transform_timestamp_microsecond(array, args)?
+                handle_transform!(
+                    batch,
+                    idx,
+                    TimestampMicrosecondArray,
+                    transform,
+                    transform_timestamp_microsecond,
+                    args
+                )
             }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<TimestampNanosecondArray>()
-                    .expect("Failed to downcast to TimestampNanosecondArray");
-                transform.transform_timestamp_nanosecond(array, args)?
+                handle_transform!(
+                    batch,
+                    idx,
+                    TimestampNanosecondArray,
+                    transform,
+                    transform_timestamp_nanosecond,
+                    args
+                )
+            }
+            DataType::Date32 => {
+                handle_transform!(batch, idx, Date32Array, transform, transform_date32, args)
+            }
+            DataType::Date64 => {
+                handle_transform!(batch, idx, Date64Array, transform, transform_date64, args)
+            }
+            DataType::Time32(TimeUnit::Second) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    Time32SecondArray,
+                    transform,
+                    transform_time32_second,
+                    args
+                )
+            }
+            DataType::Time32(TimeUnit::Millisecond) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    Time32MillisecondArray,
+                    transform,
+                    transform_time32_millisecond,
+                    args
+                )
+            }
+            DataType::Time32(TimeUnit::Microsecond) => unreachable!(),
+            DataType::Time32(TimeUnit::Nanosecond) => unreachable!(),
+            DataType::Time64(TimeUnit::Second) => unreachable!(),
+            DataType::Time64(TimeUnit::Millisecond) => unreachable!(),
+            DataType::Time64(TimeUnit::Microsecond) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    Time64MicrosecondArray,
+                    transform,
+                    transform_time64_microsecond,
+                    args
+                )
             }
             DataType::Time64(TimeUnit::Nanosecond) => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<Time64NanosecondArray>()
-                    .expect("Failed to downcast to Time64NanosecondArray");
-                transform.transform_time64_nanosecond(array, args)?
+                handle_transform!(
+                    batch,
+                    idx,
+                    Time64NanosecondArray,
+                    transform,
+                    transform_time64_nanosecond,
+                    args
+                )
+            }
+            DataType::Utf8 => {
+                handle_transform!(batch, idx, StringArray, transform, transform_utf8, args)
+            }
+            DataType::LargeUtf8 => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    LargeStringArray,
+                    transform,
+                    transform_large_utf8,
+                    args
+                )
+            }
+            DataType::Binary => {
+                handle_transform!(batch, idx, BinaryArray, transform, transform_binary, args)
+            }
+            DataType::LargeBinary => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    LargeBinaryArray,
+                    transform,
+                    transform_large_binary,
+                    args
+                )
             }
             DataType::List(_field) => {
-                let array = batch
-                    .column(idx)
-                    .as_any()
-                    .downcast_ref::<ListArray>()
-                    .expect("Failed to downcast to ListArray");
-                transform.transform_list(array, args)?
+                handle_transform!(batch, idx, ListArray, transform, transform_list, args)
             }
             data_type => {
                 return Err(DataFusionError::NotImplemented(format!(
