@@ -1,14 +1,23 @@
 CREATE TABLE supported_data_types (
     null_col NULL,
+    tinyint_col TINYINT,
+    smallint_col SMALLINT,
     int_col INTEGER,
+    bigint_col BIGINT,
+    float_col FLOAT,
+    double_col DOUBLE,
     real_col REAL,
+    char_col CHAR,
+    varchar_col VARCHAR,
     text_col TEXT,
+    binary_col BINARY,
+    varbinary_col VARBINARY,
     blob_col BLOB
 );
 
 INSERT INTO supported_data_types VALUES
-(NULL, 1, 1.1, 'text', X'010203'),
-(NULL, NULL, NULL, NULL, NULL);
+(NULL, 1, 2, 3, 4, 1.1, 2.2, 3.3, 'char', 'varchar','text', X'01', X'02', X'03'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id INTEGER,

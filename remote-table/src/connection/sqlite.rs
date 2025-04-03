@@ -130,14 +130,26 @@ fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
 fn sqlite_type_to_remote_type(sqlite_col: &OwnedColumn) -> DFResult<RemoteType> {
     match sqlite_col.decl_type.as_deref() {
         None => Ok(RemoteType::Sqlite(SqliteType::Null)),
-        Some(t) if t.eq_ignore_ascii_case("integer") => Ok(RemoteType::Sqlite(SqliteType::Integer)),
-        Some(t) if t.eq_ignore_ascii_case("real") => Ok(RemoteType::Sqlite(SqliteType::Real)),
-        Some(t) if t.eq_ignore_ascii_case("text") => Ok(RemoteType::Sqlite(SqliteType::Text)),
-        Some(t) if t.eq_ignore_ascii_case("blob") => Ok(RemoteType::Sqlite(SqliteType::Blob)),
-        _ => Err(DataFusionError::NotImplemented(format!(
-            "Unsupported sqlite type: {:?}",
-            sqlite_col.decl_type
-        ))),
+        Some(t) => {
+            // TODO handle char(10) type
+            let t = t.to_lowercase();
+            if ["tinyint", "smallint", "int", "integer", "bigint"].contains(&t.as_str()) {
+                return Ok(RemoteType::Sqlite(SqliteType::Integer));
+            }
+            if ["real", "float", "double"].contains(&t.as_str()) {
+                return Ok(RemoteType::Sqlite(SqliteType::Real));
+            }
+            if ["text", "varchar", "char", "string"].contains(&t.as_str()) {
+                return Ok(RemoteType::Sqlite(SqliteType::Text));
+            }
+            if ["binary", "varbinary", "tinyblob", "blob"].contains(&t.as_str()) {
+                return Ok(RemoteType::Sqlite(SqliteType::Blob));
+            }
+            Err(DataFusionError::NotImplemented(format!(
+                "Unsupported sqlite type: {:?}",
+                sqlite_col.decl_type
+            )))
+        }
     }
 }
 
