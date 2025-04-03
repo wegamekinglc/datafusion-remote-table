@@ -4,6 +4,8 @@ use crate::{
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
+use datafusion::common::Column;
+use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::datasource::TableType;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::Expr;
@@ -89,6 +91,26 @@ impl RemoteTable {
     pub fn remote_schema(&self) -> Option<RemoteSchemaRef> {
         self.remote_schema.clone()
     }
+
+    pub fn rewrite_filters(&self, filters: Vec<Expr>) -> DFResult<Vec<Expr>> {
+        filters
+            .into_iter()
+            .map(|f| {
+                f.transform_down(|e| {
+                    if let Expr::Column(col) = e {
+                        let col_idx = self.transformed_table_schema.index_of(col.name())?;
+                        let row_name = self.table_schema.field(col_idx).name().to_string();
+                        Ok(Transformed::yes(Expr::Column(Column::new_unqualified(
+                            row_name,
+                        ))))
+                    } else {
+                        Ok(Transformed::no(e))
+                    }
+                })
+                .map(|trans| trans.data)
+            })
+            .collect::<DFResult<Vec<_>>>()
+    }
 }
 
 #[async_trait::async_trait]
@@ -109,19 +131,52 @@ impl TableProvider for RemoteTable {
         &self,
         _state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        _filters: &[Expr],
+        filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         // TODO support filter pushdown
+        let rewritten_filters = self.rewrite_filters(filters.to_vec())?;
         Ok(Arc::new(RemoteTableExec::try_new(
             self.conn_options.clone(),
             self.sql.clone(),
             self.table_schema.clone(),
             self.remote_schema.clone(),
             projection.cloned(),
+            rewritten_filters,
             limit,
             self.transform.clone(),
             self.pool.get().await?,
         )?))
     }
+
+    // fn supports_filters_pushdown(&self, filters: &[&Expr]) -> DFResult<Vec<TableProviderFilterPushDown>> {
+    //     Ok(filters.iter().map(|e| support_filter_pushdown(&self.conn_options, *e)).collect())
+    // }
 }
+
+// pub(crate) fn support_filter_pushdown(
+//     options: &ConnectionOptions,
+//     filter: &Expr,
+// ) -> TableProviderFilterPushDown {
+//     let unparser = match options {
+//         ConnectionOptions::Mysql(_) => Unparser::new(&MySqlDialect {}),
+//         ConnectionOptions::Postgres(_) => Unparser::new(&PostgreSqlDialect {}),
+//         ConnectionOptions::Sqlite(_) => Unparser::new(&SqliteDialect {}),
+//         ConnectionOptions::Oracle(_) => return TableProviderFilterPushDown::Unsupported,
+//     };
+//     if let Err(_) = unparser.expr_to_sql(filter) {
+//         return TableProviderFilterPushDown::Unsupported;
+//     }
+//
+//     let mut pushdown = TableProviderFilterPushDown::Exact;
+//     filter
+//         .apply(|e| {
+//             if matches!(e, Expr::ScalarFunction(_)) {
+//                 pushdown = TableProviderFilterPushDown::Unsupported;
+//             }
+//             Ok(TreeNodeRecursion::Continue)
+//         })
+//         .expect("won't fail");
+//
+//     pushdown
+// }

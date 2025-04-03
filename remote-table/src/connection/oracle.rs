@@ -1,4 +1,4 @@
-use crate::connection::{big_decimal_to_i128, projections_contains};
+use crate::connection::{RemoteDbType, big_decimal_to_i128, projections_contains};
 use crate::{
     Connection, ConnectionOptions, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType,
@@ -12,9 +12,8 @@ use datafusion::arrow::array::{
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
-use datafusion::physical_plan::limit::LimitStream;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet};
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+use datafusion::prelude::Expr;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::StreamExt;
@@ -98,7 +97,9 @@ pub struct OracleConnection {
 #[async_trait::async_trait]
 impl Connection for OracleConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
-        let sql = try_limit_query(sql, 1).unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Oracle
+            .try_limit_query(sql, Some(1))
+            .unwrap_or_else(|| sql.to_string());
         let row = self.conn.query_row(&sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on oracle: {e:?}"))
         })?;
@@ -113,19 +114,13 @@ impl Connection for OracleConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        _filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let (sql, limit_stream) = match limit {
-            Some(limit) => {
-                if let Some(limited_sql) = try_limit_query(sql, limit) {
-                    (limited_sql, false)
-                } else {
-                    (sql.to_string(), true)
-                }
-            }
-            None => (sql.to_string(), false),
-        };
+        let sql = RemoteDbType::Oracle
+            .try_limit_query(sql, limit)
+            .unwrap_or_else(|| sql.to_string());
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let result_set = self.conn.query(&sql, &[]).map_err(|e| {
@@ -145,27 +140,10 @@ impl Connection for OracleConnection {
             rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())
         });
 
-        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(projected_schema, stream));
-
-        if limit_stream {
-            let metrics = BaselineMetrics::new(&ExecutionPlanMetricsSet::new(), 0);
-            Ok(Box::pin(LimitStream::new(
-                sendable_stream,
-                0,
-                limit,
-                metrics,
-            )))
-        } else {
-            Ok(sendable_stream)
-        }
-    }
-}
-
-fn try_limit_query(sql: &str, limit: usize) -> Option<String> {
-    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
-        Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}"))
-    } else {
-        None
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            stream,
+        )))
     }
 }
 

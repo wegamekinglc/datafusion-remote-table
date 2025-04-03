@@ -8,6 +8,7 @@ fn main() -> Result<(), String> {
         .out_dir(out_dir)
         .protoc_arg("--experimental_allow_proto3_optional")
         .extern_path(".datafusion_common", "::datafusion_proto::protobuf")
+        .extern_path(".datafusion", "::datafusion_proto::protobuf")
         .compile_well_known_types()
         .compile_protos(&[proto_path], &["proto"])
         .map_err(|e| format!("protobuf compilation failed: {e}"))?;

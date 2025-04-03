@@ -1,4 +1,4 @@
-use crate::connection::projections_contains;
+use crate::connection::{RemoteDbType, projections_contains};
 use crate::{
     Connection, ConnectionOptions, DFResult, Pool, RemoteField, RemoteSchema, RemoteSchemaRef,
     RemoteType, SqliteType,
@@ -11,6 +11,7 @@ use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::memory::MemoryStream;
+use datafusion::prelude::Expr;
 use rusqlite::{Column, Row, Rows};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -67,19 +68,13 @@ impl Connection for SqliteConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        _filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let (sql, limit_stream) = match limit {
-            Some(limit) => {
-                if let Some(limited_sql) = try_limit_query(sql, limit) {
-                    (limited_sql, false)
-                } else {
-                    (sql.to_string(), true)
-                }
-            }
-            None => (sql.to_string(), false),
-        };
+        let sql = RemoteDbType::Sqlite
+            .try_limit_query(sql, limit)
+            .unwrap_or_else(|| sql.to_string());
         let projection = projection.cloned();
         let sql = sql.to_string();
         let batch = self
@@ -98,19 +93,7 @@ impl Connection for SqliteConnection {
             .map_err(|e| DataFusionError::Execution(format!("Failed to execute query: {e:?}")))?;
 
         let memory_stream = MemoryStream::try_new(vec![batch], projected_schema, None)?;
-        if limit_stream {
-            Ok(Box::pin(memory_stream.with_fetch(limit)))
-        } else {
-            Ok(Box::pin(memory_stream))
-        }
-    }
-}
-
-fn try_limit_query(sql: &str, limit: usize) -> Option<String> {
-    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
-        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
-    } else {
-        None
+        Ok(Box::pin(memory_stream))
     }
 }
 

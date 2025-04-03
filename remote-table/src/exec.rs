@@ -10,6 +10,7 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, project_schema,
 };
+use datafusion::prelude::Expr;
 use futures::TryStreamExt;
 use std::any::Any;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ pub struct RemoteTableExec {
     pub(crate) table_schema: SchemaRef,
     pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) projection: Option<Vec<usize>>,
+    pub(crate) filters: Vec<Expr>,
     pub(crate) limit: Option<usize>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     conn: Arc<dyn Connection>,
@@ -35,6 +37,7 @@ impl RemoteTableExec {
         table_schema: SchemaRef,
         remote_schema: Option<RemoteSchemaRef>,
         projection: Option<Vec<usize>>,
+        filters: Vec<Expr>,
         limit: Option<usize>,
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
@@ -57,6 +60,7 @@ impl RemoteTableExec {
             table_schema,
             remote_schema,
             projection,
+            filters,
             limit,
             transform,
             conn,
@@ -103,6 +107,7 @@ impl ExecutionPlan for RemoteTableExec {
             self.table_schema.clone(),
             self.remote_schema.clone(),
             self.projection.clone(),
+            self.filters.clone(),
             self.limit,
             self.transform.clone(),
         );
@@ -111,17 +116,26 @@ impl ExecutionPlan for RemoteTableExec {
     }
 
     fn with_fetch(&self, limit: Option<usize>) -> Option<Arc<dyn ExecutionPlan>> {
-        Some(Arc::new(Self {
-            conn_options: self.conn_options.clone(),
-            sql: self.sql.clone(),
-            table_schema: self.table_schema.clone(),
-            remote_schema: self.remote_schema.clone(),
-            projection: self.projection.clone(),
-            limit,
-            transform: self.transform.clone(),
-            conn: self.conn.clone(),
-            plan_properties: self.plan_properties.clone(),
-        }))
+        if self
+            .conn_options
+            .db_type()
+            .support_limit_embedded(&self.sql)
+        {
+            Some(Arc::new(Self {
+                conn_options: self.conn_options.clone(),
+                sql: self.sql.clone(),
+                table_schema: self.table_schema.clone(),
+                remote_schema: self.remote_schema.clone(),
+                projection: self.projection.clone(),
+                filters: self.filters.clone(),
+                limit,
+                transform: self.transform.clone(),
+                conn: self.conn.clone(),
+                plan_properties: self.plan_properties.clone(),
+            }))
+        } else {
+            None
+        }
     }
 
     fn fetch(&self) -> Option<usize> {
@@ -137,6 +151,7 @@ async fn build_and_transform_stream(
     table_schema: SchemaRef,
     remote_schema: Option<RemoteSchemaRef>,
     projection: Option<Vec<usize>>,
+    filters: Vec<Expr>,
     limit: Option<usize>,
     transform: Option<Arc<dyn Transform>>,
 ) -> DFResult<SendableRecordBatchStream> {
@@ -146,6 +161,7 @@ async fn build_and_transform_stream(
             &sql,
             table_schema.clone(),
             projection.as_ref(),
+            filters.as_slice(),
             limit,
         )
         .await?;

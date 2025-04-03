@@ -3,6 +3,7 @@ syntax = "proto3";
 package remote_table;
 
 import "datafusion_common.proto";
+import "datafusion.proto";
 
 message RemoteTableExec {
   ConnectionOptions conn_options = 1;
@@ -10,8 +11,9 @@ message RemoteTableExec {
   datafusion_common.Schema table_schema = 3;
   RemoteSchema remote_schema = 4;
   Projection projection = 5;
-  optional uint32 limit = 6;
-  optional bytes transform = 7;
+  repeated datafusion.LogicalExprNode filters = 6;
+  optional uint32 limit = 7;
+  optional bytes transform = 8;
 }
 
 message ConnectionOptions {

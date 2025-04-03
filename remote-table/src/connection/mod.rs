@@ -19,6 +19,7 @@ pub use sqlite::*;
 use crate::{DFResult, RemoteSchemaRef};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::execution::SendableRecordBatchStream;
+use datafusion::prelude::Expr;
 use std::fmt::Debug;
 #[cfg(feature = "sqlite")]
 use std::path::PathBuf;
@@ -39,6 +40,7 @@ pub trait Connection: Debug + Send + Sync {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream>;
 }
@@ -81,7 +83,7 @@ pub enum ConnectionOptions {
 }
 
 impl ConnectionOptions {
-    pub fn stream_chunk_size(&self) -> usize {
+    pub(crate) fn stream_chunk_size(&self) -> usize {
         match self {
             #[cfg(feature = "postgres")]
             ConnectionOptions::Postgres(options) => options.stream_chunk_size,
@@ -91,6 +93,52 @@ impl ConnectionOptions {
             ConnectionOptions::Mysql(options) => options.stream_chunk_size,
             #[cfg(feature = "sqlite")]
             ConnectionOptions::Sqlite(_) => unreachable!(),
+        }
+    }
+
+    pub(crate) fn db_type(&self) -> RemoteDbType {
+        match self {
+            #[cfg(feature = "postgres")]
+            ConnectionOptions::Postgres(_) => RemoteDbType::Postgres,
+            #[cfg(feature = "oracle")]
+            ConnectionOptions::Oracle(_) => RemoteDbType::Oracle,
+            #[cfg(feature = "mysql")]
+            ConnectionOptions::Mysql(_) => RemoteDbType::Mysql,
+            #[cfg(feature = "sqlite")]
+            ConnectionOptions::Sqlite(_) => RemoteDbType::Sqlite,
+        }
+    }
+}
+
+pub(crate) enum RemoteDbType {
+    Postgres,
+    Mysql,
+    Oracle,
+    Sqlite,
+}
+
+impl RemoteDbType {
+    pub(crate) fn support_limit_embedded(&self, sql: &str) -> bool {
+        match self {
+            RemoteDbType::Postgres => sql.trim()[0..6].eq_ignore_ascii_case("select"),
+            RemoteDbType::Oracle => sql.trim()[0..6].eq_ignore_ascii_case("select"),
+            RemoteDbType::Mysql => sql.trim()[0..6].eq_ignore_ascii_case("select"),
+            RemoteDbType::Sqlite => sql.trim()[0..6].eq_ignore_ascii_case("select"),
+        }
+    }
+
+    pub(crate) fn try_limit_query(&self, sql: &str, limit: Option<usize>) -> Option<String> {
+        let limit = limit?;
+        if !self.support_limit_embedded(sql) {
+            return None;
+        }
+        match self {
+            RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
+                Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
+            }
+            RemoteDbType::Oracle => Some(format!(
+                "SELECT * FROM ({sql}) as __subquery WHERE ROWNUM <= {limit}"
+            )),
         }
     }
 }

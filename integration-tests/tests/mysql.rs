@@ -64,4 +64,17 @@ async fn pushdown_limit() {
 +----+------+"#,
     )
     .await;
+
+    // should not push down limit
+    assert_result(
+        "mysql",
+        "describe simple_table",
+        "SELECT * FROM remote_table limit 1",
+        r#"+-------+------+------+-----+---------+-------+
+| Field | Type | Null | Key | Default | Extra |
++-------+------+------+-----+---------+-------+
+| id    | int  | NO   | PRI |         |       |
++-------+------+------+-----+---------+-------+"#,
+    )
+    .await;
 }

@@ -1,4 +1,4 @@
-use crate::connection::{big_decimal_to_i128, projections_contains};
+use crate::connection::{RemoteDbType, big_decimal_to_i128, projections_contains};
 use crate::{
     Connection, ConnectionOptions, DFResult, MysqlType, Pool, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType,
@@ -16,9 +16,8 @@ use datafusion::arrow::array::{
 use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit, i256};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
-use datafusion::physical_plan::limit::LimitStream;
-use datafusion::physical_plan::metrics::{BaselineMetrics, ExecutionPlanMetricsSet};
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
+use datafusion::prelude::Expr;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::StreamExt;
@@ -99,7 +98,9 @@ pub struct MysqlConnection {
 #[async_trait::async_trait]
 impl Connection for MysqlConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
-        let sql = try_limit_query(sql, 1).unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Mysql
+            .try_limit_query(sql, Some(1))
+            .unwrap_or_else(|| sql.to_string());
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
         let row: Option<Row> = conn.query_first(&sql).await.map_err(|e| {
@@ -121,19 +122,13 @@ impl Connection for MysqlConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
+        _filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let (sql, limit_stream) = match limit {
-            Some(limit) => {
-                if let Some(limited_sql) = try_limit_query(sql, limit) {
-                    (limited_sql, false)
-                } else {
-                    (sql.to_string(), true)
-                }
-            }
-            None => (sql.to_string(), false),
-        };
+        let sql = RemoteDbType::Mysql
+            .try_limit_query(sql, limit)
+            .unwrap_or_else(|| sql.to_string());
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
@@ -174,27 +169,10 @@ impl Connection for MysqlConnection {
             rows_to_batch(rows.as_slice(), &table_schema, projection.as_ref())
         });
 
-        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(projected_schema, stream));
-
-        if limit_stream {
-            let metrics = BaselineMetrics::new(&ExecutionPlanMetricsSet::new(), 0);
-            Ok(Box::pin(LimitStream::new(
-                sendable_stream,
-                0,
-                limit,
-                metrics,
-            )))
-        } else {
-            Ok(sendable_stream)
-        }
-    }
-}
-
-fn try_limit_query(sql: &str, limit: usize) -> Option<String> {
-    if sql.trim()[0..6].eq_ignore_ascii_case("select") {
-        Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
-    } else {
-        None
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            stream,
+        )))
     }
 }
 
