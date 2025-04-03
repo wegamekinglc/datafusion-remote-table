@@ -45,12 +45,12 @@ async fn transform() {
 
     assert_eq!(
         pretty_format_batches(&result).unwrap().to_string(),
-        r#"+-----------------------------------------+-------------------------------------------------+----------------------------------------------------+-------------------------------------------------+--------------------------------------------------------+
-| transformed_null                        | transformed_int64                               | transformed_float64                                | transformed_utf8                                | transformed_binary                                     |
-+-----------------------------------------+-------------------------------------------------+----------------------------------------------------+-------------------------------------------------+--------------------------------------------------------+
-| transform_null-0-Null-Sqlite(Null)-NULL | transform_int64-1-Int64-Sqlite(Integer)-Some(1) | transform_float64-2-Float64-Sqlite(Real)-Some(1.1) | transform_utf8-3-Utf8-Sqlite(Text)-Some("text") | transform_binary-4-Binary-Sqlite(Blob)-Some([1, 2, 3]) |
-| transform_null-0-Null-Sqlite(Null)-NULL | transform_int64-1-Int64-Sqlite(Integer)-None    | transform_float64-2-Float64-Sqlite(Real)-None      | transform_utf8-3-Utf8-Sqlite(Text)-None         | transform_binary-4-Binary-Sqlite(Blob)-None            |
-+-----------------------------------------+-------------------------------------------------+----------------------------------------------------+-------------------------------------------------+--------------------------------------------------------+"#
+        r#"+-----------------------------------------+-------------------------------------------------+-------------------------------------------------+-------------------------------------------------+-------------------------------------------------+----------------------------------------------------+----------------------------------------------------+----------------------------------------------------+-------------------------------------------------+----------------------------------------------------+--------------------------------------------------+---------------------------------------------------+---------------------------------------------------+---------------------------------------------------+
+| transformed_null-null_col               | transformed_int64-tinyint_col                   | transformed_int64-smallint_col                  | transformed_int64-int_col                       | transformed_int64-bigint_col                    | transformed_float64-float_col                      | transformed_float64-double_col                     | transformed_float64-real_col                       | transformed_utf8-char_col                       | transformed_utf8-varchar_col                       | transformed_utf8-text_col                        | transformed_binary-binary_col                     | transformed_binary-varbinary_col                  | transformed_binary-blob_col                       |
++-----------------------------------------+-------------------------------------------------+-------------------------------------------------+-------------------------------------------------+-------------------------------------------------+----------------------------------------------------+----------------------------------------------------+----------------------------------------------------+-------------------------------------------------+----------------------------------------------------+--------------------------------------------------+---------------------------------------------------+---------------------------------------------------+---------------------------------------------------+
+| transform_null-0-Null-Sqlite(Null)-NULL | transform_int64-1-Int64-Sqlite(Integer)-Some(1) | transform_int64-2-Int64-Sqlite(Integer)-Some(2) | transform_int64-3-Int64-Sqlite(Integer)-Some(3) | transform_int64-4-Int64-Sqlite(Integer)-Some(4) | transform_float64-5-Float64-Sqlite(Real)-Some(1.1) | transform_float64-6-Float64-Sqlite(Real)-Some(2.2) | transform_float64-7-Float64-Sqlite(Real)-Some(3.3) | transform_utf8-8-Utf8-Sqlite(Text)-Some("char") | transform_utf8-9-Utf8-Sqlite(Text)-Some("varchar") | transform_utf8-10-Utf8-Sqlite(Text)-Some("text") | transform_binary-11-Binary-Sqlite(Blob)-Some([1]) | transform_binary-12-Binary-Sqlite(Blob)-Some([2]) | transform_binary-13-Binary-Sqlite(Blob)-Some([3]) |
+| transform_null-0-Null-Sqlite(Null)-NULL | transform_int64-1-Int64-Sqlite(Integer)-None    | transform_int64-2-Int64-Sqlite(Integer)-None    | transform_int64-3-Int64-Sqlite(Integer)-None    | transform_int64-4-Int64-Sqlite(Integer)-None    | transform_float64-5-Float64-Sqlite(Real)-None      | transform_float64-6-Float64-Sqlite(Real)-None      | transform_float64-7-Float64-Sqlite(Real)-None      | transform_utf8-8-Utf8-Sqlite(Text)-None         | transform_utf8-9-Utf8-Sqlite(Text)-None            | transform_utf8-10-Utf8-Sqlite(Text)-None         | transform_binary-11-Binary-Sqlite(Blob)-None      | transform_binary-12-Binary-Sqlite(Blob)-None      | transform_binary-13-Binary-Sqlite(Blob)-None      |
++-----------------------------------------+-------------------------------------------------+-------------------------------------------------+-------------------------------------------------+-------------------------------------------------+----------------------------------------------------+----------------------------------------------------+----------------------------------------------------+-------------------------------------------------+----------------------------------------------------+--------------------------------------------------+---------------------------------------------------+---------------------------------------------------+---------------------------------------------------+"#,
     );
 }
 
@@ -77,8 +77,9 @@ async fn transform_serialization() {
     let result = collect(exec_plan.clone(), ctx.task_ctx()).await.unwrap();
     println!("{}", pretty_format_batches(&result).unwrap());
 
-    let codec =
-        RemotePhysicalCodec::new().with_transform_codec(Some(Arc::new(MyTransformCodec {})));
+    let codec = RemotePhysicalCodec::new().with_transform_codec(Some(
+        Arc::new(MyTransformCodec {}) as Arc<dyn TransformCodec>,
+    ));
     let mut plan_buf: Vec<u8> = vec![];
     let plan_proto = PhysicalPlanNode::try_from_physical_plan(exec_plan, &codec).unwrap();
     plan_proto.try_encode(&mut plan_buf).unwrap();
@@ -145,7 +146,11 @@ impl Transform for MyTransform {
         }
         Ok((
             Arc::new(StringArray::from(data)),
-            Field::new("transformed_null", DataType::Utf8, false),
+            Field::new(
+                format!("transformed_null-{}", args.field.name()),
+                DataType::Utf8,
+                false,
+            ),
         ))
     }
 
@@ -165,7 +170,11 @@ impl Transform for MyTransform {
         }
         Ok((
             Arc::new(StringArray::from(data)),
-            Field::new("transformed_int64", DataType::Utf8, false),
+            Field::new(
+                format!("transformed_int64-{}", args.field.name()),
+                DataType::Utf8,
+                false,
+            ),
         ))
     }
 
@@ -185,7 +194,11 @@ impl Transform for MyTransform {
         }
         Ok((
             Arc::new(StringArray::from(data)),
-            Field::new("transformed_float64", DataType::Utf8, false),
+            Field::new(
+                format!("transformed_float64-{}", args.field.name()),
+                DataType::Utf8,
+                false,
+            ),
         ))
     }
 
@@ -205,7 +218,11 @@ impl Transform for MyTransform {
         }
         Ok((
             Arc::new(StringArray::from(data)),
-            Field::new("transformed_utf8", DataType::Utf8, false),
+            Field::new(
+                format!("transformed_utf8-{}", args.field.name()),
+                DataType::Utf8,
+                false,
+            ),
         ))
     }
 
@@ -225,7 +242,11 @@ impl Transform for MyTransform {
         }
         Ok((
             Arc::new(StringArray::from(data)),
-            Field::new("transformed_binary", DataType::Utf8, false),
+            Field::new(
+                format!("transformed_binary-{}", args.field.name()),
+                DataType::Utf8,
+                false,
+            ),
         ))
     }
 }
