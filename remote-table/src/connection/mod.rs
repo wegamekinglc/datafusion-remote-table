@@ -18,8 +18,11 @@ pub use sqlite::*;
 
 use crate::{DFResult, RemoteSchemaRef};
 use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::common::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::prelude::Expr;
+use datafusion::sql::unparser::Unparser;
+use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::fmt::Debug;
 #[cfg(feature = "sqlite")]
 use std::path::PathBuf;
@@ -118,25 +121,67 @@ pub(crate) enum RemoteDbType {
 }
 
 impl RemoteDbType {
-    pub(crate) fn support_limit_embedded(&self, sql: &str) -> bool {
+    pub(crate) fn support_rewrite_with_filters_limit(&self, sql: &str) -> bool {
+        sql.trim()[0..6].eq_ignore_ascii_case("select")
+    }
+
+    pub(crate) fn create_unparser(&self) -> DFResult<Unparser> {
         match self {
-            RemoteDbType::Postgres => sql.trim()[0..6].eq_ignore_ascii_case("select"),
-            RemoteDbType::Oracle => sql.trim()[0..6].eq_ignore_ascii_case("select"),
-            RemoteDbType::Mysql => sql.trim()[0..6].eq_ignore_ascii_case("select"),
-            RemoteDbType::Sqlite => sql.trim()[0..6].eq_ignore_ascii_case("select"),
+            RemoteDbType::Postgres => Ok(Unparser::new(&PostgreSqlDialect {})),
+            RemoteDbType::Mysql => Ok(Unparser::new(&MySqlDialect {})),
+            RemoteDbType::Sqlite => Ok(Unparser::new(&SqliteDialect {})),
+            RemoteDbType::Oracle => Err(DataFusionError::NotImplemented(
+                "Oracle unparser not implemented".to_string(),
+            )),
         }
     }
 
-    pub(crate) fn try_limit_query(&self, sql: &str, limit: Option<usize>) -> Option<String> {
-        let limit = limit?;
-        if !self.support_limit_embedded(sql) {
+    pub(crate) fn try_rewrite_query(
+        &self,
+        sql: &str,
+        filters: &[Expr],
+        limit: Option<usize>,
+    ) -> Option<String> {
+        if !self.support_rewrite_with_filters_limit(sql) {
             return None;
         }
         match self {
             RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
-                Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
+                let where_clause = if filters.is_empty() {
+                    "".to_string()
+                } else {
+                    let unparser = self.create_unparser().ok()?;
+                    let filters_ast = filters
+                        .iter()
+                        .map(|f| unparser.expr_to_sql(f).expect("checked already"))
+                        .collect::<Vec<_>>();
+                    format!(
+                        " WHERE {}",
+                        filters_ast
+                            .iter()
+                            .map(|f| format!("{f}"))
+                            .collect::<Vec<_>>()
+                            .join(" AND ")
+                    )
+                };
+                let limit_clause = if let Some(limit) = limit {
+                    format!(" LIMIT {limit}")
+                } else {
+                    "".to_string()
+                };
+
+                if where_clause.is_empty() && limit_clause.is_empty() {
+                    None
+                } else {
+                    Some(format!(
+                        "SELECT * FROM ({sql}) as __subquery{where_clause}{limit_clause}"
+                    ))
+                }
             }
-            RemoteDbType::Oracle => Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}")),
+            RemoteDbType::Oracle => {
+                let limit = limit?;
+                Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}"))
+            }
         }
     }
 }

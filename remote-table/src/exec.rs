@@ -3,6 +3,8 @@ use crate::{
     transform_schema,
 };
 use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::common::Column;
+use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
@@ -119,7 +121,7 @@ impl ExecutionPlan for RemoteTableExec {
         if self
             .conn_options
             .db_type()
-            .support_limit_embedded(&self.sql)
+            .support_rewrite_with_filters_limit(&self.sql)
         {
             Some(Arc::new(Self {
                 conn_options: self.conn_options.clone(),
@@ -155,13 +157,20 @@ async fn build_and_transform_stream(
     limit: Option<usize>,
     transform: Option<Arc<dyn Transform>>,
 ) -> DFResult<SendableRecordBatchStream> {
+    let transformed_table_schema = transform_schema(
+        table_schema.clone(),
+        transform.as_ref(),
+        remote_schema.as_ref(),
+    )?;
+    let rewritten_filters =
+        rewrite_filters_column(filters, &table_schema, &transformed_table_schema)?;
     let stream = conn
         .query(
             &conn_options,
             &sql,
             table_schema.clone(),
             projection.as_ref(),
-            filters.as_slice(),
+            rewritten_filters.as_slice(),
             limit,
         )
         .await?;
@@ -178,8 +187,41 @@ async fn build_and_transform_stream(
     }
 }
 
+fn rewrite_filters_column(
+    filters: Vec<Expr>,
+    table_schema: &SchemaRef,
+    transformed_table_schema: &SchemaRef,
+) -> DFResult<Vec<Expr>> {
+    filters
+        .into_iter()
+        .map(|f| {
+            f.transform_down(|e| {
+                if let Expr::Column(col) = e {
+                    let col_idx = transformed_table_schema.index_of(col.name())?;
+                    let row_name = table_schema.field(col_idx).name().to_string();
+                    Ok(Transformed::yes(Expr::Column(Column::new_unqualified(
+                        row_name,
+                    ))))
+                } else {
+                    Ok(Transformed::no(e))
+                }
+            })
+            .map(|trans| trans.data)
+        })
+        .collect::<DFResult<Vec<_>>>()
+}
+
 impl DisplayAs for RemoteTableExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "RemoteTableExec: limit={:?}", self.limit)
+        write!(
+            f,
+            "RemoteTableExec: limit={:?}, filters=[{}]",
+            self.limit,
+            self.filters
+                .iter()
+                .map(|e| format!("{e}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
     }
 }

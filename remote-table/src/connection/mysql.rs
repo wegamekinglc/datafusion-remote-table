@@ -99,7 +99,7 @@ pub struct MysqlConnection {
 impl Connection for MysqlConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let sql = RemoteDbType::Mysql
-            .try_limit_query(sql, Some(1))
+            .try_rewrite_query(sql, &[], Some(1))
             .unwrap_or_else(|| sql.to_string());
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
@@ -122,12 +122,12 @@ impl Connection for MysqlConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        _filters: &[Expr],
+        filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
         let sql = RemoteDbType::Mysql
-            .try_limit_query(sql, limit)
+            .try_rewrite_query(sql, filters, limit)
             .unwrap_or_else(|| sql.to_string());
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
@@ -135,10 +135,10 @@ impl Connection for MysqlConnection {
         let stream = Box::pin(stream! {
             let mut conn = conn.lock().await;
             let mut query_iter = conn
-                .query_iter(sql)
+                .query_iter(sql.clone())
                 .await
                 .map_err(|e| {
-                    DataFusionError::Execution(format!("Failed to execute query on mysql: {e:?}"))
+                    DataFusionError::Execution(format!("Failed to execute query {sql} on mysql: {e:?}"))
                 })?;
 
             let Some(stream) = query_iter.stream::<Row>().await.map_err(|e| {

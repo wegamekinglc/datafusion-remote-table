@@ -1,5 +1,5 @@
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::{assert_result, assert_sqls};
+use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
 #[tokio::test]
 pub async fn supported_oracle_types() {
@@ -49,10 +49,11 @@ pub async fn various_sqls() {
 async fn pushdown_limit() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
-    assert_result(
+    assert_plan_and_result(
         "oracle",
         "select * from SYS.simple_table",
         "select * from remote_table limit 1",
+        "RemoteTableExec: limit=Some(1), filters=[]\n",
         r#"+----+------+
 | ID | NAME |
 +----+------+

@@ -1,4 +1,4 @@
-use integration_tests::utils::assert_result;
+use integration_tests::utils::{assert_plan_and_result, assert_result};
 
 #[tokio::test]
 pub async fn supported_sqlite_types() {
@@ -18,10 +18,11 @@ pub async fn supported_sqlite_types() {
 
 #[tokio::test]
 async fn pushdown_limit() {
-    assert_result(
+    assert_plan_and_result(
         "sqlite",
         "select * from simple_table",
         "select * from remote_table limit 1",
+        "RemoteTableExec: limit=Some(1), filters=[]\n",
         r#"+----+------+
 | id | name |
 +----+------+

@@ -112,7 +112,7 @@ pub(crate) struct PostgresConnection {
 impl Connection for PostgresConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
         let sql = RemoteDbType::Postgres
-            .try_limit_query(sql, Some(1))
+            .try_rewrite_query(sql, &[], Some(1))
             .unwrap_or_else(|| sql.to_string());
         let row = self.conn.query_one(&sql, &[]).await.map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on postgres: {e:?}",))
@@ -128,12 +128,12 @@ impl Connection for PostgresConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        _filters: &[Expr],
+        filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
         let sql = RemoteDbType::Postgres
-            .try_limit_query(sql, limit)
+            .try_rewrite_query(sql, filters, limit)
             .unwrap_or_else(|| sql.to_string());
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
@@ -143,7 +143,7 @@ impl Connection for PostgresConnection {
             .await
             .map_err(|e| {
                 DataFusionError::Execution(format!(
-                    "Failed to execute query {sql} on postgres due to {e}",
+                    "Failed to execute query {sql} on postgres: {e}",
                 ))
             })?
             .chunks(chunk_size)

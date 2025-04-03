@@ -1,5 +1,5 @@
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::{assert_result, assert_sqls};
+use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
 #[tokio::test]
 pub async fn supported_mysql_types() {
@@ -70,6 +70,44 @@ async fn pushdown_limit() {
         "mysql",
         "describe simple_table",
         "SELECT * FROM remote_table limit 1",
+        r#"+-------+------+------+-----+---------+-------+
+| Field | Type | Null | Key | Default | Extra |
++-------+------+------+-----+---------+-------+
+| id    | int  | NO   | PRI |         |       |
++-------+------+------+-----+---------+-------+"#,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn pushdown_filters() {
+    setup_shared_containers();
+    // Wait for the database to be ready to connect
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+    assert_plan_and_result(
+        "mysql",
+        "select * from simple_table",
+        "select * from remote_table where id = 1",
+        "RemoteTableExec: limit=None, filters=[id = Int32(1)]\n",
+        r#"+----+------+
+| id | name |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+
+    // should not push down filters
+    assert_plan_and_result(
+        "mysql",
+        "describe simple_table",
+        r#"SELECT * FROM remote_table where "Key" = 'PRI'"#,
+        r#"CoalesceBatchesExec: target_batch_size=8192
+  FilterExec: Key@3 = PRI
+    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1
+      RemoteTableExec: limit=None, filters=[]
+"#,
         r#"+-------+------+------+-----+---------+-------+
 | Field | Type | Null | Key | Default | Extra |
 +-------+------+------+-----+---------+-------+

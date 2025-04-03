@@ -68,15 +68,15 @@ impl Connection for SqliteConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        _filters: &[Expr],
+        filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
         let sql = RemoteDbType::Sqlite
-            .try_limit_query(sql, limit)
+            .try_rewrite_query(sql, filters, limit)
             .unwrap_or_else(|| sql.to_string());
+        let sql_clone = sql.clone();
         let projection = projection.cloned();
-        let sql = sql.to_string();
         let batch = self
             .conn
             .call(move |conn| {
@@ -90,7 +90,11 @@ impl Connection for SqliteConnection {
                 Ok(batch)
             })
             .await
-            .map_err(|e| DataFusionError::Execution(format!("Failed to execute query: {e:?}")))?;
+            .map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Failed to execute query {sql_clone} on sqlite: {e:?}"
+                ))
+            })?;
 
         let memory_stream = MemoryStream::try_new(vec![batch], projected_schema, None)?;
         Ok(Box::pin(memory_stream))

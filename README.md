@@ -4,7 +4,7 @@
 
 ## Features
 1. Execute SQL queries on remote databases and stream results as datafusion table provider
-2. Support pushing down limit to remote databases
+2. Support pushing down filters and limit to remote databases
 3. Execution plan can be serialized for distributed execution
 4. Record batches can be transformed before outputting to next plan node
 

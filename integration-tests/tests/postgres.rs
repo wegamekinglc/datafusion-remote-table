@@ -1,5 +1,5 @@
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::{assert_result, assert_sqls};
+use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
 #[tokio::test]
 pub async fn supported_postgres_types() {
@@ -84,10 +84,11 @@ pub async fn various_sqls() {
 #[tokio::test]
 async fn pushdown_limit() {
     setup_shared_containers();
-    assert_result(
+    assert_plan_and_result(
         "postgres",
         "select * from simple_table",
         "select * from remote_table limit 1",
+        "RemoteTableExec: limit=Some(1), filters=[]\n",
         r#"+----+------+
 | id | name |
 +----+------+
