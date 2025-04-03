@@ -62,3 +62,24 @@ async fn pushdown_limit() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn pushdown_filters() {
+    setup_shared_containers();
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+    assert_plan_and_result(
+        "oracle",
+        "select * from SYS.simple_table",
+        r#"select * from remote_table where "ID" = 1"#,
+        "CoalesceBatchesExec: target_batch_size=8192
+  FilterExec: ID@0 = Some(1),38,0
+    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1
+      RemoteTableExec: limit=None, filters=[]\n",
+        r#"+----+------+
+| ID | NAME |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}

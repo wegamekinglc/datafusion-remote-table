@@ -31,3 +31,19 @@ async fn pushdown_limit() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn pushdown_filters() {
+    assert_plan_and_result(
+        "sqlite",
+        "select * from simple_table",
+        "select * from remote_table where id = 1",
+        "RemoteTableExec: limit=None, filters=[id = Int64(1)]\n",
+        r#"+----+------+
+| id | name |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}

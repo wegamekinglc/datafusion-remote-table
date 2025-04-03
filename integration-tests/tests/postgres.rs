@@ -97,3 +97,20 @@ async fn pushdown_limit() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn pushdown_filters() {
+    setup_shared_containers();
+    assert_plan_and_result(
+        "postgres",
+        "select * from simple_table",
+        "select * from remote_table where id = 1",
+        "RemoteTableExec: limit=None, filters=[id = Int32(1)]\n",
+        r#"+----+------+
+| id | name |
++----+------+
+| 1  | Tom  |
++----+------+"#,
+    )
+    .await;
+}
