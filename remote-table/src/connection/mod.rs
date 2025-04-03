@@ -136,9 +136,7 @@ impl RemoteDbType {
             RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
                 Some(format!("SELECT * FROM ({sql}) as __subquery LIMIT {limit}"))
             }
-            RemoteDbType::Oracle => Some(format!(
-                "SELECT * FROM ({sql}) as __subquery WHERE ROWNUM <= {limit}"
-            )),
+            RemoteDbType::Oracle => Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}")),
         }
     }
 }
