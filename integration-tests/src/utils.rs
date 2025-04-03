@@ -1,7 +1,7 @@
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
-use datafusion::prelude::SessionContext;
+use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_remote_table::{
     ConnectionOptions, MysqlConnectionOptions, OracleConnectionOptions, PostgresConnectionOptions,
     RemoteTable,
@@ -44,7 +44,8 @@ pub async fn assert_plan_and_result(
     let table = RemoteTable::try_new(options, remote_sql).await.unwrap();
     println!("remote schema: {:#?}", table.remote_schema());
 
-    let ctx = SessionContext::new();
+    let config = SessionConfig::new().with_target_partitions(12);
+    let ctx = SessionContext::new_with_config(config);
     ctx.register_table("remote_table", Arc::new(table)).unwrap();
 
     let df = ctx.sql(df_sql).await.unwrap();
