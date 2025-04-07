@@ -32,7 +32,6 @@ prost = { workspace = true }
 derive-with = "0.6"
 derive-getters = "0.5"
 itertools = "0.14"
-regex = "1.11"
 tokio = { workspace = true }
 bb8 = { version = "0.9", optional = true }
 # Postgres

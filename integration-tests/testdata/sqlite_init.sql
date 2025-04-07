@@ -7,7 +7,7 @@ CREATE TABLE supported_data_types (
     double_col DOUBLE,
     real_col REAL,
     real_precision_col REAL(10),
-    real_precision_scale_col REAL(10, 2),
+    real_precision_scale_col REAL (10, 2),
     char_col CHAR,
     char_len_col CHAR(10),
     varchar_col VARCHAR,
