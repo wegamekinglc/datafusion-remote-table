@@ -13,11 +13,12 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::memory::MemoryStream;
 use datafusion::prelude::Expr;
 use itertools::Itertools;
+use regex::Regex;
 use rusqlite::types::ValueRef;
 use rusqlite::{Column, Row, Rows};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 #[derive(Debug)]
 pub struct SqlitePool {
@@ -118,6 +119,13 @@ fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
     }
 }
 
+static CHAR_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)char\(\d+\)$").unwrap());
+static VARCHAR_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)varchar\(\d+\)$").unwrap());
+static TEXT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)text\(\d+\)$").unwrap());
+static BINARY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)binary\(\d+\)$").unwrap());
+static VARBINARY_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?i)varbinary\(\d+\)$").unwrap());
+
 fn decl_type_to_remote_type(decl_type: &str) -> DFResult<RemoteType> {
     if "null".eq(decl_type) {
         return Ok(RemoteType::Sqlite(SqliteType::Null));
@@ -131,7 +139,14 @@ fn decl_type_to_remote_type(decl_type: &str) -> DFResult<RemoteType> {
     if ["text", "varchar", "char", "string"].contains(&decl_type) {
         return Ok(RemoteType::Sqlite(SqliteType::Text));
     }
+    if CHAR_RE.is_match(decl_type) || VARCHAR_RE.is_match(decl_type) || TEXT_RE.is_match(decl_type)
+    {
+        return Ok(RemoteType::Sqlite(SqliteType::Text));
+    }
     if ["binary", "varbinary", "tinyblob", "blob"].contains(&decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Blob));
+    }
+    if BINARY_RE.is_match(decl_type) || VARBINARY_RE.is_match(decl_type) {
         return Ok(RemoteType::Sqlite(SqliteType::Blob));
     }
     Err(DataFusionError::NotImplemented(format!(

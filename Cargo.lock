@@ -1381,6 +1381,7 @@ dependencies = [
  "num-bigint",
  "oracle",
  "prost",
+ "regex",
  "rusqlite",
  "serde_json",
  "time",

@@ -7,16 +7,21 @@ CREATE TABLE supported_data_types (
     double_col DOUBLE,
     real_col REAL,
     char_col CHAR,
+    char_len_col CHAR(10),
     varchar_col VARCHAR,
+    varchar_len_col VARCHAR(120),
     text_col TEXT,
+    text_len_col TEXT(200),
     binary_col BINARY,
+    binary_len_col BINARY(10),
     varbinary_col VARBINARY,
+    varbinary_len_col VARBINARY(200),
     blob_col BLOB
 );
 
 INSERT INTO supported_data_types VALUES
-(1, 2, 3, 4, 1.1, 2.2, 3.3, 'char', 'varchar','text', X'01', X'02', X'03'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 1.1, 2.2, 3.3, 'char', 'char(10)', 'varchar', 'varchar(120)', 'text', 'text(200)', X'01', X'02', X'03', X'04', X'05'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id INTEGER,
