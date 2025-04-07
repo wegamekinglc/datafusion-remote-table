@@ -6,6 +6,8 @@ CREATE TABLE supported_data_types (
     float_col FLOAT,
     double_col DOUBLE,
     real_col REAL,
+    real_precision_col REAL(10),
+    real_precision_scale_col REAL(10, 2),
     char_col CHAR,
     char_len_col CHAR(10),
     varchar_col VARCHAR,
@@ -20,8 +22,8 @@ CREATE TABLE supported_data_types (
 );
 
 INSERT INTO supported_data_types VALUES
-(1, 2, 3, 4, 1.1, 2.2, 3.3, 'char', 'char(10)', 'varchar', 'varchar(120)', 'text', 'text(200)', X'01', X'02', X'03', X'04', X'05'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 1.1, 2.2, 3.3, 4.4, 5.5, 'char', 'char(10)', 'varchar', 'varchar(120)', 'text', 'text(200)', X'01', X'02', X'03', X'04', X'05'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id INTEGER,

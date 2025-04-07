@@ -119,6 +119,7 @@ fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
     }
 }
 
+static REAL_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)real\(.*\)$").unwrap());
 static CHAR_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)char\(\d+\)$").unwrap());
 static VARCHAR_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)varchar\(\d+\)$").unwrap());
 static TEXT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?i)text\(\d+\)$").unwrap());
@@ -134,6 +135,9 @@ fn decl_type_to_remote_type(decl_type: &str) -> DFResult<RemoteType> {
         return Ok(RemoteType::Sqlite(SqliteType::Integer));
     }
     if ["real", "float", "double"].contains(&decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Real));
+    }
+    if REAL_RE.is_match(decl_type) {
         return Ok(RemoteType::Sqlite(SqliteType::Real));
     }
     if ["text", "varchar", "char", "string"].contains(&decl_type) {
