@@ -12,7 +12,10 @@ use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::memory::MemoryStream;
 use datafusion::prelude::Expr;
+use itertools::Itertools;
+use rusqlite::types::ValueRef;
 use rusqlite::{Column, Row, Rows};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -47,12 +50,13 @@ impl Connection for SqliteConnection {
         let sql = sql.to_string();
         self.conn
             .call(move |conn| {
-                let stmt = conn.prepare(&sql)?;
+                let mut stmt = conn.prepare(&sql)?;
                 let columns: Vec<OwnedColumn> =
                     stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
+                let rows = stmt.query([])?;
 
                 let remote_schema = Arc::new(
-                    build_remote_schema(columns.as_slice())
+                    build_remote_schema(columns.as_slice(), rows)
                         .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?,
                 );
                 let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
@@ -114,38 +118,117 @@ fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
     }
 }
 
-fn sqlite_type_to_remote_type(sqlite_col: &OwnedColumn) -> DFResult<RemoteType> {
-    match sqlite_col.decl_type.as_deref() {
-        None => Ok(RemoteType::Sqlite(SqliteType::Null)),
-        Some(t) => {
-            // TODO handle char(10) type
-            let t = t.to_lowercase();
-            if ["tinyint", "smallint", "int", "integer", "bigint"].contains(&t.as_str()) {
-                return Ok(RemoteType::Sqlite(SqliteType::Integer));
-            }
-            if ["real", "float", "double"].contains(&t.as_str()) {
-                return Ok(RemoteType::Sqlite(SqliteType::Real));
-            }
-            if ["text", "varchar", "char", "string"].contains(&t.as_str()) {
-                return Ok(RemoteType::Sqlite(SqliteType::Text));
-            }
-            if ["binary", "varbinary", "tinyblob", "blob"].contains(&t.as_str()) {
-                return Ok(RemoteType::Sqlite(SqliteType::Blob));
-            }
-            Err(DataFusionError::NotImplemented(format!(
-                "Unsupported sqlite type: {:?}",
-                sqlite_col.decl_type
-            )))
-        }
+fn decl_type_to_remote_type(decl_type: &str) -> DFResult<RemoteType> {
+    if "null".eq(decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Null));
     }
+    if ["tinyint", "smallint", "int", "integer", "bigint"].contains(&decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Integer));
+    }
+    if ["real", "float", "double"].contains(&decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Real));
+    }
+    if ["text", "varchar", "char", "string"].contains(&decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Text));
+    }
+    if ["binary", "varbinary", "tinyblob", "blob"].contains(&decl_type) {
+        return Ok(RemoteType::Sqlite(SqliteType::Blob));
+    }
+    Err(DataFusionError::NotImplemented(format!(
+        "Unsupported sqlite decl type: {decl_type}",
+    )))
 }
 
-fn build_remote_schema(columns: &[OwnedColumn]) -> DFResult<RemoteSchema> {
-    let mut remote_fields = Vec::with_capacity(columns.len());
-    for col in columns.iter() {
-        let remote_type = sqlite_type_to_remote_type(col)?;
-        remote_fields.push(RemoteField::new(&col.name, remote_type, true));
+fn build_remote_schema(columns: &[OwnedColumn], mut rows: Rows) -> DFResult<RemoteSchema> {
+    let mut remote_field_map = HashMap::with_capacity(columns.len());
+    let mut unknown_cols = vec![];
+    for (col_idx, col) in columns.iter().enumerate() {
+        if let Some(decl_type) = &col.decl_type {
+            let remote_type = decl_type_to_remote_type(&decl_type.to_ascii_lowercase())?;
+            remote_field_map.insert(col_idx, RemoteField::new(&col.name, remote_type, true));
+        } else {
+            unknown_cols.push(col_idx);
+        }
     }
+
+    if !unknown_cols.is_empty() {
+        while let Some(row) = rows.next().map_err(|e| {
+            DataFusionError::Execution(format!("Failed to get next row from sqlite: {e:?}"))
+        })? {
+            let mut to_be_removed = vec![];
+            for col_idx in unknown_cols.iter() {
+                let value_ref = row.get_ref(*col_idx).map_err(|e| {
+                    DataFusionError::Execution(format!(
+                        "Failed to get value ref for column {col_idx}: {e:?}"
+                    ))
+                })?;
+                match value_ref {
+                    ValueRef::Null => {}
+                    ValueRef::Integer(_) => {
+                        remote_field_map.insert(
+                            *col_idx,
+                            RemoteField::new(
+                                columns[*col_idx].name.clone(),
+                                RemoteType::Sqlite(SqliteType::Integer),
+                                true,
+                            ),
+                        );
+                        to_be_removed.push(*col_idx);
+                    }
+                    ValueRef::Real(_) => {
+                        remote_field_map.insert(
+                            *col_idx,
+                            RemoteField::new(
+                                columns[*col_idx].name.clone(),
+                                RemoteType::Sqlite(SqliteType::Real),
+                                true,
+                            ),
+                        );
+                        to_be_removed.push(*col_idx);
+                    }
+                    ValueRef::Text(_) => {
+                        remote_field_map.insert(
+                            *col_idx,
+                            RemoteField::new(
+                                columns[*col_idx].name.clone(),
+                                RemoteType::Sqlite(SqliteType::Text),
+                                true,
+                            ),
+                        );
+                        to_be_removed.push(*col_idx);
+                    }
+                    ValueRef::Blob(_) => {
+                        remote_field_map.insert(
+                            *col_idx,
+                            RemoteField::new(
+                                columns[*col_idx].name.clone(),
+                                RemoteType::Sqlite(SqliteType::Blob),
+                                true,
+                            ),
+                        );
+                        to_be_removed.push(*col_idx);
+                    }
+                }
+            }
+            for col_idx in to_be_removed.iter() {
+                unknown_cols.retain(|&x| x != *col_idx);
+            }
+            if unknown_cols.is_empty() {
+                break;
+            }
+        }
+    }
+
+    if !unknown_cols.is_empty() {
+        return Err(DataFusionError::NotImplemented(format!(
+            "Failed to infer sqlite decl type for columns: {unknown_cols:?}"
+        )));
+    }
+    let remote_fields = remote_field_map
+        .into_iter()
+        .sorted_by_key(|entry| entry.0)
+        .map(|entry| entry.1)
+        .collect::<Vec<_>>();
     Ok(RemoteSchema::new(remote_fields))
 }
 

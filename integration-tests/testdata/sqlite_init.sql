@@ -1,5 +1,4 @@
 CREATE TABLE supported_data_types (
-    null_col NULL,
     tinyint_col TINYINT,
     smallint_col SMALLINT,
     int_col INTEGER,
@@ -16,8 +15,8 @@ CREATE TABLE supported_data_types (
 );
 
 INSERT INTO supported_data_types VALUES
-(NULL, 1, 2, 3, 4, 1.1, 2.2, 3.3, 'char', 'varchar','text', X'01', X'02', X'03'),
-(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 2, 3, 4, 1.1, 2.2, 3.3, 'char', 'varchar','text', X'01', X'02', X'03'),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 CREATE TABLE simple_table (
     id INTEGER,

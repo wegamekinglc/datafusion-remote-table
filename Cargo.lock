@@ -1376,6 +1376,7 @@ dependencies = [
  "derive-getters",
  "derive-with",
  "futures",
+ "itertools 0.14.0",
  "mysql_async",
  "num-bigint",
  "oracle",
