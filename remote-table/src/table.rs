@@ -116,25 +116,13 @@ impl TableProvider for RemoteTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        let supported_filters = filters
-            .iter()
-            .filter(|f| {
-                let pushdown = support_filter_pushdown(self.conn_options.db_type(), &self.sql, f);
-                matches!(
-                    pushdown,
-                    TableProviderFilterPushDown::Exact | TableProviderFilterPushDown::Inexact
-                )
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
         Ok(Arc::new(RemoteTableExec::try_new(
             self.conn_options.clone(),
             self.sql.clone(),
             self.table_schema.clone(),
             self.remote_schema.clone(),
             projection.cloned(),
-            supported_filters,
+            filters.to_vec(),
             limit,
             self.transform.clone(),
             self.pool.get().await?,
