@@ -116,7 +116,6 @@ impl TableProvider for RemoteTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        // TODO support filter pushdown
         let supported_filters = filters
             .iter()
             .filter(|f| {

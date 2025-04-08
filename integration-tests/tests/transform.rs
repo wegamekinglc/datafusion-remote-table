@@ -14,6 +14,7 @@ use datafusion_remote_table::{
 use std::any::Any;
 use std::path::PathBuf;
 use std::sync::Arc;
+use datafusion::physical_plan::display::DisplayableExecutionPlan;
 
 #[tokio::test]
 async fn transform() {
@@ -72,8 +73,9 @@ async fn transform_serialization() {
 
     let ctx = SessionContext::new();
     ctx.register_table("remote_table", Arc::new(table)).unwrap();
-    let plan = ctx.sql("select * from remote_table").await.unwrap();
+    let plan = ctx.sql(r#"select * from remote_table where "transformed_int64-tinyint_col" = 1 limit 1"#).await.unwrap();
     let exec_plan = plan.create_physical_plan().await.unwrap();
+    println!("plan: {}", DisplayableExecutionPlan::new(exec_plan.as_ref()).indent(true));
     let result = collect(exec_plan.clone(), ctx.task_ctx()).await.unwrap();
     println!("{}", pretty_format_batches(&result).unwrap());
 
@@ -87,6 +89,7 @@ async fn transform_serialization() {
     let new_plan: Arc<dyn ExecutionPlan> = PhysicalPlanNode::try_decode(&plan_buf)
         .and_then(|proto| proto.try_into_physical_plan(&ctx, &ctx.runtime_env(), &codec))
         .unwrap();
+    println!("plan: {}", DisplayableExecutionPlan::new(new_plan.as_ref()).indent(true));
 
     let serde_result = collect(new_plan, ctx.task_ctx()).await.unwrap();
     println!("{}", pretty_format_batches(&serde_result).unwrap());
