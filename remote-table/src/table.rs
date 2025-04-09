@@ -58,27 +58,40 @@ impl RemoteTable {
     ) -> DFResult<Self> {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
-        let conn = pool.get().await?;
-        let (table_schema, remote_schema) = match conn.infer_schema(&sql).await {
-            Ok((remote_schema, inferred_table_schema)) => (
-                table_schema.unwrap_or(inferred_table_schema),
-                Some(remote_schema),
-            ),
-            Err(e) => {
-                if let Some(table_schema) = table_schema {
-                    (table_schema, None)
-                } else {
+
+        let (table_schema, remote_schema) = if let Some(table_schema) = table_schema {
+            let remote_schema = if transform.is_some() {
+                // Infer remote schema
+                let conn = pool.get().await?;
+                match conn.infer_schema(&sql).await {
+                    Ok((remote_schema, _)) => Some(remote_schema),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+            (table_schema, remote_schema)
+        } else {
+            // Infer table schema
+            let conn = pool.get().await?;
+            match conn.infer_schema(&sql).await {
+                Ok((remote_schema, inferred_table_schema)) => {
+                    (inferred_table_schema, Some(remote_schema))
+                }
+                Err(e) => {
                     return Err(DataFusionError::Execution(format!(
                         "Failed to infer schema: {e}"
                     )));
                 }
             }
         };
+
         let transformed_table_schema = transform_schema(
             table_schema.clone(),
             transform.as_ref(),
             remote_schema.as_ref(),
         )?;
+
         Ok(RemoteTable {
             conn_options,
             sql,
