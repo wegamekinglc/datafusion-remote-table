@@ -1,9 +1,10 @@
+use datafusion_remote_table::RemoteDbType;
 use integration_tests::utils::{assert_plan_and_result, assert_result};
 
 #[tokio::test]
 pub async fn supported_sqlite_types() {
     assert_result(
-        "sqlite",
+        RemoteDbType::Sqlite,
         "select * from supported_data_types",
         "select * from remote_table",
         r#"+-------------+--------------+---------+------------+-----------+------------+----------+--------------------+--------------------------+----------+--------------+-------------+-----------------+----------+--------------+------------+----------------+---------------+-------------------+----------+
@@ -16,7 +17,7 @@ pub async fn supported_sqlite_types() {
     .await;
 
     assert_result(
-        "sqlite",
+        RemoteDbType::Sqlite,
         "select count(1) from supported_data_types",
         "select * from remote_table",
         r#"+----------+
@@ -31,7 +32,7 @@ pub async fn supported_sqlite_types() {
 #[tokio::test]
 async fn pushdown_limit() {
     assert_plan_and_result(
-        "sqlite",
+        RemoteDbType::Sqlite,
         "select * from simple_table",
         "select * from remote_table limit 1",
         "RemoteTableExec: limit=Some(1), filters=[]\n",
@@ -47,7 +48,7 @@ async fn pushdown_limit() {
 #[tokio::test]
 async fn pushdown_filters() {
     assert_plan_and_result(
-        "sqlite",
+        RemoteDbType::Sqlite,
         "select * from simple_table",
         "select * from remote_table where id = 1",
         "RemoteTableExec: limit=None, filters=[id = Int64(1)]\n",

@@ -1,3 +1,4 @@
+use datafusion_remote_table::RemoteDbType;
 use integration_tests::shared_containers::setup_shared_containers;
 use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
@@ -7,7 +8,7 @@ pub async fn supported_mysql_types() {
     // Wait for the database to be ready to connect
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_result(
-        "mysql",
+        RemoteDbType::Mysql,
         "select * from supported_data_types",
         "SELECT * FROM remote_table",
         r#"+-------------+----------------------+--------------+-----------------------+-------------+----------------------+---------------+------------------------+------------+---------------------+-----------+------------+--------------+------------+---------------------+----------+---------------------+----------+----------+-------------+----------------------+----------------------+---------------+--------------+----------+----------------+--------------+--------------+----------+----------------+--------------+------------------+----------------------------------------------------+
@@ -25,7 +26,7 @@ pub async fn describe_table() {
     // Wait for the database to be ready to connect
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_result(
-        "mysql",
+        RemoteDbType::Mysql,
         "describe simple_table",
         "SELECT * FROM remote_table",
         r#"+-------+--------------+------+-----+---------+-------+
@@ -44,7 +45,11 @@ pub async fn various_sqls() {
     // Wait for the database to be ready to connect
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
 
-    assert_sqls("mysql", vec!["select * from mysql.innodb_table_stats"]).await;
+    assert_sqls(
+        RemoteDbType::Mysql,
+        vec!["select * from mysql.innodb_table_stats"],
+    )
+    .await;
 }
 
 #[tokio::test]
@@ -54,7 +59,7 @@ async fn pushdown_limit() {
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
 
     assert_result(
-        "mysql",
+        RemoteDbType::Mysql,
         "select * from simple_table",
         "select * from remote_table limit 1",
         r#"+----+------+
@@ -67,7 +72,7 @@ async fn pushdown_limit() {
 
     // should not push down limit
     assert_result(
-        "mysql",
+        RemoteDbType::Mysql,
         "describe simple_table",
         "SELECT * FROM remote_table limit 1",
         r#"+-------+------+------+-----+---------+-------+
@@ -86,7 +91,7 @@ async fn pushdown_filters() {
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
 
     assert_plan_and_result(
-        "mysql",
+        RemoteDbType::Mysql,
         "select * from simple_table",
         "select * from remote_table where id = 1",
         "RemoteTableExec: limit=None, filters=[id = Int32(1)]\n",
@@ -100,7 +105,7 @@ async fn pushdown_filters() {
 
     // should not push down filters
     assert_plan_and_result(
-        "mysql",
+        RemoteDbType::Mysql,
         "describe simple_table",
         r#"SELECT * FROM remote_table where "Key" = 'PRI'"#,
         r#"CoalesceBatchesExec: target_batch_size=8192

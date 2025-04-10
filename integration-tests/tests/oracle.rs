@@ -1,3 +1,4 @@
+use datafusion_remote_table::RemoteDbType;
 use integration_tests::shared_containers::setup_shared_containers;
 use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
@@ -6,7 +7,7 @@ pub async fn supported_oracle_types() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_result(
-        "oracle",
+        RemoteDbType::Oracle,
         "SELECT * from SYS.supported_data_types",
         "SELECT * FROM remote_table",
         r#"+-------------+--------------+-------------+------------------+-------------------+------------+----------+-----------+--------------+---------------+------------+------------+----------+-----------+---------+------------------+----------+---------------------+----------------------------+
@@ -24,7 +25,7 @@ pub async fn supported_oracle_types2() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_result(
-        "oracle",
+        RemoteDbType::Oracle,
         "SELECT * from SYS.supported_data_types2",
         "SELECT * FROM remote_table",
         r#"+----------+
@@ -42,7 +43,7 @@ pub async fn various_sqls() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
 
-    assert_sqls("oracle", vec!["select * from USER_TABLES"]).await;
+    assert_sqls(RemoteDbType::Oracle, vec!["select * from USER_TABLES"]).await;
 }
 
 #[tokio::test]
@@ -50,7 +51,7 @@ async fn pushdown_limit() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_plan_and_result(
-        "oracle",
+        RemoteDbType::Oracle,
         "select * from SYS.simple_table",
         "select * from remote_table limit 1",
         "RemoteTableExec: limit=Some(1), filters=[]\n",
@@ -68,7 +69,7 @@ async fn pushdown_filters() {
     setup_shared_containers();
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_plan_and_result(
-        "oracle",
+        RemoteDbType::Oracle,
         "select * from SYS.simple_table",
         r#"select * from remote_table where "ID" = 1"#,
         "CoalesceBatchesExec: target_batch_size=8192

@@ -1,3 +1,4 @@
+use datafusion_remote_table::RemoteDbType;
 use integration_tests::shared_containers::setup_shared_containers;
 use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
@@ -5,7 +6,7 @@ use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sql
 pub async fn supported_postgres_types() {
     setup_shared_containers();
     assert_result(
-        "postgres",
+        RemoteDbType::Postgres,
         "SELECT * from supported_data_types",
         "SELECT * FROM remote_table",
         r#"+--------------+-------------+------------+----------+------------+-------------+------------+-------------+------------+----------+-----------+------------+----------+---------------------+----------------------+----------------+-------------+-------------------+-------------------+----------------------------------------------------+--------------------+-------------------+------------------+----------------+------------------+--------------------------+----------------------+--------------------+----------------+----------------+
@@ -17,7 +18,7 @@ pub async fn supported_postgres_types() {
     ).await;
 
     assert_result(
-        "postgres",
+        RemoteDbType::Postgres,
         "SELECT * from supported_data_types",
         "SELECT integer_col, varchar_col FROM remote_table",
         r#"+-------------+-------------+
@@ -57,7 +58,7 @@ ORDER BY
         "simple_table"
     );
     assert_result(
-        "postgres",
+        RemoteDbType::Postgres,
         &sql,
         "SELECT * FROM remote_table",
         r#"+-------------+------------------------+-------------+----------+
@@ -75,7 +76,7 @@ pub async fn various_sqls() {
     setup_shared_containers();
 
     assert_sqls(
-        "postgres",
+        RemoteDbType::Postgres,
         vec!["select * from pg_catalog.pg_stat_all_tables"],
     )
     .await;
@@ -85,7 +86,7 @@ pub async fn various_sqls() {
 async fn pushdown_limit() {
     setup_shared_containers();
     assert_plan_and_result(
-        "postgres",
+        RemoteDbType::Postgres,
         "select * from simple_table",
         "select * from remote_table limit 1",
         "RemoteTableExec: limit=Some(1), filters=[]\n",
@@ -102,7 +103,7 @@ async fn pushdown_limit() {
 async fn pushdown_filters() {
     setup_shared_containers();
     assert_plan_and_result(
-        "postgres",
+        RemoteDbType::Postgres,
         "select * from simple_table",
         "select * from remote_table where id = 1",
         "RemoteTableExec: limit=None, filters=[id = Int32(1)]\n",

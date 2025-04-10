@@ -113,7 +113,7 @@ impl ConnectionOptions {
     }
 }
 
-pub(crate) enum RemoteDbType {
+pub enum RemoteDbType {
     Postgres,
     Mysql,
     Oracle,

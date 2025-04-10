@@ -4,12 +4,17 @@ use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_remote_table::{
     ConnectionOptions, MysqlConnectionOptions, OracleConnectionOptions, PostgresConnectionOptions,
-    RemoteTable,
+    RemoteDbType, RemoteTable,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub async fn assert_result(database: &str, remote_sql: &str, df_sql: &str, expected_result: &str) {
+pub async fn assert_result(
+    database: RemoteDbType,
+    remote_sql: &str,
+    df_sql: &str,
+    expected_result: &str,
+) {
     let options = build_conn_options(database);
     let table = RemoteTable::try_new(options, remote_sql).await.unwrap();
     println!("remote schema: {:#?}", table.remote_schema());
@@ -34,7 +39,7 @@ pub async fn assert_result(database: &str, remote_sql: &str, df_sql: &str, expec
 }
 
 pub async fn assert_plan_and_result(
-    database: &str,
+    database: RemoteDbType,
     remote_sql: &str,
     df_sql: &str,
     expected_plan: &str,
@@ -70,7 +75,7 @@ pub async fn assert_plan_and_result(
     );
 }
 
-pub async fn assert_sqls(database: &str, remote_sqls: Vec<&str>) {
+pub async fn assert_sqls(database: RemoteDbType, remote_sqls: Vec<&str>) {
     let options = build_conn_options(database);
 
     for sql in remote_sqls.into_iter() {
@@ -90,27 +95,26 @@ pub async fn assert_sqls(database: &str, remote_sqls: Vec<&str>) {
     }
 }
 
-fn build_conn_options(database: &str) -> ConnectionOptions {
-    match database.to_lowercase().as_str() {
-        "mysql" => ConnectionOptions::Mysql(
+fn build_conn_options(database: RemoteDbType) -> ConnectionOptions {
+    match database {
+        RemoteDbType::Mysql => ConnectionOptions::Mysql(
             MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")
                 .with_database(Some("test".to_string())),
         ),
-        "postgres" => ConnectionOptions::Postgres(
+        RemoteDbType::Postgres => ConnectionOptions::Postgres(
             PostgresConnectionOptions::new("localhost", 5432, "postgres", "password")
                 .with_database(Some("postgres".to_string())),
         ),
-        "oracle" => ConnectionOptions::Oracle(OracleConnectionOptions::new(
+        RemoteDbType::Oracle => ConnectionOptions::Oracle(OracleConnectionOptions::new(
             "127.0.0.1",
             49161,
             "system",
             "oracle",
             "free",
         )),
-        "sqlite" => ConnectionOptions::Sqlite(PathBuf::from(format!(
+        RemoteDbType::Sqlite => ConnectionOptions::Sqlite(PathBuf::from(format!(
             "{}/testdata/sqlite3.db",
             env!("CARGO_MANIFEST_DIR")
         ))),
-        _ => panic!("database {database} not supported"),
     }
 }
