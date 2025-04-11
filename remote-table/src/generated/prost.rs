@@ -92,6 +92,8 @@ pub struct OracleConnectionOptions {
 pub struct SqliteConnectionOptions {
     #[prost(string, tag = "1")]
     pub path: ::prost::alloc::string::String,
+    #[prost(uint32, tag = "2")]
+    pub stream_chunk_size: u32,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Projection {

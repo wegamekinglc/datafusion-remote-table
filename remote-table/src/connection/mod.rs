@@ -24,8 +24,6 @@ use datafusion::prelude::Expr;
 use datafusion::sql::unparser::Unparser;
 use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::fmt::Debug;
-#[cfg(feature = "sqlite")]
-use std::path::PathBuf;
 use std::sync::Arc;
 
 #[async_trait::async_trait]
@@ -66,8 +64,8 @@ pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
             Ok(Arc::new(pool))
         }
         #[cfg(feature = "sqlite")]
-        ConnectionOptions::Sqlite(path) => {
-            let pool = connect_sqlite(path).await?;
+        ConnectionOptions::Sqlite(options) => {
+            let pool = connect_sqlite(options).await?;
             Ok(Arc::new(pool))
         }
     }
@@ -82,7 +80,7 @@ pub enum ConnectionOptions {
     #[cfg(feature = "mysql")]
     Mysql(MysqlConnectionOptions),
     #[cfg(feature = "sqlite")]
-    Sqlite(PathBuf),
+    Sqlite(SqliteConnectionOptions),
 }
 
 impl ConnectionOptions {
@@ -95,7 +93,7 @@ impl ConnectionOptions {
             #[cfg(feature = "mysql")]
             ConnectionOptions::Mysql(options) => options.stream_chunk_size,
             #[cfg(feature = "sqlite")]
-            ConnectionOptions::Sqlite(_) => unreachable!(),
+            ConnectionOptions::Sqlite(options) => options.stream_chunk_size,
         }
     }
 

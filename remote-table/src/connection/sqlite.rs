@@ -10,8 +10,10 @@ use datafusion::arrow::array::{
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
-use datafusion::physical_plan::memory::MemoryStream;
+use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::prelude::Expr;
+use derive_getters::Getters;
+use derive_with::With;
 use itertools::Itertools;
 use rusqlite::types::ValueRef;
 use rusqlite::{Column, Row, Rows};
@@ -19,15 +21,32 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+#[derive(Debug, Clone, With, Getters)]
+pub struct SqliteConnectionOptions {
+    pub path: PathBuf,
+    pub stream_chunk_size: usize,
+}
+
+impl SqliteConnectionOptions {
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            stream_chunk_size: 2048,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SqlitePool {
     pool: tokio_rusqlite::Connection,
 }
 
-pub async fn connect_sqlite(path: &PathBuf) -> DFResult<SqlitePool> {
-    let pool = tokio_rusqlite::Connection::open(path).await.map_err(|e| {
-        DataFusionError::Execution(format!("Failed to open sqlite connection: {e:?}"))
-    })?;
+pub async fn connect_sqlite(options: &SqliteConnectionOptions) -> DFResult<SqlitePool> {
+    let pool = tokio_rusqlite::Connection::open(&options.path)
+        .await
+        .map_err(|e| {
+            DataFusionError::Execution(format!("Failed to open sqlite connection: {e:?}"))
+        })?;
     Ok(SqlitePool { pool })
 }
 
@@ -68,7 +87,7 @@ impl Connection for SqliteConnection {
 
     async fn query(
         &self,
-        _conn_options: &ConnectionOptions,
+        conn_options: &ConnectionOptions,
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
@@ -79,29 +98,45 @@ impl Connection for SqliteConnection {
         let sql = RemoteDbType::Sqlite
             .try_rewrite_query(sql, filters, limit)
             .unwrap_or_else(|| sql.to_string());
-        let sql_clone = sql.clone();
+        let conn = self.conn.clone();
         let projection = projection.cloned();
-        let batch = self
-            .conn
-            .call(move |conn| {
-                let mut stmt = conn.prepare(&sql)?;
-                let columns: Vec<OwnedColumn> =
-                    stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
-                let rows = stmt.query([])?;
+        let limit = conn_options.stream_chunk_size();
+        let stream = async_stream::stream! {
+            let mut offset = 0;
+            loop {
+                let sql = format!("SELECT * FROM ({sql}) LIMIT {limit} OFFSET {offset}");
+                println!("Executing sql: {sql}");
+                let sql_clone = sql.clone();
+                let conn = conn.clone();
+                let projection = projection.clone();
+                let table_schema = table_schema.clone();
+                let (batch, is_empty) = conn
+                    .call(move |conn| {
+                        let mut stmt = conn.prepare(&sql)?;
+                        let columns: Vec<OwnedColumn> =
+                            stmt.columns().iter().map(sqlite_col_to_owned_col).collect();
+                        let rows = stmt.query([])?;
 
-                let batch = rows_to_batch(rows, &table_schema, columns, projection.as_ref())
-                    .map_err(|e| tokio_rusqlite::Error::Other(e.into()))?;
-                Ok(batch)
-            })
-            .await
-            .map_err(|e| {
-                DataFusionError::Execution(format!(
-                    "Failed to execute query {sql_clone} on sqlite: {e:?}"
-                ))
-            })?;
-
-        let memory_stream = MemoryStream::try_new(vec![batch], projected_schema, None)?;
-        Ok(Box::pin(memory_stream))
+                        rows_to_batch(rows, &table_schema, columns, projection.as_ref())
+                            .map_err(|e| tokio_rusqlite::Error::Other(e.into()))
+                })
+                .await
+                .map_err(|e| {
+                    DataFusionError::Execution(format!(
+                        "Failed to execute query {sql_clone} on sqlite: {e:?}"
+                    ))
+                })?;
+                if is_empty {
+                    break;
+                }
+                yield Ok(batch);
+                offset += limit;
+            }
+        };
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            stream,
+        )))
     }
 }
 
@@ -246,7 +281,7 @@ fn rows_to_batch(
     table_schema: &SchemaRef,
     columns: Vec<OwnedColumn>,
     projection: Option<&Vec<usize>>,
-) -> DFResult<RecordBatch> {
+) -> DFResult<(RecordBatch, bool)> {
     let projected_schema = project_schema(table_schema, projection)?;
     let mut array_builders = vec![];
     for field in table_schema.fields() {
@@ -254,9 +289,11 @@ fn rows_to_batch(
         array_builders.push(builder);
     }
 
+    let mut is_empty = true;
     while let Some(row) = rows.next().map_err(|e| {
         DataFusionError::Execution(format!("Failed to get next row from sqlite: {e:?}"))
     })? {
+        is_empty = false;
         append_rows_to_array_builders(
             row,
             table_schema,
@@ -272,7 +309,10 @@ fn rows_to_batch(
         .filter(|(idx, _)| projections_contains(projection, *idx))
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
-    Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+    Ok((
+        RecordBatch::try_new(projected_schema, projected_columns)?,
+        is_empty,
+    ))
 }
 
 macro_rules! handle_primitive_type {

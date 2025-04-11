@@ -1,5 +1,13 @@
-use datafusion_remote_table::RemoteDbType;
+use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::physical_plan::collect;
+use datafusion::physical_plan::display::DisplayableExecutionPlan;
+use datafusion::prelude::SessionContext;
+use datafusion_remote_table::{
+    ConnectionOptions, RemoteDbType, RemoteTable, SqliteConnectionOptions,
+};
 use integration_tests::utils::{assert_plan_and_result, assert_result};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 #[tokio::test]
 pub async fn supported_sqlite_types() {
@@ -27,6 +35,45 @@ pub async fn supported_sqlite_types() {
 +----------+"#,
     )
     .await;
+}
+
+#[tokio::test]
+async fn streaming_execution() {
+    let options = ConnectionOptions::Sqlite(
+        SqliteConnectionOptions::new(PathBuf::from(format!(
+            "{}/testdata/sqlite3.db",
+            env!("CARGO_MANIFEST_DIR")
+        )))
+        .with_stream_chunk_size(1usize),
+    );
+    let table = RemoteTable::try_new(options, "select * from simple_table")
+        .await
+        .unwrap();
+    println!("remote schema: {:#?}", table.remote_schema());
+
+    let ctx = SessionContext::new();
+    ctx.register_table("remote_table", Arc::new(table)).unwrap();
+
+    let df = ctx.sql("select * from remote_table").await.unwrap();
+    let exec_plan = df.create_physical_plan().await.unwrap();
+    println!(
+        "{}",
+        DisplayableExecutionPlan::new(exec_plan.as_ref()).indent(true)
+    );
+
+    let result = collect(exec_plan, ctx.task_ctx()).await.unwrap();
+    println!("{}", pretty_format_batches(&result).unwrap());
+
+    assert_eq!(
+        pretty_format_batches(&result).unwrap().to_string(),
+        r#"+----+-------+
+| id | name  |
++----+-------+
+| 1  | Tom   |
+| 2  | Jerry |
+| 3  | Spike |
++----+-------+"#,
+    );
 }
 
 #[tokio::test]

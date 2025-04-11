@@ -57,6 +57,7 @@ message OracleConnectionOptions {
 
 message SqliteConnectionOptions {
   string path = 1;
+  uint32 stream_chunk_size = 2;
 }
 
 message Projection {

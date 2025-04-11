@@ -7,7 +7,8 @@ use crate::PostgresConnectionOptions;
 use crate::generated::prost as protobuf;
 use crate::{
     ConnectionOptions, DFResult, MysqlType, OracleType, PostgresType, RemoteField, RemoteSchema,
-    RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect,
+    RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteConnectionOptions, SqliteType, Transform,
+    connect,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
@@ -207,10 +208,11 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
             )),
         },
         #[cfg(feature = "sqlite")]
-        ConnectionOptions::Sqlite(path) => protobuf::ConnectionOptions {
+        ConnectionOptions::Sqlite(options) => protobuf::ConnectionOptions {
             connection_options: Some(protobuf::connection_options::ConnectionOptions::Sqlite(
                 protobuf::SqliteConnectionOptions {
-                    path: path.to_str().unwrap().to_string(),
+                    path: options.path.to_str().unwrap().to_string(),
+                    stream_chunk_size: options.stream_chunk_size as u32,
                 },
             )),
         },
@@ -257,7 +259,10 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
         }
         #[cfg(feature = "sqlite")]
         Some(protobuf::connection_options::ConnectionOptions::Sqlite(options)) => {
-            ConnectionOptions::Sqlite(Path::new(&options.path).to_path_buf())
+            ConnectionOptions::Sqlite(SqliteConnectionOptions {
+                path: Path::new(&options.path).to_path_buf(),
+                stream_chunk_size: options.stream_chunk_size as usize,
+            })
         }
         _ => panic!("Failed to parse connection options: {options:?}"),
     }

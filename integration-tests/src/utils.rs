@@ -4,7 +4,7 @@ use datafusion::physical_plan::display::DisplayableExecutionPlan;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_remote_table::{
     ConnectionOptions, MysqlConnectionOptions, OracleConnectionOptions, PostgresConnectionOptions,
-    RemoteDbType, RemoteTable,
+    RemoteDbType, RemoteTable, SqliteConnectionOptions,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -112,9 +112,11 @@ fn build_conn_options(database: RemoteDbType) -> ConnectionOptions {
             "oracle",
             "free",
         )),
-        RemoteDbType::Sqlite => ConnectionOptions::Sqlite(PathBuf::from(format!(
-            "{}/testdata/sqlite3.db",
-            env!("CARGO_MANIFEST_DIR")
-        ))),
+        RemoteDbType::Sqlite => {
+            ConnectionOptions::Sqlite(SqliteConnectionOptions::new(PathBuf::from(format!(
+                "{}/testdata/sqlite3.db",
+                env!("CARGO_MANIFEST_DIR")
+            ))))
+        }
     }
 }
