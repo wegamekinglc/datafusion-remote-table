@@ -10,7 +10,8 @@ use datafusion::prelude::SessionContext;
 use datafusion_proto::physical_plan::AsExecutionPlan;
 use datafusion_proto::protobuf::PhysicalPlanNode;
 use datafusion_remote_table::{
-    ConnectionOptions, RemotePhysicalCodec, RemoteTable, Transform, TransformArgs, TransformCodec,
+    ConnectionOptions, RemotePhysicalCodec, RemoteTable, SqliteConnectionOptions, Transform,
+    TransformArgs, TransformCodec,
 };
 use std::any::Any;
 use std::path::PathBuf;
@@ -18,10 +19,10 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn transform() {
-    let options = ConnectionOptions::Sqlite(PathBuf::from(format!(
+    let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(PathBuf::from(format!(
         "{}/testdata/sqlite3.db",
         env!("CARGO_MANIFEST_DIR")
-    )));
+    ))));
 
     let table = RemoteTable::try_new_with_transform(
         options,
@@ -57,10 +58,10 @@ async fn transform() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn transform_serialization() {
-    let options = ConnectionOptions::Sqlite(PathBuf::from(format!(
+    let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(PathBuf::from(format!(
         "{}/testdata/sqlite3.db",
         env!("CARGO_MANIFEST_DIR")
-    )));
+    ))));
 
     let table = RemoteTable::try_new_with_transform(
         options,

@@ -105,7 +105,6 @@ impl Connection for SqliteConnection {
             let mut offset = 0;
             loop {
                 let sql = format!("SELECT * FROM ({sql}) LIMIT {limit} OFFSET {offset}");
-                println!("Executing sql: {sql}");
                 let sql_clone = sql.clone();
                 let conn = conn.clone();
                 let projection = projection.clone();
