@@ -4,9 +4,10 @@
 
 ## Features
 1. Execute SQL queries on remote databases and stream results as datafusion table provider
-2. Support pushing down filters and limit to remote databases
-3. Execution plan can be serialized for distributed execution
-4. Record batches can be transformed before outputting to next plan node
+2. Support inferring schema or user specified schema
+3. Support pushing down filters and limit to remote databases
+4. Execution plan can be serialized for distributed execution
+5. Record batches can be transformed before outputting to next plan node
 
 ## Usage
 ```rust
