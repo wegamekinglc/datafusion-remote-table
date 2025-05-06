@@ -5,8 +5,8 @@ use datafusion::prelude::SessionContext;
 use datafusion_remote_table::{
     ConnectionOptions, RemoteDbType, RemoteTable, SqliteConnectionOptions,
 };
+use integration_tests::shared_containers::setup_sqlite_db;
 use integration_tests::utils::{assert_plan_and_result, assert_result};
-use std::path::PathBuf;
 use std::sync::Arc;
 
 #[tokio::test]
@@ -39,12 +39,9 @@ pub async fn supported_sqlite_types() {
 
 #[tokio::test]
 async fn streaming_execution() {
+    let db_path = setup_sqlite_db();
     let options = ConnectionOptions::Sqlite(
-        SqliteConnectionOptions::new(PathBuf::from(format!(
-            "{}/testdata/sqlite3.db",
-            env!("CARGO_MANIFEST_DIR")
-        )))
-        .with_stream_chunk_size(1usize),
+        SqliteConnectionOptions::new(db_path).with_stream_chunk_size(1usize),
     );
     let table = RemoteTable::try_new(options, "select * from simple_table")
         .await

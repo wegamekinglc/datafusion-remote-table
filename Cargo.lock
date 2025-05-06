@@ -2103,7 +2103,9 @@ dependencies = [
  "datafusion",
  "datafusion-proto",
  "datafusion-remote-table",
+ "rusqlite",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

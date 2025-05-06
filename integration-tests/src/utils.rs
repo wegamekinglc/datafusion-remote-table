@@ -1,3 +1,4 @@
+use crate::shared_containers::setup_sqlite_db;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
@@ -6,7 +7,6 @@ use datafusion_remote_table::{
     ConnectionOptions, MysqlConnectionOptions, OracleConnectionOptions, PostgresConnectionOptions,
     RemoteDbType, RemoteTable, SqliteConnectionOptions,
 };
-use std::path::PathBuf;
 use std::sync::Arc;
 
 pub async fn assert_result(
@@ -113,10 +113,8 @@ fn build_conn_options(database: RemoteDbType) -> ConnectionOptions {
             "free",
         )),
         RemoteDbType::Sqlite => {
-            ConnectionOptions::Sqlite(SqliteConnectionOptions::new(PathBuf::from(format!(
-                "{}/testdata/sqlite3.db",
-                env!("CARGO_MANIFEST_DIR")
-            ))))
+            let db_path = setup_sqlite_db();
+            ConnectionOptions::Sqlite(SqliteConnectionOptions::new(db_path))
         }
     }
 }

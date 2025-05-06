@@ -13,16 +13,14 @@ use datafusion_remote_table::{
     ConnectionOptions, RemotePhysicalCodec, RemoteTable, SqliteConnectionOptions, Transform,
     TransformArgs, TransformCodec,
 };
+use integration_tests::shared_containers::setup_sqlite_db;
 use std::any::Any;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 #[tokio::test]
 async fn transform() {
-    let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(PathBuf::from(format!(
-        "{}/testdata/sqlite3.db",
-        env!("CARGO_MANIFEST_DIR")
-    ))));
+    let db_path = setup_sqlite_db();
+    let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(db_path));
 
     let table = RemoteTable::try_new_with_transform(
         options,
@@ -58,10 +56,8 @@ async fn transform() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn transform_serialization() {
-    let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(PathBuf::from(format!(
-        "{}/testdata/sqlite3.db",
-        env!("CARGO_MANIFEST_DIR")
-    ))));
+    let db_path = setup_sqlite_db();
+    let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(db_path));
 
     let table = RemoteTable::try_new_with_transform(
         options,

@@ -6,5 +6,6 @@ resolver = "3"
 datafusion = "47"
 datafusion-proto = "47"
 tokio = { version = "1", features = ["full"] }
+rusqlite = { version = "0.32" }
 prost = "0.13"
 prost-build = "0.13"
