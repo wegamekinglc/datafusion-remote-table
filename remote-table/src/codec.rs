@@ -1,3 +1,5 @@
+#[cfg(feature = "dm")]
+use crate::DmConnectionOptions;
 #[cfg(feature = "mysql")]
 use crate::MysqlConnectionOptions;
 #[cfg(feature = "oracle")]
@@ -8,9 +10,8 @@ use crate::PostgresConnectionOptions;
 use crate::SqliteConnectionOptions;
 use crate::generated::prost as protobuf;
 use crate::{
-    ConnectionOptions, DFResult, DmConnectionOptions, DmType, MysqlType, OracleType, PostgresType,
-    RemoteField, RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform,
-    connect,
+    ConnectionOptions, DFResult, DmType, MysqlType, OracleType, PostgresType, RemoteField,
+    RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;

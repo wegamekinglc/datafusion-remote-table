@@ -28,10 +28,10 @@ use datafusion::prelude::Expr;
 use datafusion::sql::unparser::Unparser;
 use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::fmt::Debug;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 #[cfg(feature = "dm")]
-pub(crate) static ODBC_ENV: OnceLock<odbc_api::Environment> = OnceLock::new();
+pub(crate) static ODBC_ENV: std::sync::OnceLock<odbc_api::Environment> = std::sync::OnceLock::new();
 
 #[async_trait::async_trait]
 pub trait Pool: Debug + Send + Sync {
