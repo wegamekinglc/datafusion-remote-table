@@ -7,6 +7,7 @@ pub enum RemoteType {
     Mysql(MysqlType),
     Oracle(OracleType),
     Sqlite(SqliteType),
+    Dm(DmType),
 }
 
 impl RemoteType {
@@ -16,6 +17,7 @@ impl RemoteType {
             RemoteType::Mysql(mysql_type) => mysql_type.to_arrow_type(),
             RemoteType::Oracle(oracle_type) => oracle_type.to_arrow_type(),
             RemoteType::Sqlite(sqlite_type) => sqlite_type.to_arrow_type(),
+            RemoteType::Dm(dm_type) => dm_type.to_arrow_type(),
         }
     }
 }
@@ -268,6 +270,20 @@ impl SqliteType {
             SqliteType::Real => DataType::Float64,
             SqliteType::Text => DataType::Utf8,
             SqliteType::Blob => DataType::Binary,
+        }
+    }
+}
+
+// https://eco.dameng.com/document/dm/zh-cn/pm/odbc-rogramming-guide.html
+#[derive(Debug, Clone)]
+pub enum DmType {
+    Text,
+}
+
+impl DmType {
+    pub fn to_arrow_type(&self) -> DataType {
+        match self {
+            DmType::Text => DataType::Utf8,
         }
     }
 }

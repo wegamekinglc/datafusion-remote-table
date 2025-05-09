@@ -8,8 +8,9 @@ use crate::PostgresConnectionOptions;
 use crate::SqliteConnectionOptions;
 use crate::generated::prost as protobuf;
 use crate::{
-    ConnectionOptions, DFResult, MysqlType, OracleType, PostgresType, RemoteField, RemoteSchema,
-    RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect,
+    ConnectionOptions, DFResult, DmConnectionOptions, DmType, MysqlType, OracleType, PostgresType,
+    RemoteField, RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform,
+    connect,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
@@ -217,6 +218,20 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                 },
             )),
         },
+        #[cfg(feature = "dm")]
+        ConnectionOptions::Dm(options) => protobuf::ConnectionOptions {
+            connection_options: Some(protobuf::connection_options::ConnectionOptions::Dm(
+                protobuf::DmConnectionOptions {
+                    host: options.host.clone(),
+                    port: options.port as u32,
+                    username: options.username.clone(),
+                    password: options.password.clone(),
+                    database: options.database.clone(),
+                    pool_max_size: options.pool_max_size as u32,
+                    stream_chunk_size: options.stream_chunk_size as u32,
+                },
+            )),
+        },
     }
 }
 
@@ -262,6 +277,18 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
         Some(protobuf::connection_options::ConnectionOptions::Sqlite(options)) => {
             ConnectionOptions::Sqlite(SqliteConnectionOptions {
                 path: Path::new(&options.path).to_path_buf(),
+                stream_chunk_size: options.stream_chunk_size as usize,
+            })
+        }
+        #[cfg(feature = "dm")]
+        Some(protobuf::connection_options::ConnectionOptions::Dm(options)) => {
+            ConnectionOptions::Dm(DmConnectionOptions {
+                host: options.host,
+                port: options.port as u16,
+                username: options.username,
+                password: options.password,
+                database: options.database,
+                pool_max_size: options.pool_max_size as usize,
                 stream_chunk_size: options.stream_chunk_size as usize,
             })
         }
@@ -702,6 +729,9 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::SqliteBlob {},
             )),
         },
+        RemoteType::Dm(DmType::Text) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmText(protobuf::DmText {})),
+        },
     }
 }
 
@@ -878,5 +908,6 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::SqliteReal(_) => RemoteType::Sqlite(SqliteType::Real),
         protobuf::remote_type::Type::SqliteText(_) => RemoteType::Sqlite(SqliteType::Text),
         protobuf::remote_type::Type::SqliteBlob(_) => RemoteType::Sqlite(SqliteType::Blob),
+        protobuf::remote_type::Type::DmText(_) => RemoteType::Dm(DmType::Text),
     }
 }

@@ -176,6 +176,7 @@ impl Connection for MysqlConnection {
     }
 }
 
+// TODO return MysqlType
 fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
     let character_set = mysql_col.character_set();
     let is_utf8_bin_character_set = character_set == 45;

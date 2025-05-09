@@ -1,3 +1,5 @@
+#[cfg(feature = "dm")]
+mod dm;
 #[cfg(feature = "mysql")]
 mod mysql;
 #[cfg(feature = "oracle")]
@@ -7,6 +9,8 @@ mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
+#[cfg(feature = "dm")]
+pub use dm::*;
 #[cfg(feature = "mysql")]
 pub use mysql::*;
 #[cfg(feature = "oracle")]
@@ -24,7 +28,10 @@ use datafusion::prelude::Expr;
 use datafusion::sql::unparser::Unparser;
 use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+#[cfg(feature = "dm")]
+pub(crate) static ODBC_ENV: OnceLock<odbc_api::Environment> = OnceLock::new();
 
 #[async_trait::async_trait]
 pub trait Pool: Debug + Send + Sync {
@@ -33,6 +40,7 @@ pub trait Pool: Debug + Send + Sync {
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
+    // TODO result remove arrow schema
     async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)>;
 
     async fn query(
@@ -68,6 +76,11 @@ pub async fn connect(options: &ConnectionOptions) -> DFResult<Arc<dyn Pool>> {
             let pool = connect_sqlite(options).await?;
             Ok(Arc::new(pool))
         }
+        #[cfg(feature = "dm")]
+        ConnectionOptions::Dm(options) => {
+            let pool = connect_dm(options)?;
+            Ok(Arc::new(pool))
+        }
     }
 }
 
@@ -81,6 +94,8 @@ pub enum ConnectionOptions {
     Mysql(MysqlConnectionOptions),
     #[cfg(feature = "sqlite")]
     Sqlite(SqliteConnectionOptions),
+    #[cfg(feature = "dm")]
+    Dm(DmConnectionOptions),
 }
 
 impl ConnectionOptions {
@@ -94,6 +109,8 @@ impl ConnectionOptions {
             ConnectionOptions::Mysql(options) => options.stream_chunk_size,
             #[cfg(feature = "sqlite")]
             ConnectionOptions::Sqlite(options) => options.stream_chunk_size,
+            #[cfg(feature = "dm")]
+            ConnectionOptions::Dm(options) => options.stream_chunk_size,
         }
     }
 
@@ -107,6 +124,8 @@ impl ConnectionOptions {
             ConnectionOptions::Mysql(_) => RemoteDbType::Mysql,
             #[cfg(feature = "sqlite")]
             ConnectionOptions::Sqlite(_) => RemoteDbType::Sqlite,
+            #[cfg(feature = "dm")]
+            ConnectionOptions::Dm(_) => RemoteDbType::Dm,
         }
     }
 }
@@ -116,6 +135,7 @@ pub enum RemoteDbType {
     Mysql,
     Oracle,
     Sqlite,
+    Dm,
 }
 
 impl RemoteDbType {
@@ -130,6 +150,9 @@ impl RemoteDbType {
             RemoteDbType::Sqlite => Ok(Unparser::new(&SqliteDialect {})),
             RemoteDbType::Oracle => Err(DataFusionError::NotImplemented(
                 "Oracle unparser not implemented".to_string(),
+            )),
+            RemoteDbType::Dm => Err(DataFusionError::NotImplemented(
+                "Dm unparser not implemented".to_string(),
             )),
         }
     }
@@ -179,6 +202,9 @@ impl RemoteDbType {
             RemoteDbType::Oracle => {
                 let limit = limit?;
                 Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}"))
+            }
+            RemoteDbType::Dm => {
+                todo!()
             }
         }
     }

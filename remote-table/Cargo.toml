@@ -10,11 +10,12 @@ repository = "https://github.com/systemxlabs/datafusion-remote-table"
 readme = "../README.md"
 
 [features]
-default = ["postgres", "mysql", "oracle", "sqlite"]
+default = ["postgres", "mysql", "oracle", "sqlite", "dm"]
 postgres = ["dep:bb8", "dep:bb8-postgres"]
 mysql = ["dep:mysql_async"]
 oracle = ["dep:bb8", "dep:oracle", "dep:bb8-oracle"]
 sqlite = ["dep:rusqlite", "dep:tokio-rusqlite"]
+dm = ["dep:odbc-api"]
 
 [dependencies]
 datafusion = { workspace = true }
@@ -49,3 +50,5 @@ bb8-oracle = { version = "0.3", features = ["chrono"], optional = true}
 # Sqlite
 rusqlite = { workspace = true, features = ["column_decltype"], optional = true }
 tokio-rusqlite = { version = "0.6.0", features = ["bundled"], optional = true }
+# Dm
+odbc-api = { version = "12.2", optional = true }

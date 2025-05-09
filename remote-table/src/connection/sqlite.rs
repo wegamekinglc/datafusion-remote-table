@@ -152,6 +152,7 @@ fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
     }
 }
 
+// TODO return sqlite type
 fn decl_type_to_remote_type(decl_type: &str) -> DFResult<RemoteType> {
     if ["tinyint", "smallint", "int", "integer", "bigint"].contains(&decl_type) {
         return Ok(RemoteType::Sqlite(SqliteType::Integer));

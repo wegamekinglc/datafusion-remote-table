@@ -22,6 +22,7 @@ message ConnectionOptions {
     MysqlConnectionOptions mysql = 2;
     OracleConnectionOptions oracle = 3;
     SqliteConnectionOptions sqlite = 4;
+    DmConnectionOptions dm = 5;
   }
 }
 
@@ -58,6 +59,16 @@ message OracleConnectionOptions {
 message SqliteConnectionOptions {
   string path = 1;
   uint32 stream_chunk_size = 2;
+}
+
+message DmConnectionOptions {
+  string host = 1;
+  uint32 port = 2;
+  string username = 3;
+  string password = 4;
+  optional string database = 5;
+  uint32 pool_max_size = 6;
+  uint32 stream_chunk_size = 7;
 }
 
 message Projection {
@@ -155,6 +166,7 @@ message RemoteType {
     SqliteReal sqlite_real = 303;
     SqliteText sqlite_text = 304;
     SqliteBlob sqlite_blob = 305;
+    DmText dm_text = 401;
   }
 }
 
@@ -267,3 +279,5 @@ message SqliteInteger {}
 message SqliteReal {}
 message SqliteText {}
 message SqliteBlob {}
+
+message DmText {}

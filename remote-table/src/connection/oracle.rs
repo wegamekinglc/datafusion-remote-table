@@ -147,6 +147,7 @@ impl Connection for OracleConnection {
     }
 }
 
+// TODO return oracle type
 fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> {
     match oracle_type {
         ColumnType::Number(precision, scale) => {

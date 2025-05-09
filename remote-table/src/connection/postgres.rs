@@ -168,6 +168,7 @@ impl Connection for PostgresConnection {
     }
 }
 
+// TODO return pg type
 fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<RemoteType> {
     match pg_type {
         &Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),

@@ -116,5 +116,6 @@ fn build_conn_options(database: RemoteDbType) -> ConnectionOptions {
             let db_path = setup_sqlite_db();
             ConnectionOptions::Sqlite(SqliteConnectionOptions::new(db_path))
         }
+        RemoteDbType::Dm => todo!(),
     }
 }

@@ -166,6 +166,7 @@ pub(crate) fn support_filter_pushdown(
         RemoteDbType::Postgres => Unparser::new(&PostgreSqlDialect {}),
         RemoteDbType::Sqlite => Unparser::new(&SqliteDialect {}),
         RemoteDbType::Oracle => return TableProviderFilterPushDown::Unsupported,
+        RemoteDbType::Dm => todo!(),
     };
     if unparser.expr_to_sql(filter).is_err() {
         return TableProviderFilterPushDown::Unsupported;
