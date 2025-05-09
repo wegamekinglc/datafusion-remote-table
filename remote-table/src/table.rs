@@ -64,7 +64,7 @@ impl RemoteTable {
                 // Infer remote schema
                 let conn = pool.get().await?;
                 match conn.infer_schema(&sql).await {
-                    Ok((remote_schema, _)) => Some(remote_schema),
+                    Ok(remote_schema) => Some(remote_schema),
                     Err(_) => None,
                 }
             } else {
@@ -75,7 +75,8 @@ impl RemoteTable {
             // Infer table schema
             let conn = pool.get().await?;
             match conn.infer_schema(&sql).await {
-                Ok((remote_schema, inferred_table_schema)) => {
+                Ok(remote_schema) => {
+                    let inferred_table_schema = Arc::new(remote_schema.to_arrow_schema());
                     (inferred_table_schema, Some(remote_schema))
                 }
                 Err(e) => {

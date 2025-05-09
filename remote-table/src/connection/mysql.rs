@@ -97,7 +97,7 @@ pub struct MysqlConnection {
 
 #[async_trait::async_trait]
 impl Connection for MysqlConnection {
-    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = RemoteDbType::Mysql
             .try_rewrite_query(sql, &[], Some(1))
             .unwrap_or_else(|| sql.to_string());
@@ -112,8 +112,7 @@ impl Connection for MysqlConnection {
             ));
         };
         let remote_schema = Arc::new(build_remote_schema(&row)?);
-        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        Ok((remote_schema, arrow_schema))
+        Ok(remote_schema)
     }
 
     async fn query(
@@ -176,8 +175,7 @@ impl Connection for MysqlConnection {
     }
 }
 
-// TODO return MysqlType
-fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
+fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<MysqlType> {
     let character_set = mysql_col.character_set();
     let is_utf8_bin_character_set = character_set == 45;
     let is_binary = mysql_col.flags().contains(ColumnFlags::BINARY_FLAG);
@@ -187,82 +185,78 @@ fn mysql_type_to_remote_type(mysql_col: &Column) -> DFResult<RemoteType> {
     match mysql_col.column_type() {
         ColumnType::MYSQL_TYPE_TINY => {
             if is_unsigned {
-                Ok(RemoteType::Mysql(MysqlType::TinyIntUnsigned))
+                Ok(MysqlType::TinyIntUnsigned)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::TinyInt))
+                Ok(MysqlType::TinyInt)
             }
         }
         ColumnType::MYSQL_TYPE_SHORT => {
             if is_unsigned {
-                Ok(RemoteType::Mysql(MysqlType::SmallIntUnsigned))
+                Ok(MysqlType::SmallIntUnsigned)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::SmallInt))
+                Ok(MysqlType::SmallInt)
             }
         }
         ColumnType::MYSQL_TYPE_INT24 => {
             if is_unsigned {
-                Ok(RemoteType::Mysql(MysqlType::MediumIntUnsigned))
+                Ok(MysqlType::MediumIntUnsigned)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::MediumInt))
+                Ok(MysqlType::MediumInt)
             }
         }
         ColumnType::MYSQL_TYPE_LONG => {
             if is_unsigned {
-                Ok(RemoteType::Mysql(MysqlType::IntegerUnsigned))
+                Ok(MysqlType::IntegerUnsigned)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::Integer))
+                Ok(MysqlType::Integer)
             }
         }
         ColumnType::MYSQL_TYPE_LONGLONG => {
             if is_unsigned {
-                Ok(RemoteType::Mysql(MysqlType::BigIntUnsigned))
+                Ok(MysqlType::BigIntUnsigned)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::BigInt))
+                Ok(MysqlType::BigInt)
             }
         }
-        ColumnType::MYSQL_TYPE_FLOAT => Ok(RemoteType::Mysql(MysqlType::Float)),
-        ColumnType::MYSQL_TYPE_DOUBLE => Ok(RemoteType::Mysql(MysqlType::Double)),
+        ColumnType::MYSQL_TYPE_FLOAT => Ok(MysqlType::Float),
+        ColumnType::MYSQL_TYPE_DOUBLE => Ok(MysqlType::Double),
         ColumnType::MYSQL_TYPE_NEWDECIMAL => {
             let precision = (mysql_col.column_length() - 2) as u8;
             let scale = mysql_col.decimals();
-            Ok(RemoteType::Mysql(MysqlType::Decimal(precision, scale)))
+            Ok(MysqlType::Decimal(precision, scale))
         }
-        ColumnType::MYSQL_TYPE_DATE => Ok(RemoteType::Mysql(MysqlType::Date)),
-        ColumnType::MYSQL_TYPE_DATETIME => Ok(RemoteType::Mysql(MysqlType::Datetime)),
-        ColumnType::MYSQL_TYPE_TIME => Ok(RemoteType::Mysql(MysqlType::Time)),
-        ColumnType::MYSQL_TYPE_TIMESTAMP => Ok(RemoteType::Mysql(MysqlType::Timestamp)),
-        ColumnType::MYSQL_TYPE_YEAR => Ok(RemoteType::Mysql(MysqlType::Year)),
-        ColumnType::MYSQL_TYPE_STRING if !is_binary => Ok(RemoteType::Mysql(MysqlType::Char)),
+        ColumnType::MYSQL_TYPE_DATE => Ok(MysqlType::Date),
+        ColumnType::MYSQL_TYPE_DATETIME => Ok(MysqlType::Datetime),
+        ColumnType::MYSQL_TYPE_TIME => Ok(MysqlType::Time),
+        ColumnType::MYSQL_TYPE_TIMESTAMP => Ok(MysqlType::Timestamp),
+        ColumnType::MYSQL_TYPE_YEAR => Ok(MysqlType::Year),
+        ColumnType::MYSQL_TYPE_STRING if !is_binary => Ok(MysqlType::Char),
         ColumnType::MYSQL_TYPE_STRING if is_binary => {
             if is_utf8_bin_character_set {
-                Ok(RemoteType::Mysql(MysqlType::Char))
+                Ok(MysqlType::Char)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::Binary))
+                Ok(MysqlType::Binary)
             }
         }
-        ColumnType::MYSQL_TYPE_VAR_STRING if !is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::Varchar))
-        }
+        ColumnType::MYSQL_TYPE_VAR_STRING if !is_binary => Ok(MysqlType::Varchar),
         ColumnType::MYSQL_TYPE_VAR_STRING if is_binary => {
             if is_utf8_bin_character_set {
-                Ok(RemoteType::Mysql(MysqlType::Varchar))
+                Ok(MysqlType::Varchar)
             } else {
-                Ok(RemoteType::Mysql(MysqlType::Varbinary))
+                Ok(MysqlType::Varbinary)
             }
         }
-        ColumnType::MYSQL_TYPE_VARCHAR => Ok(RemoteType::Mysql(MysqlType::Varchar)),
-        ColumnType::MYSQL_TYPE_BLOB if is_blob && !is_binary => {
-            Ok(RemoteType::Mysql(MysqlType::Text(col_length)))
-        }
+        ColumnType::MYSQL_TYPE_VARCHAR => Ok(MysqlType::Varchar),
+        ColumnType::MYSQL_TYPE_BLOB if is_blob && !is_binary => Ok(MysqlType::Text(col_length)),
         ColumnType::MYSQL_TYPE_BLOB if is_blob && is_binary => {
             if is_utf8_bin_character_set {
-                Ok(RemoteType::Mysql(MysqlType::Text(col_length)))
+                Ok(MysqlType::Text(col_length))
             } else {
-                Ok(RemoteType::Mysql(MysqlType::Blob(col_length)))
+                Ok(MysqlType::Blob(col_length))
             }
         }
-        ColumnType::MYSQL_TYPE_JSON => Ok(RemoteType::Mysql(MysqlType::Json)),
-        ColumnType::MYSQL_TYPE_GEOMETRY => Ok(RemoteType::Mysql(MysqlType::Geometry)),
+        ColumnType::MYSQL_TYPE_JSON => Ok(MysqlType::Json),
+        ColumnType::MYSQL_TYPE_GEOMETRY => Ok(MysqlType::Geometry),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported mysql type: {mysql_col:?}",
         ))),
@@ -274,7 +268,7 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
     for col in row.columns_ref() {
         remote_fields.push(RemoteField::new(
             col.name_str().to_string(),
-            mysql_type_to_remote_type(col)?,
+            RemoteType::Mysql(mysql_type_to_remote_type(col)?),
             true,
         ));
     }

@@ -65,7 +65,7 @@ pub struct SqliteConnection {
 
 #[async_trait::async_trait]
 impl Connection for SqliteConnection {
-    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = sql.to_string();
         self.conn
             .call(move |conn| {
@@ -78,8 +78,7 @@ impl Connection for SqliteConnection {
                     build_remote_schema(columns.as_slice(), rows)
                         .map_err(|e| tokio_rusqlite::Error::Other(Box::new(e)))?,
                 );
-                let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-                Ok((remote_schema, arrow_schema))
+                Ok(remote_schema)
             })
             .await
             .map_err(|e| DataFusionError::Execution(format!("Failed to infer schema: {e:?}")))
@@ -152,31 +151,30 @@ fn sqlite_col_to_owned_col(sqlite_col: &Column) -> OwnedColumn {
     }
 }
 
-// TODO return sqlite type
-fn decl_type_to_remote_type(decl_type: &str) -> DFResult<RemoteType> {
+fn decl_type_to_remote_type(decl_type: &str) -> DFResult<SqliteType> {
     if ["tinyint", "smallint", "int", "integer", "bigint"].contains(&decl_type) {
-        return Ok(RemoteType::Sqlite(SqliteType::Integer));
+        return Ok(SqliteType::Integer);
     }
     if ["real", "float", "double"].contains(&decl_type) {
-        return Ok(RemoteType::Sqlite(SqliteType::Real));
+        return Ok(SqliteType::Real);
     }
     if decl_type.starts_with("real") {
-        return Ok(RemoteType::Sqlite(SqliteType::Real));
+        return Ok(SqliteType::Real);
     }
     if ["text", "varchar", "char", "string"].contains(&decl_type) {
-        return Ok(RemoteType::Sqlite(SqliteType::Text));
+        return Ok(SqliteType::Text);
     }
     if decl_type.starts_with("char")
         || decl_type.starts_with("varchar")
         || decl_type.starts_with("text")
     {
-        return Ok(RemoteType::Sqlite(SqliteType::Text));
+        return Ok(SqliteType::Text);
     }
     if ["binary", "varbinary", "tinyblob", "blob"].contains(&decl_type) {
-        return Ok(RemoteType::Sqlite(SqliteType::Blob));
+        return Ok(SqliteType::Blob);
     }
     if decl_type.starts_with("binary") || decl_type.starts_with("varbinary") {
-        return Ok(RemoteType::Sqlite(SqliteType::Blob));
+        return Ok(SqliteType::Blob);
     }
     Err(DataFusionError::NotImplemented(format!(
         "Unsupported sqlite decl type: {decl_type}",
@@ -188,7 +186,8 @@ fn build_remote_schema(columns: &[OwnedColumn], mut rows: Rows) -> DFResult<Remo
     let mut unknown_cols = vec![];
     for (col_idx, col) in columns.iter().enumerate() {
         if let Some(decl_type) = &col.decl_type {
-            let remote_type = decl_type_to_remote_type(&decl_type.to_ascii_lowercase())?;
+            let remote_type =
+                RemoteType::Sqlite(decl_type_to_remote_type(&decl_type.to_ascii_lowercase())?);
             remote_field_map.insert(col_idx, RemoteField::new(&col.name, remote_type, true));
         } else {
             unknown_cols.push(col_idx);

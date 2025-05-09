@@ -96,7 +96,7 @@ pub struct OracleConnection {
 
 #[async_trait::async_trait]
 impl Connection for OracleConnection {
-    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = RemoteDbType::Oracle
             .try_rewrite_query(sql, &[], Some(1))
             .unwrap_or_else(|| sql.to_string());
@@ -104,8 +104,7 @@ impl Connection for OracleConnection {
             DataFusionError::Execution(format!("Failed to execute query {sql} on oracle: {e:?}"))
         })?;
         let remote_schema = Arc::new(build_remote_schema(&row)?);
-        let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-        Ok((remote_schema, arrow_schema))
+        Ok(remote_schema)
     }
 
     async fn query(

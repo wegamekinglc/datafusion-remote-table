@@ -40,8 +40,7 @@ pub trait Pool: Debug + Send + Sync {
 
 #[async_trait::async_trait]
 pub trait Connection: Debug + Send + Sync {
-    // TODO result remove arrow schema
-    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)>;
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef>;
 
     async fn query(
         &self,

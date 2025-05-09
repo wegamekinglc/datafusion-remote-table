@@ -87,7 +87,7 @@ pub struct DmConnection {
 
 #[async_trait::async_trait]
 impl Connection for DmConnection {
-    async fn infer_schema(&self, sql: &str) -> DFResult<(RemoteSchemaRef, SchemaRef)> {
+    async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let conn = self.connection.lock().unwrap();
         let cursor_opt = conn
             .execute(sql, (), None)
@@ -98,8 +98,7 @@ impl Connection for DmConnection {
             )),
             Some(cursor) => {
                 let remote_schema = Arc::new(build_remote_schema(cursor)?);
-                let arrow_schema = Arc::new(remote_schema.to_arrow_schema());
-                Ok((remote_schema, arrow_schema))
+                Ok(remote_schema)
             }
         }
     }
