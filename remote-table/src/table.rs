@@ -63,10 +63,7 @@ impl RemoteTable {
             let remote_schema = if transform.is_some() {
                 // Infer remote schema
                 let conn = pool.get().await?;
-                match conn.infer_schema(&sql).await {
-                    Ok(remote_schema) => Some(remote_schema),
-                    Err(_) => None,
-                }
+                conn.infer_schema(&sql).await.ok()
             } else {
                 None
             };

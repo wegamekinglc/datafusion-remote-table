@@ -146,31 +146,30 @@ impl Connection for OracleConnection {
     }
 }
 
-// TODO return oracle type
-fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> {
+fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<OracleType> {
     match oracle_type {
         ColumnType::Number(precision, scale) => {
             // TODO need more investigation on the precision and scale
             let precision = if *precision == 0 { 38 } else { *precision };
             let scale = if *scale == -127 { 0 } else { *scale };
-            Ok(RemoteType::Oracle(OracleType::Number(precision, scale)))
+            Ok(OracleType::Number(precision, scale))
         }
-        ColumnType::BinaryFloat => Ok(RemoteType::Oracle(OracleType::BinaryFloat)),
-        ColumnType::BinaryDouble => Ok(RemoteType::Oracle(OracleType::BinaryDouble)),
-        ColumnType::Float(precision) => Ok(RemoteType::Oracle(OracleType::Float(*precision))),
-        ColumnType::Varchar2(size) => Ok(RemoteType::Oracle(OracleType::Varchar2(*size))),
-        ColumnType::NVarchar2(size) => Ok(RemoteType::Oracle(OracleType::NVarchar2(*size))),
-        ColumnType::Char(size) => Ok(RemoteType::Oracle(OracleType::Char(*size))),
-        ColumnType::NChar(size) => Ok(RemoteType::Oracle(OracleType::NChar(*size))),
-        ColumnType::Long => Ok(RemoteType::Oracle(OracleType::Long)),
-        ColumnType::CLOB => Ok(RemoteType::Oracle(OracleType::Clob)),
-        ColumnType::NCLOB => Ok(RemoteType::Oracle(OracleType::NClob)),
-        ColumnType::Raw(size) => Ok(RemoteType::Oracle(OracleType::Raw(*size))),
-        ColumnType::LongRaw => Ok(RemoteType::Oracle(OracleType::LongRaw)),
-        ColumnType::BLOB => Ok(RemoteType::Oracle(OracleType::Blob)),
-        ColumnType::Date => Ok(RemoteType::Oracle(OracleType::Date)),
-        ColumnType::Timestamp(_) => Ok(RemoteType::Oracle(OracleType::Timestamp)),
-        ColumnType::Boolean => Ok(RemoteType::Oracle(OracleType::Boolean)),
+        ColumnType::BinaryFloat => Ok(OracleType::BinaryFloat),
+        ColumnType::BinaryDouble => Ok(OracleType::BinaryDouble),
+        ColumnType::Float(precision) => Ok(OracleType::Float(*precision)),
+        ColumnType::Varchar2(size) => Ok(OracleType::Varchar2(*size)),
+        ColumnType::NVarchar2(size) => Ok(OracleType::NVarchar2(*size)),
+        ColumnType::Char(size) => Ok(OracleType::Char(*size)),
+        ColumnType::NChar(size) => Ok(OracleType::NChar(*size)),
+        ColumnType::Long => Ok(OracleType::Long),
+        ColumnType::CLOB => Ok(OracleType::Clob),
+        ColumnType::NCLOB => Ok(OracleType::NClob),
+        ColumnType::Raw(size) => Ok(OracleType::Raw(*size)),
+        ColumnType::LongRaw => Ok(OracleType::LongRaw),
+        ColumnType::BLOB => Ok(OracleType::Blob),
+        ColumnType::Date => Ok(OracleType::Date),
+        ColumnType::Timestamp(_) => Ok(OracleType::Timestamp),
+        ColumnType::Boolean => Ok(OracleType::Boolean),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported oracle type: {oracle_type:?}",
         ))),
@@ -180,7 +179,7 @@ fn oracle_type_to_remote_type(oracle_type: &ColumnType) -> DFResult<RemoteType> 
 fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
     let mut remote_fields = vec![];
     for col in row.column_info() {
-        let remote_type = oracle_type_to_remote_type(col.oracle_type())?;
+        let remote_type = RemoteType::Oracle(oracle_type_to_remote_type(col.oracle_type())?);
         remote_fields.push(RemoteField::new(col.name(), remote_type, col.nullable()));
     }
     Ok(RemoteSchema::new(remote_fields))

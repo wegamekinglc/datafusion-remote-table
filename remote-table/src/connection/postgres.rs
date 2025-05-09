@@ -167,14 +167,13 @@ impl Connection for PostgresConnection {
     }
 }
 
-// TODO return pg type
-fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<RemoteType> {
+fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<PostgresType> {
     match pg_type {
-        &Type::INT2 => Ok(RemoteType::Postgres(PostgresType::Int2)),
-        &Type::INT4 => Ok(RemoteType::Postgres(PostgresType::Int4)),
-        &Type::INT8 => Ok(RemoteType::Postgres(PostgresType::Int8)),
-        &Type::FLOAT4 => Ok(RemoteType::Postgres(PostgresType::Float4)),
-        &Type::FLOAT8 => Ok(RemoteType::Postgres(PostgresType::Float8)),
+        &Type::INT2 => Ok(PostgresType::Int2),
+        &Type::INT4 => Ok(PostgresType::Int4),
+        &Type::INT8 => Ok(PostgresType::Int8),
+        &Type::FLOAT4 => Ok(PostgresType::Float4),
+        &Type::FLOAT8 => Ok(PostgresType::Float8),
         &Type::NUMERIC => {
             let v: Option<BigDecimalFromSql> = row.try_get(idx).map_err(|e| {
                 DataFusionError::Execution(format!("Failed to get BigDecimal value: {e:?}"))
@@ -184,37 +183,33 @@ fn pg_type_to_remote_type(pg_type: &Type, row: &Row, idx: usize) -> DFResult<Rem
                 None => 0,
             };
             assert!((scale as u32) <= (i8::MAX as u32));
-            Ok(RemoteType::Postgres(PostgresType::Numeric(
-                scale.try_into().unwrap_or_default(),
-            )))
+            Ok(PostgresType::Numeric(scale.try_into().unwrap_or_default()))
         }
-        &Type::OID => Ok(RemoteType::Postgres(PostgresType::Oid)),
-        &Type::NAME => Ok(RemoteType::Postgres(PostgresType::Name)),
-        &Type::VARCHAR => Ok(RemoteType::Postgres(PostgresType::Varchar)),
-        &Type::BPCHAR => Ok(RemoteType::Postgres(PostgresType::Bpchar)),
-        &Type::TEXT => Ok(RemoteType::Postgres(PostgresType::Text)),
-        &Type::BYTEA => Ok(RemoteType::Postgres(PostgresType::Bytea)),
-        &Type::DATE => Ok(RemoteType::Postgres(PostgresType::Date)),
-        &Type::TIMESTAMP => Ok(RemoteType::Postgres(PostgresType::Timestamp)),
-        &Type::TIMESTAMPTZ => Ok(RemoteType::Postgres(PostgresType::TimestampTz)),
-        &Type::TIME => Ok(RemoteType::Postgres(PostgresType::Time)),
-        &Type::INTERVAL => Ok(RemoteType::Postgres(PostgresType::Interval)),
-        &Type::BOOL => Ok(RemoteType::Postgres(PostgresType::Bool)),
-        &Type::JSON => Ok(RemoteType::Postgres(PostgresType::Json)),
-        &Type::JSONB => Ok(RemoteType::Postgres(PostgresType::Jsonb)),
-        &Type::INT2_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int2Array)),
-        &Type::INT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int4Array)),
-        &Type::INT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Int8Array)),
-        &Type::FLOAT4_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float4Array)),
-        &Type::FLOAT8_ARRAY => Ok(RemoteType::Postgres(PostgresType::Float8Array)),
-        &Type::VARCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::VarcharArray)),
-        &Type::BPCHAR_ARRAY => Ok(RemoteType::Postgres(PostgresType::BpcharArray)),
-        &Type::TEXT_ARRAY => Ok(RemoteType::Postgres(PostgresType::TextArray)),
-        &Type::BYTEA_ARRAY => Ok(RemoteType::Postgres(PostgresType::ByteaArray)),
-        &Type::BOOL_ARRAY => Ok(RemoteType::Postgres(PostgresType::BoolArray)),
-        other if other.name().eq_ignore_ascii_case("geometry") => {
-            Ok(RemoteType::Postgres(PostgresType::PostGisGeometry))
-        }
+        &Type::OID => Ok(PostgresType::Oid),
+        &Type::NAME => Ok(PostgresType::Name),
+        &Type::VARCHAR => Ok(PostgresType::Varchar),
+        &Type::BPCHAR => Ok(PostgresType::Bpchar),
+        &Type::TEXT => Ok(PostgresType::Text),
+        &Type::BYTEA => Ok(PostgresType::Bytea),
+        &Type::DATE => Ok(PostgresType::Date),
+        &Type::TIMESTAMP => Ok(PostgresType::Timestamp),
+        &Type::TIMESTAMPTZ => Ok(PostgresType::TimestampTz),
+        &Type::TIME => Ok(PostgresType::Time),
+        &Type::INTERVAL => Ok(PostgresType::Interval),
+        &Type::BOOL => Ok(PostgresType::Bool),
+        &Type::JSON => Ok(PostgresType::Json),
+        &Type::JSONB => Ok(PostgresType::Jsonb),
+        &Type::INT2_ARRAY => Ok(PostgresType::Int2Array),
+        &Type::INT4_ARRAY => Ok(PostgresType::Int4Array),
+        &Type::INT8_ARRAY => Ok(PostgresType::Int8Array),
+        &Type::FLOAT4_ARRAY => Ok(PostgresType::Float4Array),
+        &Type::FLOAT8_ARRAY => Ok(PostgresType::Float8Array),
+        &Type::VARCHAR_ARRAY => Ok(PostgresType::VarcharArray),
+        &Type::BPCHAR_ARRAY => Ok(PostgresType::BpcharArray),
+        &Type::TEXT_ARRAY => Ok(PostgresType::TextArray),
+        &Type::BYTEA_ARRAY => Ok(PostgresType::ByteaArray),
+        &Type::BOOL_ARRAY => Ok(PostgresType::BoolArray),
+        other if other.name().eq_ignore_ascii_case("geometry") => Ok(PostgresType::PostGisGeometry),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported postgres type {pg_type:?}",
         ))),
@@ -226,7 +221,7 @@ fn build_remote_schema(row: &Row) -> DFResult<RemoteSchema> {
     for (idx, col) in row.columns().iter().enumerate() {
         remote_fields.push(RemoteField::new(
             col.name(),
-            pg_type_to_remote_type(col.type_(), row, idx)?,
+            RemoteType::Postgres(pg_type_to_remote_type(col.type_(), row, idx)?),
             true,
         ));
     }
