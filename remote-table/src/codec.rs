@@ -730,6 +730,16 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::SqliteBlob {},
             )),
         },
+        RemoteType::Dm(DmType::Integer) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmInteger(
+                protobuf::DmInteger {},
+            )),
+        },
+        RemoteType::Dm(DmType::Char(len)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmChar(protobuf::DmChar {
+                length: len.map(|s| s as u32),
+            })),
+        },
         RemoteType::Dm(DmType::Text) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmText(protobuf::DmText {})),
         },
@@ -909,6 +919,10 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::SqliteReal(_) => RemoteType::Sqlite(SqliteType::Real),
         protobuf::remote_type::Type::SqliteText(_) => RemoteType::Sqlite(SqliteType::Text),
         protobuf::remote_type::Type::SqliteBlob(_) => RemoteType::Sqlite(SqliteType::Blob),
+        protobuf::remote_type::Type::DmInteger(_) => RemoteType::Dm(DmType::Integer),
+        protobuf::remote_type::Type::DmChar(protobuf::DmChar { length }) => {
+            RemoteType::Dm(DmType::Char(length.map(|s| s as u16)))
+        }
         protobuf::remote_type::Type::DmText(_) => RemoteType::Dm(DmType::Text),
     }
 }

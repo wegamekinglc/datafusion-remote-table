@@ -270,6 +270,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-odbc"
+version = "16.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "212acf2aaf14506b805f0105a336466f77aee8d1dc4c0a4205fdb31fe33281a2"
+dependencies = [
+ "arrow",
+ "chrono",
+ "log",
+ "odbc-api",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "arrow-ord"
 version = "55.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1577,6 +1590,7 @@ dependencies = [
 name = "datafusion-remote-table"
 version = "0.13.0"
 dependencies = [
+ "arrow-odbc",
  "async-stream",
  "async-trait",
  "bb8",

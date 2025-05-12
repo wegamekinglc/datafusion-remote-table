@@ -140,7 +140,7 @@ pub struct RemoteField {
 pub struct RemoteType {
     #[prost(
         oneof = "remote_type::Type",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305, 401"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305, 401, 402, 403"
     )]
     pub r#type: ::core::option::Option<remote_type::Type>,
 }
@@ -307,6 +307,10 @@ pub mod remote_type {
         #[prost(message, tag = "305")]
         SqliteBlob(super::SqliteBlob),
         #[prost(message, tag = "401")]
+        DmInteger(super::DmInteger),
+        #[prost(message, tag = "402")]
+        DmChar(super::DmChar),
+        #[prost(message, tag = "403")]
         DmText(super::DmText),
     }
 }
@@ -505,5 +509,12 @@ pub struct SqliteReal {}
 pub struct SqliteText {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SqliteBlob {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct DmInteger {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct DmChar {
+    #[prost(uint32, optional, tag = "1")]
+    pub length: ::core::option::Option<u32>,
+}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct DmText {}
