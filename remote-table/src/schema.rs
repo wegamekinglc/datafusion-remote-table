@@ -281,8 +281,10 @@ pub enum DmType {
     Integer,
     BigInt,
     Real,
+    Double,
     Char(Option<u16>),
     Text,
+    Date,
 }
 
 impl DmType {
@@ -292,8 +294,10 @@ impl DmType {
             DmType::Integer => DataType::Int32,
             DmType::BigInt => DataType::Int64,
             DmType::Real => DataType::Float32,
+            DmType::Double => DataType::Float64,
             DmType::Char(_) => DataType::Utf8,
             DmType::Text => DataType::Utf8,
+            DmType::Date => DataType::Date32,
         }
     }
 }

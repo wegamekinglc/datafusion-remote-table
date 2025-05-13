@@ -746,6 +746,9 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
         RemoteType::Dm(DmType::Real) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmReal(protobuf::DmReal {})),
         },
+        RemoteType::Dm(DmType::Double) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmDouble(protobuf::DmDouble {})),
+        },
         RemoteType::Dm(DmType::Char(len)) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmChar(protobuf::DmChar {
                 length: len.map(|s| s as u32),
@@ -753,6 +756,9 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
         },
         RemoteType::Dm(DmType::Text) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmText(protobuf::DmText {})),
+        },
+        RemoteType::Dm(DmType::Date) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmDate(protobuf::DmDate {})),
         },
     }
 }
@@ -934,9 +940,11 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::DmInteger(_) => RemoteType::Dm(DmType::Integer),
         protobuf::remote_type::Type::DmBigInt(_) => RemoteType::Dm(DmType::BigInt),
         protobuf::remote_type::Type::DmReal(_) => RemoteType::Dm(DmType::Real),
+        protobuf::remote_type::Type::DmDouble(_) => RemoteType::Dm(DmType::Double),
         protobuf::remote_type::Type::DmChar(protobuf::DmChar { length }) => {
             RemoteType::Dm(DmType::Char(length.map(|s| s as u16)))
         }
         protobuf::remote_type::Type::DmText(_) => RemoteType::Dm(DmType::Text),
+        protobuf::remote_type::Type::DmDate(_) => RemoteType::Dm(DmType::Date),
     }
 }
