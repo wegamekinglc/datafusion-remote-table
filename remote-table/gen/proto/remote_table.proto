@@ -173,8 +173,9 @@ message RemoteType {
     DmReal dm_real = 405;
     DmDouble dm_double = 406;
     DmChar dm_char = 407;
-    DmText dm_text = 408;
-    DmDate dm_date = 409;
+    DmVarchar dm_varchar = 408;
+    DmText dm_text = 409;
+    DmDate dm_date = 410;
   }
 }
 
@@ -295,6 +296,9 @@ message DmBigInt {}
 message DmReal {}
 message DmDouble {}
 message DmChar {
+  optional uint32 length = 1;
+}
+message DmVarchar {
   optional uint32 length = 1;
 }
 message DmText {}

@@ -284,6 +284,7 @@ pub enum DmType {
     Real,
     Double,
     Char(Option<u16>),
+    Varchar(Option<u16>),
     Text,
     Date,
 }
@@ -298,6 +299,7 @@ impl DmType {
             DmType::Real => DataType::Float32,
             DmType::Double => DataType::Float64,
             DmType::Char(_) => DataType::Utf8,
+            DmType::Varchar(_) => DataType::Utf8,
             DmType::Text => DataType::Utf8,
             DmType::Date => DataType::Date32,
         }
