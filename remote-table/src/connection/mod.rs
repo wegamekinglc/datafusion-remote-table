@@ -203,6 +203,13 @@ impl RemoteDbType {
                 .unwrap_or_else(|| sql.to_string())),
         }
     }
+
+    pub(crate) fn query_limit_1(&self, sql: &str) -> DFResult<String> {
+        if !self.support_rewrite_with_filters_limit(sql) {
+            return Ok(sql.to_string());
+        }
+        self.try_rewrite_query(sql, &[], Some(1))
+    }
 }
 
 pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usize) -> bool {

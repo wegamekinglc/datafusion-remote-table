@@ -66,7 +66,7 @@ pub struct SqliteConnection {
 #[async_trait::async_trait]
 impl Connection for SqliteConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
-        let sql = RemoteDbType::Sqlite.try_rewrite_query(sql, &[], Some(1))?;
+        let sql = RemoteDbType::Sqlite.query_limit_1(sql)?;
         self.conn
             .call(move |conn| {
                 let mut stmt = conn.prepare(&sql)?;

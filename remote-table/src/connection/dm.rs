@@ -95,9 +95,7 @@ pub struct DmConnection {
 #[async_trait::async_trait]
 impl Connection for DmConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
-        let sql = RemoteDbType::Dm
-            .try_rewrite_query(sql, &[], Some(1))
-            .unwrap_or_else(|_e| sql.to_string());
+        let sql = RemoteDbType::Dm.query_limit_1(sql)?;
         let conn = self.conn.lock().await;
         let cursor_opt = conn
             .execute(&sql, (), None)
