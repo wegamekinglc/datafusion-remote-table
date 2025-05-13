@@ -21,6 +21,7 @@ pub use postgres::*;
 pub use sqlite::*;
 
 use crate::{DFResult, RemoteSchemaRef};
+use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -203,7 +204,8 @@ impl RemoteDbType {
                 Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}"))
             }
             RemoteDbType::Dm => {
-                todo!()
+                let limit = limit?;
+                Some(format!("SELECT * FROM ({sql}) LIMIT {limit}"))
             }
         }
     }
@@ -213,6 +215,17 @@ pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usi
     match projection {
         Some(p) => p.contains(&col_idx),
         None => true,
+    }
+}
+
+pub(crate) fn project_batch(
+    batch: RecordBatch,
+    projection: Option<&Vec<usize>>,
+) -> DFResult<RecordBatch> {
+    if let Some(projection) = projection {
+        Ok(batch.project(projection)?)
+    } else {
+        Ok(batch)
     }
 }
 

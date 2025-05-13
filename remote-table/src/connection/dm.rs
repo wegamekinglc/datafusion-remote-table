@@ -1,6 +1,6 @@
-use crate::connection::ODBC_ENV;
+use crate::connection::{ODBC_ENV, project_batch};
 use crate::{
-    Connection, ConnectionOptions, DFResult, DmType, Pool, RemoteField, RemoteSchema,
+    Connection, ConnectionOptions, DFResult, DmType, Pool, RemoteDbType, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType,
 };
 use arrow_odbc::OdbcReaderBuilder;
@@ -95,9 +95,12 @@ pub struct DmConnection {
 #[async_trait::async_trait]
 impl Connection for DmConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
+        let sql = RemoteDbType::Dm
+            .try_rewrite_query(sql, &[], Some(1))
+            .unwrap_or_else(|| sql.to_string());
         let conn = self.conn.lock().await;
         let cursor_opt = conn
-            .execute(sql, (), None)
+            .execute(&sql, (), None)
             .map_err(|e| DataFusionError::Execution(format!("Failed to infer schema: {e:?}")))?;
         match cursor_opt {
             None => Err(DataFusionError::Execution(
@@ -116,62 +119,66 @@ impl Connection for DmConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        _filters: &[Expr],
-        _limit: Option<usize>,
+        filters: &[Expr],
+        limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let _projected_schema = project_schema(&table_schema, projection)?;
-        let _chunk_size = conn_options.stream_chunk_size();
+        let projected_schema = project_schema(&table_schema, projection)?;
+        let sql = RemoteDbType::Dm
+            .try_rewrite_query(sql, filters, limit)
+            .unwrap_or_else(|| sql.to_string());
+        let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
-        let sql = sql.to_string();
+        let projection = projection.cloned();
         let (batch_tx, mut batch_rx) = tokio::sync::mpsc::channel::<RecordBatch>(4);
 
-        let create_stream = async || -> DFResult<SendableRecordBatchStream> {
-            let table_schema_captured = table_schema.clone();
-            let join_handle = tokio::task::spawn_blocking(move || {
-                let handle = Handle::current();
-                let conn = handle.block_on(async { conn.lock().await });
+        let join_handle = tokio::task::spawn_blocking(move || {
+            let handle = Handle::current();
+            let conn = handle.block_on(async { conn.lock().await });
 
-                let cursor_opt = conn.execute(&sql, (), None).map_err(|e| {
-                    DataFusionError::Execution(format!("Failed to execute query: {e:?}"))
-                })?;
+            let cursor_opt = conn.execute(&sql, (), None).map_err(|e| {
+                DataFusionError::Execution(format!("Failed to execute query: {e:?}"))
+            })?;
 
-                match cursor_opt {
-                    None => {}
-                    Some(cursor) => {
-                        let reader = OdbcReaderBuilder::new()
-                            .with_schema(table_schema_captured)
-                            .build(cursor)
-                            .map_err(|e| {
-                                DataFusionError::Execution(format!("Failed to build reader: {e:?}"))
-                            })?;
-                        for batch in reader {
-                            batch_tx.blocking_send(batch?).map_err(|e| {
-                                DataFusionError::Execution(format!("Failed to send batch: {e:?}"))
-                            })?;
-                        }
+            match cursor_opt {
+                None => {}
+                Some(cursor) => {
+                    let reader = OdbcReaderBuilder::new()
+                        .with_schema(table_schema)
+                        .with_max_num_rows_per_batch(chunk_size)
+                        .with_max_bytes_per_batch(256 * 1024 * 1024)
+                        .build(cursor)
+                        .map_err(|e| {
+                            DataFusionError::Execution(format!("Failed to build reader: {e:?}"))
+                        })?;
+                    for batch in reader {
+                        let projected_batch = project_batch(batch?, projection.as_ref())?;
+                        batch_tx.blocking_send(projected_batch).map_err(|e| {
+                            DataFusionError::Execution(format!("Failed to send batch: {e:?}"))
+                        })?;
                     }
                 }
+            }
 
-                Ok::<_, DataFusionError>(())
-            });
+            Ok::<_, DataFusionError>(())
+        });
 
-            let output_stream = stream! {
-                while let Some(batch) = batch_rx.recv().await {
-                    yield Ok(batch);
-                }
+        let output_stream = stream! {
+            while let Some(batch) = batch_rx.recv().await {
+                yield Ok(batch);
+            }
 
-                if let Err(e) = join_handle.await {
-                    yield Err(DataFusionError::Execution(format!(
-                        "Failed to execute ODBC query: {e}"
-                    )))
-                }
-            };
-
-            let result: SendableRecordBatchStream =
-                Box::pin(RecordBatchStreamAdapter::new(table_schema, output_stream));
-            Ok(result)
+            if let Err(e) = join_handle.await {
+                yield Err(DataFusionError::Execution(format!(
+                    "Failed to execute ODBC query: {e}"
+                )))
+            }
         };
-        create_stream().await
+
+        let result: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+            projected_schema,
+            output_stream,
+        ));
+        Ok(result)
     }
 }
 
