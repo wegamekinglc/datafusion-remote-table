@@ -204,9 +204,12 @@ fn build_remote_schema(mut cursor: CursorImpl<StatementImpl>) -> DFResult<Remote
 
 fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
     match data_type {
-        odbc_api::DataType::LongVarchar { length: _ } => Ok(DmType::Text),
+        odbc_api::DataType::SmallInt => Ok(DmType::SmallInt),
         odbc_api::DataType::Integer => Ok(DmType::Integer),
+        odbc_api::DataType::BigInt => Ok(DmType::BigInt),
+        odbc_api::DataType::Real => Ok(DmType::Real),
         odbc_api::DataType::Char { length } => Ok(DmType::Char(length.map(|l| l.get() as u16))),
+        odbc_api::DataType::LongVarchar { length: _ } => Ok(DmType::Text),
         _ => Err(DataFusionError::Execution(format!(
             "Unsupported DM type: {data_type:?}"
         ))),

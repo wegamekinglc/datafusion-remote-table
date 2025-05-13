@@ -277,7 +277,10 @@ impl SqliteType {
 // https://eco.dameng.com/document/dm/zh-cn/pm/odbc-rogramming-guide.html
 #[derive(Debug, Clone)]
 pub enum DmType {
+    SmallInt,
     Integer,
+    BigInt,
+    Real,
     Char(Option<u16>),
     Text,
 }
@@ -285,7 +288,10 @@ pub enum DmType {
 impl DmType {
     pub fn to_arrow_type(&self) -> DataType {
         match self {
+            DmType::SmallInt => DataType::Int32,
             DmType::Integer => DataType::Int32,
+            DmType::BigInt => DataType::Int64,
+            DmType::Real => DataType::Float32,
             DmType::Char(_) => DataType::Utf8,
             DmType::Text => DataType::Utf8,
         }
