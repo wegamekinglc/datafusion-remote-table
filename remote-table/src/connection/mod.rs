@@ -21,7 +21,6 @@ pub use postgres::*;
 pub use sqlite::*;
 
 use crate::{DFResult, RemoteSchemaRef};
-use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -218,11 +217,11 @@ pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usi
     }
 }
 
-#[cfg(any(feature = "dm"))]
+#[cfg(feature = "dm")]
 pub(crate) fn project_batch(
-    batch: RecordBatch,
+    batch: datafusion::arrow::array::RecordBatch,
     projection: Option<&Vec<usize>>,
-) -> DFResult<RecordBatch> {
+) -> DFResult<datafusion::arrow::array::RecordBatch> {
     if let Some(projection) = projection {
         Ok(batch.project(projection)?)
     } else {
