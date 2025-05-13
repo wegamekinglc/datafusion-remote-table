@@ -9,21 +9,16 @@ use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
-use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
+use datafusion::execution::SendableRecordBatchStream;
 use datafusion::logical_expr::Expr;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::lock::Mutex;
-use odbc_api::buffers::{ColumnarAnyBuffer, RowVec, TextRowSet};
 use odbc_api::handles::StatementImpl;
-use odbc_api::{Cursor, CursorImpl, Environment, ResultSetMetadata};
-use oracle::Row;
-use std::pin::Pin;
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
+use odbc_api::{CursorImpl, Environment, ResultSetMetadata};
+use std::sync::Arc;
 use tokio::runtime::Handle;
-use tokio::sync::mpsc::Sender;
 
 #[derive(Debug, Clone, With, Getters)]
 pub struct DmConnectionOptions {
@@ -124,8 +119,8 @@ impl Connection for DmConnection {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
-        let projected_schema = project_schema(&table_schema, projection)?;
-        let chunk_size = conn_options.stream_chunk_size();
+        let _projected_schema = project_schema(&table_schema, projection)?;
+        let _chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
         let sql = sql.to_string();
         let (batch_tx, mut batch_rx) = tokio::sync::mpsc::channel::<RecordBatch>(4);
@@ -176,35 +171,8 @@ impl Connection for DmConnection {
                 Box::pin(RecordBatchStreamAdapter::new(table_schema, output_stream));
             Ok(result)
         };
-        run_async_with_tokio(create_stream).await
+        create_stream().await
     }
-}
-
-pub async fn run_async_with_tokio<F, Fut, T, E>(f: F) -> Result<T, E>
-where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = Result<T, E>>,
-{
-    match Handle::try_current() {
-        Ok(_) => f().await,
-        Err(_) => execute_in_tokio(f),
-    }
-}
-
-pub fn execute_in_tokio<F, Fut, T>(f: F) -> T
-where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = T>,
-{
-    get_tokio_runtime().0.block_on(f())
-}
-
-pub(crate) struct TokioRuntime(tokio::runtime::Runtime);
-
-#[inline]
-pub(crate) fn get_tokio_runtime() -> &'static TokioRuntime {
-    static RUNTIME: OnceLock<TokioRuntime> = OnceLock::new();
-    RUNTIME.get_or_init(|| TokioRuntime(tokio::runtime::Runtime::new().unwrap()))
 }
 
 fn build_remote_schema(mut cursor: CursorImpl<StatementImpl>) -> DFResult<RemoteSchema> {
