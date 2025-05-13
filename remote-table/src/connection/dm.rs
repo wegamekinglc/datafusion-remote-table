@@ -16,7 +16,7 @@ use derive_getters::Getters;
 use derive_with::With;
 use futures::lock::Mutex;
 use odbc_api::handles::StatementImpl;
-use odbc_api::{CursorImpl, Environment, ResultSetMetadata};
+use odbc_api::{Cursor, CursorImpl, Environment, ResultSetMetadata};
 use std::sync::Arc;
 use tokio::runtime::Handle;
 
@@ -204,6 +204,7 @@ fn build_remote_schema(mut cursor: CursorImpl<StatementImpl>) -> DFResult<Remote
 
 fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
     match data_type {
+        odbc_api::DataType::TinyInt => Ok(DmType::TinyInt),
         odbc_api::DataType::SmallInt => Ok(DmType::SmallInt),
         odbc_api::DataType::Integer => Ok(DmType::Integer),
         odbc_api::DataType::BigInt => Ok(DmType::BigInt),

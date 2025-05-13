@@ -20,11 +20,10 @@ pub struct RemoteTableExec {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConnectionOptions {
-    #[prost(
-        oneof = "connection_options::ConnectionOptions",
-        tags = "1, 2, 3, 4, 5"
-    )]
-    pub connection_options: ::core::option::Option<connection_options::ConnectionOptions>,
+    #[prost(oneof = "connection_options::ConnectionOptions", tags = "1, 2, 3, 4, 5")]
+    pub connection_options: ::core::option::Option<
+        connection_options::ConnectionOptions,
+    >,
 }
 /// Nested message and enum types in `ConnectionOptions`.
 pub mod connection_options {
@@ -140,7 +139,7 @@ pub struct RemoteField {
 pub struct RemoteType {
     #[prost(
         oneof = "remote_type::Type",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305, 401, 402, 403, 404, 405, 406, 407, 408"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305, 401, 402, 403, 404, 405, 406, 407, 408, 409"
     )]
     pub r#type: ::core::option::Option<remote_type::Type>,
 }
@@ -307,20 +306,22 @@ pub mod remote_type {
         #[prost(message, tag = "305")]
         SqliteBlob(super::SqliteBlob),
         #[prost(message, tag = "401")]
-        DmSmallInt(super::DmSmallInt),
+        DmTinyInt(super::DmTinyInt),
         #[prost(message, tag = "402")]
-        DmInteger(super::DmInteger),
+        DmSmallInt(super::DmSmallInt),
         #[prost(message, tag = "403")]
-        DmBigInt(super::DmBigInt),
+        DmInteger(super::DmInteger),
         #[prost(message, tag = "404")]
-        DmReal(super::DmReal),
+        DmBigInt(super::DmBigInt),
         #[prost(message, tag = "405")]
-        DmDouble(super::DmDouble),
+        DmReal(super::DmReal),
         #[prost(message, tag = "406")]
-        DmChar(super::DmChar),
+        DmDouble(super::DmDouble),
         #[prost(message, tag = "407")]
-        DmText(super::DmText),
+        DmChar(super::DmChar),
         #[prost(message, tag = "408")]
+        DmText(super::DmText),
+        #[prost(message, tag = "409")]
         DmDate(super::DmDate),
     }
 }
@@ -519,6 +520,8 @@ pub struct SqliteReal {}
 pub struct SqliteText {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct SqliteBlob {}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct DmTinyInt {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct DmSmallInt {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]

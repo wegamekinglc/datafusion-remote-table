@@ -166,14 +166,15 @@ message RemoteType {
     SqliteReal sqlite_real = 303;
     SqliteText sqlite_text = 304;
     SqliteBlob sqlite_blob = 305;
-    DmSmallInt dm_small_int = 401;
-    DmInteger dm_integer = 402;
-    DmBigInt dm_big_int = 403;
-    DmReal dm_real = 404;
-    DmDouble dm_double = 405;
-    DmChar dm_char = 406;
-    DmText dm_text = 407;
-    DmDate dm_date = 408;
+    DmTinyInt dm_tiny_int = 401;
+    DmSmallInt dm_small_int = 402;
+    DmInteger dm_integer = 403;
+    DmBigInt dm_big_int = 404;
+    DmReal dm_real = 405;
+    DmDouble dm_double = 406;
+    DmChar dm_char = 407;
+    DmText dm_text = 408;
+    DmDate dm_date = 409;
   }
 }
 
@@ -287,6 +288,7 @@ message SqliteReal {}
 message SqliteText {}
 message SqliteBlob {}
 
+message DmTinyInt {}
 message DmSmallInt {}
 message DmInteger {}
 message DmBigInt {}

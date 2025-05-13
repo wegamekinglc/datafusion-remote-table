@@ -730,6 +730,11 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 protobuf::SqliteBlob {},
             )),
         },
+        RemoteType::Dm(DmType::TinyInt) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmTinyInt(
+                protobuf::DmTinyInt {},
+            )),
+        },
         RemoteType::Dm(DmType::SmallInt) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmSmallInt(
                 protobuf::DmSmallInt {},
@@ -936,6 +941,7 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::SqliteReal(_) => RemoteType::Sqlite(SqliteType::Real),
         protobuf::remote_type::Type::SqliteText(_) => RemoteType::Sqlite(SqliteType::Text),
         protobuf::remote_type::Type::SqliteBlob(_) => RemoteType::Sqlite(SqliteType::Blob),
+        protobuf::remote_type::Type::DmTinyInt(_) => RemoteType::Dm(DmType::TinyInt),
         protobuf::remote_type::Type::DmSmallInt(_) => RemoteType::Dm(DmType::SmallInt),
         protobuf::remote_type::Type::DmInteger(_) => RemoteType::Dm(DmType::Integer),
         protobuf::remote_type::Type::DmBigInt(_) => RemoteType::Dm(DmType::BigInt),
