@@ -227,7 +227,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     port: options.port as u32,
                     username: options.username.clone(),
                     password: options.password.clone(),
-                    database: options.database.clone(),
+                    schema: options.schema.clone(),
                     pool_max_size: options.pool_max_size as u32,
                     stream_chunk_size: options.stream_chunk_size as u32,
                 },
@@ -288,7 +288,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 port: options.port as u16,
                 username: options.username,
                 password: options.password,
-                database: options.database,
+                schema: options.schema,
                 pool_max_size: options.pool_max_size as usize,
                 stream_chunk_size: options.stream_chunk_size as usize,
             })

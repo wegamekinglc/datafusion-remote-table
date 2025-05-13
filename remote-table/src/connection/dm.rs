@@ -16,7 +16,7 @@ use derive_getters::Getters;
 use derive_with::With;
 use futures::lock::Mutex;
 use odbc_api::handles::StatementImpl;
-use odbc_api::{Cursor, CursorImpl, Environment, ResultSetMetadata};
+use odbc_api::{CursorImpl, Environment, ResultSetMetadata};
 use std::sync::Arc;
 use tokio::runtime::Handle;
 
@@ -26,7 +26,7 @@ pub struct DmConnectionOptions {
     pub(crate) port: u16,
     pub(crate) username: String,
     pub(crate) password: String,
-    pub(crate) database: Option<String>,
+    pub(crate) schema: Option<String>,
     pub(crate) pool_max_size: usize,
     pub(crate) stream_chunk_size: usize,
 }
@@ -43,7 +43,7 @@ impl DmConnectionOptions {
             port,
             username: username.into(),
             password: password.into(),
-            database: None,
+            schema: None,
             pool_max_size: 10,
             stream_chunk_size: 2048,
         }
@@ -73,8 +73,8 @@ impl Pool for DmPool {
             self.options.username,
             self.options.password,
         );
-        if let Some(database) = &self.options.database {
-            connection_str.push_str(&format!(";Database={}", database));
+        if let Some(schema) = &self.options.schema {
+            connection_str.push_str(&format!(";SCHEMA={schema}"));
         }
         let connection = env
             .connect_with_connection_string(&connection_str, odbc_api::ConnectionOptions::default())
@@ -170,11 +170,10 @@ impl Connection for DmConnection {
             }
         };
 
-        let result: SendableRecordBatchStream = Box::pin(RecordBatchStreamAdapter::new(
+        Ok(Box::pin(RecordBatchStreamAdapter::new(
             projected_schema,
             output_stream,
-        ));
-        Ok(result)
+        )))
     }
 }
 

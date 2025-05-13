@@ -111,7 +111,7 @@ pub struct DmConnectionOptions {
     #[prost(string, tag = "4")]
     pub password: ::prost::alloc::string::String,
     #[prost(string, optional, tag = "5")]
-    pub database: ::core::option::Option<::prost::alloc::string::String>,
+    pub schema: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint32, tag = "6")]
     pub pool_max_size: u32,
     #[prost(uint32, tag = "7")]
