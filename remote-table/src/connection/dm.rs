@@ -97,7 +97,7 @@ impl Connection for DmConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = RemoteDbType::Dm
             .try_rewrite_query(sql, &[], Some(1))
-            .unwrap_or_else(|| sql.to_string());
+            .unwrap_or_else(|_e| sql.to_string());
         let conn = self.conn.lock().await;
         let cursor_opt = conn
             .execute(&sql, (), None)
@@ -123,9 +123,7 @@ impl Connection for DmConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Dm
-            .try_rewrite_query(sql, filters, limit)
-            .unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Dm.try_rewrite_query(sql, filters, limit)?;
         let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
         let projection = projection.cloned();

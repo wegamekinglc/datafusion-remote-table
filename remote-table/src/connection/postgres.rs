@@ -113,7 +113,7 @@ impl Connection for PostgresConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = RemoteDbType::Postgres
             .try_rewrite_query(sql, &[], Some(1))
-            .unwrap_or_else(|| sql.to_string());
+            .unwrap_or_else(|_e| sql.to_string());
         let row = self.conn.query_one(&sql, &[]).await.map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on postgres: {e:?}",))
         })?;
@@ -131,9 +131,7 @@ impl Connection for PostgresConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Postgres
-            .try_rewrite_query(sql, filters, limit)
-            .unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Postgres.try_rewrite_query(sql, filters, limit)?;
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let stream = self

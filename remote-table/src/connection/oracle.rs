@@ -99,7 +99,7 @@ impl Connection for OracleConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = RemoteDbType::Oracle
             .try_rewrite_query(sql, &[], Some(1))
-            .unwrap_or_else(|| sql.to_string());
+            .unwrap_or_else(|_e| sql.to_string());
         let row = self.conn.query_row(&sql, &[]).map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on oracle: {e:?}"))
         })?;
@@ -117,9 +117,7 @@ impl Connection for OracleConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Oracle
-            .try_rewrite_query(sql, filters, limit)
-            .unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Oracle.try_rewrite_query(sql, filters, limit)?;
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let result_set = self.conn.query(&sql, &[]).map_err(|e| {

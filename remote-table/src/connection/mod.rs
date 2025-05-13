@@ -162,20 +162,22 @@ impl RemoteDbType {
         sql: &str,
         filters: &[Expr],
         limit: Option<usize>,
-    ) -> Option<String> {
+    ) -> DFResult<String> {
         if !self.support_rewrite_with_filters_limit(sql) {
-            return None;
+            return Err(DataFusionError::Internal(format!(
+                "SQL is not supported for rewriting with filters and limit: {sql}"
+            )));
         }
         match self {
             RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
                 let where_clause = if filters.is_empty() {
                     "".to_string()
                 } else {
-                    let unparser = self.create_unparser().ok()?;
+                    let unparser = self.create_unparser()?;
                     let filters_ast = filters
                         .iter()
-                        .map(|f| unparser.expr_to_sql(f).expect("checked already"))
-                        .collect::<Vec<_>>();
+                        .map(|f| unparser.expr_to_sql(f))
+                        .collect::<DFResult<Vec<_>>>()?;
                     format!(
                         " WHERE {}",
                         filters_ast
@@ -192,21 +194,19 @@ impl RemoteDbType {
                 };
 
                 if where_clause.is_empty() && limit_clause.is_empty() {
-                    None
+                    Ok(sql.to_string())
                 } else {
-                    Some(format!(
+                    Ok(format!(
                         "SELECT * FROM ({sql}) as __subquery{where_clause}{limit_clause}"
                     ))
                 }
             }
-            RemoteDbType::Oracle => {
-                let limit = limit?;
-                Some(format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {limit}"))
-            }
-            RemoteDbType::Dm => {
-                let limit = limit?;
-                Some(format!("SELECT * FROM ({sql}) LIMIT {limit}"))
-            }
+            RemoteDbType::Oracle => Ok(limit
+                .map(|l| format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {l}"))
+                .unwrap_or_else(|| sql.to_string())),
+            RemoteDbType::Dm => Ok(limit
+                .map(|l| format!("SELECT * FROM ({sql}) LIMIT {l}"))
+                .unwrap_or_else(|| sql.to_string())),
         }
     }
 }
@@ -218,6 +218,7 @@ pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usi
     }
 }
 
+#[cfg(any(feature = "dm"))]
 pub(crate) fn project_batch(
     batch: RecordBatch,
     projection: Option<&Vec<usize>>,

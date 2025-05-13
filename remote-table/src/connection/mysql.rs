@@ -100,7 +100,7 @@ impl Connection for MysqlConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
         let sql = RemoteDbType::Mysql
             .try_rewrite_query(sql, &[], Some(1))
-            .unwrap_or_else(|| sql.to_string());
+            .unwrap_or_else(|_e| sql.to_string());
         let mut conn = self.conn.lock().await;
         let conn = &mut *conn;
         let row: Option<Row> = conn.query_first(&sql).await.map_err(|e| {
@@ -125,9 +125,7 @@ impl Connection for MysqlConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Mysql
-            .try_rewrite_query(sql, filters, limit)
-            .unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Mysql.try_rewrite_query(sql, filters, limit)?;
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);

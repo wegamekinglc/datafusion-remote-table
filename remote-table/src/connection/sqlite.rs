@@ -66,7 +66,7 @@ pub struct SqliteConnection {
 #[async_trait::async_trait]
 impl Connection for SqliteConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
-        let sql = sql.to_string();
+        let sql = RemoteDbType::Sqlite.try_rewrite_query(sql, &[], Some(1))?;
         self.conn
             .call(move |conn| {
                 let mut stmt = conn.prepare(&sql)?;
@@ -94,9 +94,7 @@ impl Connection for SqliteConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Sqlite
-            .try_rewrite_query(sql, filters, limit)
-            .unwrap_or_else(|| sql.to_string());
+        let sql = RemoteDbType::Sqlite.try_rewrite_query(sql, filters, limit)?;
         let conn = self.conn.clone();
         let projection = projection.cloned();
         let limit = conn_options.stream_chunk_size();
