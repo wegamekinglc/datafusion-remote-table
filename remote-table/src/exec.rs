@@ -162,8 +162,19 @@ async fn build_and_transform_stream(
         transform.as_ref(),
         remote_schema.as_ref(),
     )?;
+
     let rewritten_filters =
         rewrite_filters_column(filters, &table_schema, &transformed_table_schema)?;
+
+    let limit = if conn_options
+        .db_type()
+        .support_rewrite_with_filters_limit(&sql)
+    {
+        limit
+    } else {
+        None
+    };
+
     let stream = conn
         .query(
             &conn_options,
@@ -174,6 +185,7 @@ async fn build_and_transform_stream(
             limit,
         )
         .await?;
+
     if let Some(transform) = transform.as_ref() {
         Ok(Box::pin(TransformStream::try_new(
             stream,

@@ -162,11 +162,6 @@ impl RemoteDbType {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<String> {
-        if !self.support_rewrite_with_filters_limit(sql) {
-            return Err(DataFusionError::Internal(format!(
-                "SQL is not supported for rewriting with filters and limit: {sql}"
-            )));
-        }
         match self {
             RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
                 let where_clause = if filters.is_empty() {
