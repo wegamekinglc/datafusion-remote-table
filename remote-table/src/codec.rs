@@ -782,6 +782,12 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 },
             )),
         },
+        RemoteType::Dm(DmType::Text) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmText(protobuf::DmText {})),
+        },
+        RemoteType::Dm(DmType::Image) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmImage(protobuf::DmImage {})),
+        },
         RemoteType::Dm(DmType::Date) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmDate(protobuf::DmDate {})),
         },
@@ -979,6 +985,8 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::DmVarchar(protobuf::DmVarchar { length }) => {
             RemoteType::Dm(DmType::Varchar(length.map(|s| s as u16)))
         }
+        protobuf::remote_type::Type::DmText(protobuf::DmText {}) => RemoteType::Dm(DmType::Text),
+        protobuf::remote_type::Type::DmImage(protobuf::DmImage {}) => RemoteType::Dm(DmType::Image),
         protobuf::remote_type::Type::DmDate(_) => RemoteType::Dm(DmType::Date),
     }
 }

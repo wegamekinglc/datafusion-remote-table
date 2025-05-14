@@ -287,6 +287,8 @@ pub enum DmType {
     Decimal(u8, i8),
     Char(Option<u16>),
     Varchar(Option<u16>),
+    Text,
+    Image,
     Date,
 }
 
@@ -303,6 +305,8 @@ impl DmType {
             DmType::Decimal(precision, scale) => DataType::Decimal128(*precision, *scale),
             DmType::Char(_) => DataType::Utf8,
             DmType::Varchar(_) => DataType::Utf8,
+            DmType::Text => DataType::Utf8,
+            DmType::Image => DataType::Binary,
             DmType::Date => DataType::Date32,
         }
     }
