@@ -754,6 +754,22 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
         RemoteType::Dm(DmType::Double) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmDouble(protobuf::DmDouble {})),
         },
+        RemoteType::Dm(DmType::Numeric(precision, scale)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmNumeric(
+                protobuf::DmNumeric {
+                    precision: *precision as u32,
+                    scale: *scale as i32,
+                },
+            )),
+        },
+        RemoteType::Dm(DmType::Decimal(precision, scale)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmDecimal(
+                protobuf::DmDecimal {
+                    precision: *precision as u32,
+                    scale: *scale as i32,
+                },
+            )),
+        },
         RemoteType::Dm(DmType::Char(len)) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmChar(protobuf::DmChar {
                 length: len.map(|s| s as u32),
@@ -765,9 +781,6 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                     length: len.map(|s| s as u32),
                 },
             )),
-        },
-        RemoteType::Dm(DmType::Text) => protobuf::RemoteType {
-            r#type: Some(protobuf::remote_type::Type::DmText(protobuf::DmText {})),
         },
         RemoteType::Dm(DmType::Date) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmDate(protobuf::DmDate {})),
@@ -954,13 +967,18 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::DmBigInt(_) => RemoteType::Dm(DmType::BigInt),
         protobuf::remote_type::Type::DmReal(_) => RemoteType::Dm(DmType::Real),
         protobuf::remote_type::Type::DmDouble(_) => RemoteType::Dm(DmType::Double),
+        protobuf::remote_type::Type::DmNumeric(protobuf::DmNumeric { precision, scale }) => {
+            RemoteType::Dm(DmType::Numeric(*precision as u8, *scale as i8))
+        }
+        protobuf::remote_type::Type::DmDecimal(protobuf::DmDecimal { precision, scale }) => {
+            RemoteType::Dm(DmType::Decimal(*precision as u8, *scale as i8))
+        }
         protobuf::remote_type::Type::DmChar(protobuf::DmChar { length }) => {
             RemoteType::Dm(DmType::Char(length.map(|s| s as u16)))
         }
         protobuf::remote_type::Type::DmVarchar(protobuf::DmVarchar { length }) => {
             RemoteType::Dm(DmType::Varchar(length.map(|s| s as u16)))
         }
-        protobuf::remote_type::Type::DmText(_) => RemoteType::Dm(DmType::Text),
         protobuf::remote_type::Type::DmDate(_) => RemoteType::Dm(DmType::Date),
     }
 }

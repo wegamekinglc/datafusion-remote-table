@@ -209,11 +209,22 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
         odbc_api::DataType::BigInt => Ok(DmType::BigInt),
         odbc_api::DataType::Real => Ok(DmType::Real),
         odbc_api::DataType::Double => Ok(DmType::Double),
+        odbc_api::DataType::Numeric { precision, scale } => {
+            assert!(precision >= 1);
+            assert!(precision <= 38);
+            assert!(scale <= 38);
+            Ok(DmType::Numeric(precision as u8, scale as i8))
+        }
+        odbc_api::DataType::Decimal { precision, scale } => {
+            assert!(precision >= 1);
+            assert!(precision <= 38);
+            assert!(scale <= 38);
+            Ok(DmType::Decimal(precision as u8, scale as i8))
+        }
         odbc_api::DataType::Char { length } => Ok(DmType::Char(length.map(|l| l.get() as u16))),
         odbc_api::DataType::Varchar { length } => {
             Ok(DmType::Varchar(length.map(|l| l.get() as u16)))
         }
-        odbc_api::DataType::LongVarchar { length: _ } => Ok(DmType::Text),
         odbc_api::DataType::Date => Ok(DmType::Date),
         _ => Err(DataFusionError::Execution(format!(
             "Unsupported DM type: {data_type:?}"

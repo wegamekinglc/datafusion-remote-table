@@ -283,9 +283,10 @@ pub enum DmType {
     BigInt,
     Real,
     Double,
+    Numeric(u8, i8),
+    Decimal(u8, i8),
     Char(Option<u16>),
     Varchar(Option<u16>),
-    Text,
     Date,
 }
 
@@ -298,9 +299,10 @@ impl DmType {
             DmType::BigInt => DataType::Int64,
             DmType::Real => DataType::Float32,
             DmType::Double => DataType::Float64,
+            DmType::Numeric(precision, scale) => DataType::Decimal128(*precision, *scale),
+            DmType::Decimal(precision, scale) => DataType::Decimal128(*precision, *scale),
             DmType::Char(_) => DataType::Utf8,
             DmType::Varchar(_) => DataType::Utf8,
-            DmType::Text => DataType::Utf8,
             DmType::Date => DataType::Date32,
         }
     }
