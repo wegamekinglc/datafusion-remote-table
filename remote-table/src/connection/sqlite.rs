@@ -4,8 +4,8 @@ use crate::{
     RemoteType, SqliteType,
 };
 use datafusion::arrow::array::{
-    ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int64Builder, NullBuilder, RecordBatch,
-    StringBuilder, make_builder,
+    ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int32Builder, Int64Builder, NullBuilder,
+    RecordBatch, StringBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::{DataFusionError, project_schema};
@@ -362,6 +362,9 @@ fn append_rows_to_array_builders(
                     .downcast_mut::<NullBuilder>()
                     .expect("Failed to downcast builder to NullBuilder");
                 builder.append_null();
+            }
+            DataType::Int32 => {
+                handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx);
             }
             DataType::Int64 => {
                 handle_primitive_type!(builder, field, col, Int64Builder, i64, row, idx);

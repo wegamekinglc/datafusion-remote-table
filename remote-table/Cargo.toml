@@ -1,6 +1,6 @@
 [package]
 name = "datafusion-remote-table"
-version = "0.14.0"
+version = "0.13.0"
 edition = "2024"
 authors = ["lewiszlw <lewiszlw520@gmail.com>"]
 description = "A DataFusion table provider for executing SQL queries on remote databases"
@@ -52,4 +52,4 @@ rusqlite = { workspace = true, features = ["column_decltype"], optional = true }
 tokio-rusqlite = { version = "0.6.0", features = ["bundled"], optional = true }
 # Dm
 odbc-api = { version = "12.2", optional = true }
-arrow-odbc = { version = "16.0", optional = true }
+arrow-odbc = { version = "15.0", optional = true }
