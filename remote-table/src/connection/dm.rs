@@ -190,12 +190,13 @@ fn build_remote_schema(mut cursor: CursorImpl<StatementImpl>) -> DFResult<Remote
             .col_data_type(i)
             .map_err(|e| DataFusionError::External(Box::new(e)))?;
         let remote_type = RemoteType::Dm(dm_type_to_remote_type(col_type)?);
-        let col_nullable = cursor
-            .col_nullability(i)
-            .map_err(|e| DataFusionError::External(Box::new(e)))?
-            .could_be_nullable();
+        // TODO fix when bumping odbc-api to 12
+        // let col_nullable = cursor
+        //     .col_nullability(i)
+        //     .map_err(|e| DataFusionError::External(Box::new(e)))?
+        //     .could_be_nullable();
 
-        remote_fields.push(RemoteField::new(col_name, remote_type, col_nullable));
+        remote_fields.push(RemoteField::new(col_name, remote_type, true));
     }
 
     Ok(RemoteSchema::new(remote_fields))
