@@ -1,4 +1,5 @@
 CREATE TABLE supported_data_types (
+    bit_col BIT,
     tinyint_col TINYINT,
     smallint_col SMALLINT,
     integer_col INTEGER,
@@ -8,5 +9,5 @@ CREATE TABLE supported_data_types (
 );
 
 INSERT INTO supported_data_types VALUES
-(1, 2, 3, 4, 1.1, 2.2),
-(NULL, NULL, NULL, NULL, NULL, NULL);
+(1, 1, 2, 3, 4, 1.1, 2.2),
+(NULL, NULL, NULL, NULL, NULL, NULL, NULL);

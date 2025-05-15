@@ -178,7 +178,8 @@ message RemoteType {
     DmVarchar dm_varchar = 410;
     DmText dm_text = 411;
     DmImage dm_image = 412;
-    DmDate dm_date = 413;
+    DmBit dm_bit = 413;
+    DmDate dm_date = 414;
   }
 }
 
@@ -314,4 +315,5 @@ message DmVarchar {
 }
 message DmText {}
 message DmImage {}
+message DmBit {}
 message DmDate {}

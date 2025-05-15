@@ -228,6 +228,7 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
         }
         odbc_api::DataType::LongVarchar { .. } => Ok(DmType::Text),
         odbc_api::DataType::LongVarbinary { .. } => Ok(DmType::Image),
+        odbc_api::DataType::Bit => Ok(DmType::Bit),
         odbc_api::DataType::Date => Ok(DmType::Date),
         _ => Err(DataFusionError::Execution(format!(
             "Unsupported DM type: {data_type:?}"

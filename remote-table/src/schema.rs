@@ -289,6 +289,7 @@ pub enum DmType {
     Varchar(Option<u16>),
     Text,
     Image,
+    Bit,
     Date,
 }
 
@@ -307,6 +308,7 @@ impl DmType {
             DmType::Varchar(_) => DataType::Utf8,
             DmType::Text => DataType::Utf8,
             DmType::Image => DataType::Binary,
+            DmType::Bit => DataType::Boolean,
             DmType::Date => DataType::Date32,
         }
     }
