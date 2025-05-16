@@ -4,11 +4,14 @@ use crate::{
     RemoteSchemaRef, RemoteType,
 };
 use async_stream::stream;
+use chrono::NaiveDate;
 use datafusion::arrow::array::{
-    BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder, Int8Builder, Int16Builder,
-    Int32Builder, Int64Builder, RecordBatch, make_builder,
+    BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder, FixedSizeBinaryBuilder,
+    Float32Builder, Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder,
+    RecordBatch, StringBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
+    TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
 };
-use datafusion::arrow::datatypes::{DataType, Field, SchemaRef};
+use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -140,12 +143,14 @@ impl Connection for DmConnection {
 
             match cursor_opt {
                 None => {}
-                Some(cursor) => {
+                Some(mut cursor) => {
                     let buffer_descs = table_schema
                         .fields()
                         .iter()
-                        .map(|field| build_buffer_desc(field))
+                        .enumerate()
+                        .map(|(idx, field)| build_buffer_desc(field, &mut cursor, idx))
                         .collect::<DFResult<Vec<_>>>()?;
+
                     let row_set_buffer = ColumnarAnyBuffer::try_from_descs(
                         chunk_size,
                         buffer_descs,
@@ -153,6 +158,7 @@ impl Connection for DmConnection {
                     .map_err(|e| {
                         DataFusionError::Execution(format!("Failed to create buffer: {e:?}"))
                     })?;
+
                     let mut block_cursor = cursor.bind_buffer(row_set_buffer).map_err(|e| {
                         DataFusionError::Execution(format!("Failed to bind buffer: {e:?}"))
                     })?;
@@ -272,7 +278,11 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
     }
 }
 
-fn build_buffer_desc(field: &Field) -> DFResult<BufferDesc> {
+fn build_buffer_desc(
+    field: &Field,
+    cursor: &mut CursorImpl<StatementImpl>,
+    col_idx: usize,
+) -> DFResult<BufferDesc> {
     let nullable = field.is_nullable();
     match field.data_type() {
         DataType::Boolean => Ok(BufferDesc::Bit { nullable }),
@@ -288,6 +298,35 @@ fn build_buffer_desc(field: &Field) -> DFResult<BufferDesc> {
                 max_str_len: *precision as usize + 2,
             })
         }
+        DataType::Utf8 => {
+            let len = cursor
+                .col_data_type(col_idx as u16 + 1)
+                .map_err(|e| DataFusionError::External(Box::new(e)))?
+                .column_size()
+                .ok_or_else(|| {
+                    DataFusionError::Execution(format!("Failed to get column size for {field:?}"))
+                })?
+                .get();
+            Ok(BufferDesc::Text {
+                max_str_len: len * 4,
+            })
+        }
+        DataType::FixedSizeBinary(size) => Ok(BufferDesc::Binary {
+            length: *size as usize,
+        }),
+        DataType::Binary => {
+            let len = cursor
+                .col_data_type(col_idx as u16 + 1)
+                .map_err(|e| DataFusionError::External(Box::new(e)))?
+                .column_size()
+                .ok_or_else(|| {
+                    DataFusionError::Execution(format!("Failed to get column size for {field:?}"))
+                })?
+                .get();
+            Ok(BufferDesc::Binary { length: len })
+        }
+        DataType::Timestamp(_, _) => Ok(BufferDesc::Timestamp { nullable }),
+        DataType::Date32 => Ok(BufferDesc::Date { nullable }),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported data type to build buffer desc: {:?}",
             field.data_type()
@@ -343,7 +382,7 @@ macro_rules! handle_variable_type {
         for value in values.iter() {
             match value {
                 Some(v) => {
-                    builder.append_value($convert(v));
+                    builder.append_value($convert(v)?);
                 }
                 None => {
                     builder.append_null();
@@ -454,7 +493,184 @@ fn buffer_to_batch(
                     Decimal128Builder,
                     col_slice,
                     as_text_view,
-                    |value: &[u8]| decimal_text_to_i128(value, *scale as usize)
+                    |value: &[u8]| Ok::<_, DataFusionError>(decimal_text_to_i128(
+                        value,
+                        *scale as usize
+                    ))
+                );
+            }
+            DataType::Utf8 => {
+                let convert: for<'a> fn(&'a [u8]) -> DFResult<&'a str> = |v| {
+                    std::str::from_utf8(v).map_err(|_| {
+                        DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", v))
+                    })
+                };
+                handle_variable_type!(
+                    builder,
+                    field,
+                    StringBuilder,
+                    col_slice,
+                    as_text_view,
+                    convert
+                );
+            }
+            DataType::FixedSizeBinary(_) => {
+                let builder = builder
+                    .as_any_mut()
+                    .downcast_mut::<FixedSizeBinaryBuilder>()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Failed to downcast builder to FixedSizeBinaryBuilder for {:?}",
+                            field
+                        )
+                    });
+                let values = col_slice.as_bin_view().ok_or_else(|| {
+                    DataFusionError::Execution(format!("Failed to get view for {:?}", field))
+                })?;
+                for value in values.iter() {
+                    match value {
+                        Some(v) => {
+                            builder.append_value(v)?;
+                        }
+                        None => {
+                            builder.append_null();
+                        }
+                    }
+                }
+            }
+            DataType::Binary => {
+                let convert: for<'a> fn(&'a [u8]) -> DFResult<&'a [u8]> = |v| Ok(v);
+                handle_variable_type!(
+                    builder,
+                    field,
+                    BinaryBuilder,
+                    col_slice,
+                    as_bin_view,
+                    convert
+                );
+            }
+            DataType::Timestamp(TimeUnit::Second, _) => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    TimestampSecondBuilder,
+                    nullable,
+                    odbc_api::sys::Timestamp,
+                    col_slice,
+                    |value: &odbc_api::sys::Timestamp| {
+                        let ndt = NaiveDate::from_ymd_opt(
+                            value.year as i32,
+                            value.month as u32,
+                            value.day as u32,
+                        )
+                        .unwrap()
+                        .and_hms_opt(value.hour as u32, value.minute as u32, value.second as u32)
+                        .unwrap();
+                        ndt.and_utc().timestamp()
+                    }
+                );
+            }
+            DataType::Timestamp(TimeUnit::Millisecond, _) => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    TimestampMillisecondBuilder,
+                    nullable,
+                    odbc_api::sys::Timestamp,
+                    col_slice,
+                    |value: &odbc_api::sys::Timestamp| {
+                        let ndt = NaiveDate::from_ymd_opt(
+                            value.year as i32,
+                            value.month as u32,
+                            value.day as u32,
+                        )
+                        .unwrap()
+                        .and_hms_nano_opt(
+                            value.hour as u32,
+                            value.minute as u32,
+                            value.second as u32,
+                            value.fraction,
+                        )
+                        .unwrap();
+                        ndt.and_utc().timestamp_millis()
+                    }
+                );
+            }
+            DataType::Timestamp(TimeUnit::Microsecond, _) => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    TimestampMicrosecondBuilder,
+                    nullable,
+                    odbc_api::sys::Timestamp,
+                    col_slice,
+                    |value: &odbc_api::sys::Timestamp| {
+                        let ndt = NaiveDate::from_ymd_opt(
+                            value.year as i32,
+                            value.month as u32,
+                            value.day as u32,
+                        )
+                        .unwrap()
+                        .and_hms_nano_opt(
+                            value.hour as u32,
+                            value.minute as u32,
+                            value.second as u32,
+                            value.fraction,
+                        )
+                        .unwrap();
+                        ndt.and_utc().timestamp_micros()
+                    }
+                );
+            }
+            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    TimestampNanosecondBuilder,
+                    nullable,
+                    odbc_api::sys::Timestamp,
+                    col_slice,
+                    |value: &odbc_api::sys::Timestamp| {
+                        let ndt = NaiveDate::from_ymd_opt(
+                            value.year as i32,
+                            value.month as u32,
+                            value.day as u32,
+                        )
+                        .unwrap()
+                        .and_hms_nano_opt(
+                            value.hour as u32,
+                            value.minute as u32,
+                            value.second as u32,
+                            value.fraction,
+                        )
+                        .unwrap();
+
+                        // TODO handle error
+                        // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
+                        // 2262-04-11T23:47:16.854775804
+                        ndt.and_utc().timestamp_nanos_opt().unwrap()
+                    }
+                );
+            }
+            DataType::Date32 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Date32Builder,
+                    nullable,
+                    odbc_api::sys::Date,
+                    col_slice,
+                    |value: &odbc_api::sys::Date| {
+                        let unix_epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                        let date = NaiveDate::from_ymd_opt(
+                            value.year as i32,
+                            value.month as u32,
+                            value.day as u32,
+                        )
+                        .unwrap();
+                        let duration = date.signed_duration_since(unix_epoch);
+                        duration.num_days().try_into().unwrap()
+                    }
                 );
             }
             _ => {
