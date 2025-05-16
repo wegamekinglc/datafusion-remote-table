@@ -4,11 +4,12 @@ use crate::{
     RemoteSchemaRef, RemoteType,
 };
 use async_stream::stream;
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveTime, Timelike};
 use datafusion::arrow::array::{
     BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder, FixedSizeBinaryBuilder,
     Float32Builder, Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder,
-    RecordBatch, StringBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
+    RecordBatch, StringBuilder, Time32MillisecondBuilder, Time32SecondBuilder,
+    Time64MicrosecondBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
     TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
@@ -271,6 +272,11 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
             assert!(precision <= 9);
             Ok(DmType::Timestamp(precision as u8))
         }
+        odbc_api::DataType::Time { precision } => {
+            assert!(precision >= 0);
+            assert!(precision <= 6);
+            Ok(DmType::Time(precision as u8))
+        }
         odbc_api::DataType::Date => Ok(DmType::Date),
         _ => Err(DataFusionError::Execution(format!(
             "Unsupported DM type: {data_type:?}"
@@ -299,7 +305,7 @@ fn build_buffer_desc(
             })
         }
         DataType::Utf8 => {
-            let len = cursor
+            let column_size = cursor
                 .col_data_type(col_idx as u16 + 1)
                 .map_err(|e| DataFusionError::External(Box::new(e)))?
                 .column_size()
@@ -308,14 +314,14 @@ fn build_buffer_desc(
                 })?
                 .get();
             Ok(BufferDesc::Text {
-                max_str_len: len * 4,
+                max_str_len: column_size * 4,
             })
         }
         DataType::FixedSizeBinary(size) => Ok(BufferDesc::Binary {
             length: *size as usize,
         }),
         DataType::Binary => {
-            let len = cursor
+            let column_size = cursor
                 .col_data_type(col_idx as u16 + 1)
                 .map_err(|e| DataFusionError::External(Box::new(e)))?
                 .column_size()
@@ -323,10 +329,26 @@ fn build_buffer_desc(
                     DataFusionError::Execution(format!("Failed to get column size for {field:?}"))
                 })?
                 .get();
-            Ok(BufferDesc::Binary { length: len })
+            Ok(BufferDesc::Binary {
+                length: column_size,
+            })
         }
         DataType::Timestamp(_, _) => Ok(BufferDesc::Timestamp { nullable }),
         DataType::Date32 => Ok(BufferDesc::Date { nullable }),
+        DataType::Time32(_) => {
+            let display_size = cursor
+                .col_data_type(col_idx as u16 + 1)
+                .map_err(|e| DataFusionError::External(Box::new(e)))?
+                .display_size()
+                .ok_or_else(|| {
+                    DataFusionError::Execution(format!("Failed to get display size for {field:?}"))
+                })?
+                .get();
+            Ok(BufferDesc::Text {
+                max_str_len: display_size * 4,
+            })
+        }
+        DataType::Time64(_) => Ok(BufferDesc::Time { nullable }),
         _ => Err(DataFusionError::NotImplemented(format!(
             "Unsupported data type to build buffer desc: {:?}",
             field.data_type()
@@ -649,6 +671,63 @@ fn buffer_to_batch(
                         // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
                         // 2262-04-11T23:47:16.854775804
                         ndt.and_utc().timestamp_nanos_opt().unwrap()
+                    }
+                );
+            }
+            DataType::Time32(TimeUnit::Second) => {
+                handle_variable_type!(
+                    builder,
+                    field,
+                    Time32SecondBuilder,
+                    col_slice,
+                    as_text_view,
+                    |value: &[u8]| {
+                        let s = std::str::from_utf8(value).map_err(|_| {
+                            DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", value))
+                        })?;
+                        // TODO handle err
+                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").unwrap();
+                        Ok::<_, DataFusionError>(nt.num_seconds_from_midnight() as i32)
+                    }
+                );
+            }
+            DataType::Time32(TimeUnit::Millisecond) => {
+                handle_variable_type!(
+                    builder,
+                    field,
+                    Time32MillisecondBuilder,
+                    col_slice,
+                    as_text_view,
+                    |value: &[u8]| {
+                        let s = std::str::from_utf8(value).map_err(|_| {
+                            DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", value))
+                        })?;
+                        // TODO handle err
+                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").unwrap();
+                        Ok::<_, DataFusionError>(
+                            nt.num_seconds_from_midnight() as i32 * 1000
+                                + (nt.nanosecond() / 1000_000) as i32,
+                        )
+                    }
+                );
+            }
+            DataType::Time64(TimeUnit::Microsecond) => {
+                handle_variable_type!(
+                    builder,
+                    field,
+                    Time64MicrosecondBuilder,
+                    col_slice,
+                    as_text_view,
+                    |value: &[u8]| {
+                        // TODO handle err
+                        let s = std::str::from_utf8(value).map_err(|_| {
+                            DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", value))
+                        })?;
+                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").unwrap();
+                        Ok::<_, DataFusionError>(
+                            nt.num_seconds_from_midnight() as i64 * 1000_1000
+                                + (nt.nanosecond() / 1000) as i64,
+                        )
                     }
                 );
             }

@@ -293,6 +293,7 @@ pub enum DmType {
     Image,
     Bit,
     Timestamp(u8),
+    Time(u8),
     Date,
 }
 
@@ -323,6 +324,15 @@ impl DmType {
                     DataType::Timestamp(TimeUnit::Microsecond, None)
                 } else {
                     DataType::Timestamp(TimeUnit::Nanosecond, None)
+                }
+            }
+            DmType::Time(precision) => {
+                if *precision == 0 {
+                    DataType::Time32(TimeUnit::Second)
+                } else if *precision <= 3 {
+                    DataType::Time32(TimeUnit::Millisecond)
+                } else {
+                    DataType::Time64(TimeUnit::Microsecond)
                 }
             }
             DmType::Date => DataType::Date32,

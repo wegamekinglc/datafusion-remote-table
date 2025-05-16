@@ -140,7 +140,7 @@ pub struct RemoteField {
 pub struct RemoteType {
     #[prost(
         oneof = "remote_type::Type",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 301, 302, 303, 304, 305, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418"
     )]
     pub r#type: ::core::option::Option<remote_type::Type>,
 }
@@ -339,6 +339,8 @@ pub mod remote_type {
         #[prost(message, tag = "416")]
         DmTimestamp(super::DmTimestamp),
         #[prost(message, tag = "417")]
+        DmTime(super::DmTime),
+        #[prost(message, tag = "418")]
         DmDate(super::DmDate),
     }
 }
@@ -591,6 +593,11 @@ pub struct DmImage {}
 pub struct DmBit {}
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct DmTimestamp {
+    #[prost(uint32, tag = "1")]
+    pub precision: u32,
+}
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct DmTime {
     #[prost(uint32, tag = "1")]
     pub precision: u32,
 }

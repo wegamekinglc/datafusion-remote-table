@@ -810,6 +810,11 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
                 },
             )),
         },
+        RemoteType::Dm(DmType::Time(precision)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmTime(protobuf::DmTime {
+                precision: *precision as u32,
+            })),
+        },
         RemoteType::Dm(DmType::Date) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmDate(protobuf::DmDate {})),
         },
@@ -1018,6 +1023,9 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
         protobuf::remote_type::Type::DmBit(protobuf::DmBit {}) => RemoteType::Dm(DmType::Bit),
         protobuf::remote_type::Type::DmTimestamp(protobuf::DmTimestamp { precision }) => {
             RemoteType::Dm(DmType::Timestamp(*precision as u8))
+        }
+        protobuf::remote_type::Type::DmTime(protobuf::DmTime { precision }) => {
+            RemoteType::Dm(DmType::Time(*precision as u8))
         }
         protobuf::remote_type::Type::DmDate(_) => RemoteType::Dm(DmType::Date),
     }
