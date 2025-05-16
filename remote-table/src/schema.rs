@@ -292,6 +292,7 @@ pub enum DmType {
     Varbinary(Option<u16>),
     Image,
     Bit,
+    Timestamp(u8),
     Date,
 }
 
@@ -313,6 +314,17 @@ impl DmType {
             DmType::Varbinary(_) => DataType::Binary,
             DmType::Image => DataType::Binary,
             DmType::Bit => DataType::Boolean,
+            DmType::Timestamp(precision) => {
+                if *precision == 0 {
+                    DataType::Timestamp(TimeUnit::Second, None)
+                } else if *precision <= 3 {
+                    DataType::Timestamp(TimeUnit::Millisecond, None)
+                } else if *precision <= 6 {
+                    DataType::Timestamp(TimeUnit::Microsecond, None)
+                } else {
+                    DataType::Timestamp(TimeUnit::Nanosecond, None)
+                }
+            }
             DmType::Date => DataType::Date32,
         }
     }

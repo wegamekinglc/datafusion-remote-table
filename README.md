@@ -58,10 +58,10 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
   - [x] Null / Integer / Real / Text / Blob
 - [x] DM (达梦数据库)
   - [x] TinyInt / Smallint / Int / Bigint
-  - [x] Real / Double / Numeric / Decimal
+  - [x] Real / Float / Double / Numeric / Decimal
   - [x] Char / Varchar
   - [x] Binary / Varbinary
-  - [x] Bit / Date
+  - [x] Bit / Timestamp / Date
 
 ## Thanks
 - [datafusion-table-providers](https://crates.io/crates/datafusion-table-providers)

@@ -181,7 +181,8 @@ message RemoteType {
     DmVarbinary dm_varbinary = 413;
     DmImage dm_image = 414;
     DmBit dm_bit = 415;
-    DmDate dm_date = 416;
+    DmTimestamp dm_timestamp = 416;
+    DmDate dm_date = 417;
   }
 }
 
@@ -324,4 +325,7 @@ message DmVarbinary {
 }
 message DmImage {}
 message DmBit {}
+message DmTimestamp {
+  uint32 precision = 1;
+}
 message DmDate {}
