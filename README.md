@@ -60,7 +60,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
   - [x] TinyInt / Smallint / Int / Bigint
   - [x] Real / Double / Numeric / Decimal
   - [x] Char / Varchar
-  - [x] Date
+  - [x] Binary / Varbinary
+  - [x] Bit / Date
 
 ## Thanks
 - [datafusion-table-providers](https://crates.io/crates/datafusion-table-providers)

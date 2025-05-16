@@ -177,9 +177,11 @@ message RemoteType {
     DmChar dm_char = 409;
     DmVarchar dm_varchar = 410;
     DmText dm_text = 411;
-    DmImage dm_image = 412;
-    DmBit dm_bit = 413;
-    DmDate dm_date = 414;
+    DmBinary dm_binary = 412;
+    DmVarbinary dm_varbinary = 413;
+    DmImage dm_image = 414;
+    DmBit dm_bit = 415;
+    DmDate dm_date = 416;
   }
 }
 
@@ -314,6 +316,12 @@ message DmVarchar {
   optional uint32 length = 1;
 }
 message DmText {}
+message DmBinary {
+  uint32 length = 1;
+}
+message DmVarbinary {
+  optional uint32 length = 1;
+}
 message DmImage {}
 message DmBit {}
 message DmDate {}

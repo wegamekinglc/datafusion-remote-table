@@ -785,6 +785,18 @@ fn serialize_remote_type(remote_type: &RemoteType) -> protobuf::RemoteType {
         RemoteType::Dm(DmType::Text) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmText(protobuf::DmText {})),
         },
+        RemoteType::Dm(DmType::Binary(len)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmBinary(protobuf::DmBinary {
+                length: *len as u32,
+            })),
+        },
+        RemoteType::Dm(DmType::Varbinary(len)) => protobuf::RemoteType {
+            r#type: Some(protobuf::remote_type::Type::DmVarbinary(
+                protobuf::DmVarbinary {
+                    length: len.map(|s| s as u32),
+                },
+            )),
+        },
         RemoteType::Dm(DmType::Image) => protobuf::RemoteType {
             r#type: Some(protobuf::remote_type::Type::DmImage(protobuf::DmImage {})),
         },
@@ -989,6 +1001,12 @@ fn parse_remote_type(remote_type: &protobuf::RemoteType) -> RemoteType {
             RemoteType::Dm(DmType::Varchar(length.map(|s| s as u16)))
         }
         protobuf::remote_type::Type::DmText(protobuf::DmText {}) => RemoteType::Dm(DmType::Text),
+        protobuf::remote_type::Type::DmBinary(protobuf::DmBinary { length }) => {
+            RemoteType::Dm(DmType::Binary(*length as u16))
+        }
+        protobuf::remote_type::Type::DmVarbinary(protobuf::DmVarbinary { length }) => {
+            RemoteType::Dm(DmType::Varbinary(length.map(|s| s as u16)))
+        }
         protobuf::remote_type::Type::DmImage(protobuf::DmImage {}) => RemoteType::Dm(DmType::Image),
         protobuf::remote_type::Type::DmBit(protobuf::DmBit {}) => RemoteType::Dm(DmType::Bit),
         protobuf::remote_type::Type::DmDate(_) => RemoteType::Dm(DmType::Date),
