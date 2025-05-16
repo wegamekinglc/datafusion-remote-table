@@ -219,18 +219,6 @@ pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usi
     }
 }
 
-#[cfg(feature = "dm")]
-pub(crate) fn project_batch(
-    batch: datafusion::arrow::array::RecordBatch,
-    projection: Option<&Vec<usize>>,
-) -> DFResult<datafusion::arrow::array::RecordBatch> {
-    if let Some(projection) = projection {
-        Ok(batch.project(projection)?)
-    } else {
-        Ok(batch)
-    }
-}
-
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "oracle"))]
 fn big_decimal_to_i128(decimal: &bigdecimal::BigDecimal, scale: Option<i32>) -> Option<i128> {
     use bigdecimal::{FromPrimitive, ToPrimitive};

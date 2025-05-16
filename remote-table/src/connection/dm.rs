@@ -1,12 +1,14 @@
-use crate::connection::{ODBC_ENV, project_batch};
+use crate::connection::{ODBC_ENV, projections_contains};
 use crate::{
     Connection, ConnectionOptions, DFResult, DmType, Pool, RemoteDbType, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType,
 };
-use arrow_odbc::OdbcReaderBuilder;
 use async_stream::stream;
-use datafusion::arrow::array::RecordBatch;
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::array::{
+    BooleanBuilder, Decimal128Builder, Float32Builder, Float64Builder, Int8Builder, Int16Builder,
+    Int32Builder, Int64Builder, RecordBatch, make_builder,
+};
+use datafusion::arrow::datatypes::{DataType, Field, SchemaRef};
 use datafusion::common::project_schema;
 use datafusion::error::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
@@ -15,8 +17,9 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::lock::Mutex;
+use odbc_api::buffers::{BufferDesc, ColumnarAnyBuffer};
 use odbc_api::handles::StatementImpl;
-use odbc_api::{CursorImpl, Environment, ResultSetMetadata};
+use odbc_api::{Bit, Cursor, CursorImpl, Environment, ResultSetMetadata, decimal_text_to_i128};
 use std::sync::Arc;
 use tokio::runtime::Handle;
 
@@ -138,19 +141,41 @@ impl Connection for DmConnection {
             match cursor_opt {
                 None => {}
                 Some(cursor) => {
-                    let reader = OdbcReaderBuilder::new()
-                        .with_schema(table_schema)
-                        .with_max_num_rows_per_batch(chunk_size)
-                        .with_max_bytes_per_batch(256 * 1024 * 1024)
-                        .build(cursor)
-                        .map_err(|e| {
-                            DataFusionError::Execution(format!("Failed to build reader: {e:?}"))
-                        })?;
-                    for batch in reader {
-                        let projected_batch = project_batch(batch?, projection.as_ref())?;
-                        batch_tx.blocking_send(projected_batch).map_err(|e| {
-                            DataFusionError::Execution(format!("Failed to send batch: {e:?}"))
-                        })?;
+                    let buffer_descs = table_schema
+                        .fields()
+                        .iter()
+                        .map(|field| build_buffer_desc(field))
+                        .collect::<DFResult<Vec<_>>>()?;
+                    let row_set_buffer = ColumnarAnyBuffer::try_from_descs(
+                        chunk_size,
+                        buffer_descs,
+                    )
+                    .map_err(|e| {
+                        DataFusionError::Execution(format!("Failed to create buffer: {e:?}"))
+                    })?;
+                    let mut block_cursor = cursor.bind_buffer(row_set_buffer).map_err(|e| {
+                        DataFusionError::Execution(format!("Failed to bind buffer: {e:?}"))
+                    })?;
+                    loop {
+                        match block_cursor.fetch_with_truncation_check(true) {
+                            Ok(Some(buffer)) => {
+                                let batch = buffer_to_batch(
+                                    buffer,
+                                    &table_schema,
+                                    projection.as_ref(),
+                                    chunk_size,
+                                )?;
+                                batch_tx.blocking_send(batch).map_err(|e| {
+                                    DataFusionError::Execution(format!(
+                                        "Failed to send batch: {e:?}"
+                                    ))
+                                })?;
+                            }
+                            Ok(None) => break,
+                            Err(odbc_error) => {
+                                return Err(DataFusionError::External(Box::new(odbc_error)));
+                            }
+                        }
                     }
                 }
             }
@@ -190,13 +215,12 @@ fn build_remote_schema(mut cursor: CursorImpl<StatementImpl>) -> DFResult<Remote
             .col_data_type(i)
             .map_err(|e| DataFusionError::External(Box::new(e)))?;
         let remote_type = RemoteType::Dm(dm_type_to_remote_type(col_type)?);
-        // TODO fix when bumping odbc-api to 12
-        // let col_nullable = cursor
-        //     .col_nullability(i)
-        //     .map_err(|e| DataFusionError::External(Box::new(e)))?
-        //     .could_be_nullable();
+        let col_nullable = cursor
+            .col_nullability(i)
+            .map_err(|e| DataFusionError::External(Box::new(e)))?
+            .could_be_nullable();
 
-        remote_fields.push(RemoteField::new(col_name, remote_type, true));
+        remote_fields.push(RemoteField::new(col_name, remote_type, col_nullable));
     }
 
     Ok(RemoteSchema::new(remote_fields))
@@ -246,4 +270,201 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
             "Unsupported DM type: {data_type:?}"
         ))),
     }
+}
+
+fn build_buffer_desc(field: &Field) -> DFResult<BufferDesc> {
+    let nullable = field.is_nullable();
+    match field.data_type() {
+        DataType::Boolean => Ok(BufferDesc::Bit { nullable }),
+        DataType::Int8 => Ok(BufferDesc::I8 { nullable }),
+        DataType::Int16 => Ok(BufferDesc::I16 { nullable }),
+        DataType::Int32 => Ok(BufferDesc::I32 { nullable }),
+        DataType::Int64 => Ok(BufferDesc::I64 { nullable }),
+        DataType::Float32 => Ok(BufferDesc::F32 { nullable }),
+        DataType::Float64 => Ok(BufferDesc::F64 { nullable }),
+        DataType::Decimal128(precision, _scale) => {
+            Ok(BufferDesc::Text {
+                // Must be able to hold num precision digits a sign and a decimal point
+                max_str_len: *precision as usize + 2,
+            })
+        }
+        _ => Err(DataFusionError::NotImplemented(format!(
+            "Unsupported data type to build buffer desc: {:?}",
+            field.data_type()
+        ))),
+    }
+}
+
+macro_rules! handle_primitive_type {
+    ($builder:expr, $field:expr, $builder_ty:ty, $nullable:expr, $value_ty:ty, $col_slice:expr, $convert:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_ty>()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Failed to downcast builder to {} for {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                )
+            });
+        if $nullable {
+            let values = $col_slice.as_nullable_slice::<$value_ty>().ok_or_else(|| {
+                DataFusionError::Execution(format!("Failed to get nullable slice for {:?}", $field))
+            })?;
+            for value in values {
+                builder.append_option(value.map($convert));
+            }
+        } else {
+            let values = $col_slice.as_slice::<$value_ty>().ok_or_else(|| {
+                DataFusionError::Execution(format!("Failed to get slice for {:?}", $field))
+            })?;
+            for value in values {
+                builder.append_value($convert(value));
+            }
+        }
+    }};
+}
+
+macro_rules! handle_variable_type {
+    ($builder:expr, $field:expr, $builder_ty:ty, $col_slice:expr, $slice_fn:ident, $convert:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_ty>()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Failed to downcast builder to {} for {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                )
+            });
+        let values = $col_slice.$slice_fn().ok_or_else(|| {
+            DataFusionError::Execution(format!("Failed to get view for {:?}", $field))
+        })?;
+        for value in values.iter() {
+            match value {
+                Some(v) => {
+                    builder.append_value($convert(v));
+                }
+                None => {
+                    builder.append_null();
+                }
+            }
+        }
+    }};
+}
+
+fn buffer_to_batch(
+    buffer: &ColumnarAnyBuffer,
+    table_schema: &SchemaRef,
+    projection: Option<&Vec<usize>>,
+    chunk_size: usize,
+) -> DFResult<RecordBatch> {
+    let projected_schema = project_schema(table_schema, projection)?;
+
+    let mut arrays = Vec::with_capacity(projected_schema.fields().len());
+    for (col_idx, field) in table_schema.fields().iter().enumerate() {
+        if !projections_contains(projection, col_idx) {
+            continue;
+        }
+        let mut builder = make_builder(field.data_type(), chunk_size);
+        let col_slice = buffer.column(col_idx);
+        let nullable = field.is_nullable();
+        match field.data_type() {
+            DataType::Boolean => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    BooleanBuilder,
+                    nullable,
+                    Bit,
+                    col_slice,
+                    |bit: &Bit| bit.as_bool()
+                );
+            }
+            DataType::Int8 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Int8Builder,
+                    nullable,
+                    i8,
+                    col_slice,
+                    |value: &i8| *value
+                );
+            }
+            DataType::Int16 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Int16Builder,
+                    nullable,
+                    i16,
+                    col_slice,
+                    |value: &i16| *value
+                );
+            }
+            DataType::Int32 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Int32Builder,
+                    nullable,
+                    i32,
+                    col_slice,
+                    |value: &i32| *value
+                );
+            }
+            DataType::Int64 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Int64Builder,
+                    nullable,
+                    i64,
+                    col_slice,
+                    |value: &i64| *value
+                );
+            }
+            DataType::Float32 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Float32Builder,
+                    nullable,
+                    f32,
+                    col_slice,
+                    |value: &f32| *value
+                );
+            }
+            DataType::Float64 => {
+                handle_primitive_type!(
+                    builder,
+                    field,
+                    Float64Builder,
+                    nullable,
+                    f64,
+                    col_slice,
+                    |value: &f64| *value
+                );
+            }
+            DataType::Decimal128(_, scale) => {
+                handle_variable_type!(
+                    builder,
+                    field,
+                    Decimal128Builder,
+                    col_slice,
+                    as_text_view,
+                    |value: &[u8]| decimal_text_to_i128(value, *scale as usize)
+                );
+            }
+            _ => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "Unsupported field to build record batch: {:?}",
+                    field
+                )));
+            }
+        }
+        arrays.push(builder.finish());
+    }
+    Ok(RecordBatch::try_new(projected_schema, arrays)?)
 }

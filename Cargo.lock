@@ -268,19 +268,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arrow-odbc"
-version = "15.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b1136f1476bd241f020a6379643742b2071d1ad28c5bf56679edd86211189b"
-dependencies = [
- "arrow",
- "chrono",
- "log",
- "odbc-api",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "arrow-ord"
 version = "54.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1493,7 +1480,6 @@ dependencies = [
 name = "datafusion-remote-table"
 version = "0.13.0"
 dependencies = [
- "arrow-odbc",
  "async-stream",
  "async-trait",
  "bb8",
@@ -2938,9 +2924,9 @@ dependencies = [
 
 [[package]]
 name = "odbc-api"
-version = "11.1.1"
+version = "12.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c285198749d5fe2cc75db87bd7356daedceb311c5435ce8d314bf85bf0164a9"
+checksum = "cfa6c3cbfe5253d35eb3f55414d8b3447748febf8589d1895839976f508462d1"
 dependencies = [
  "atoi",
  "log",
