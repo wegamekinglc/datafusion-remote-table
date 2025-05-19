@@ -230,6 +230,7 @@ fn serialize_connection_options(options: &ConnectionOptions) -> protobuf::Connec
                     schema: options.schema.clone(),
                     pool_max_size: options.pool_max_size as u32,
                     stream_chunk_size: options.stream_chunk_size as u32,
+                    driver: options.driver.clone(),
                 },
             )),
         },
@@ -291,6 +292,7 @@ fn parse_connection_options(options: protobuf::ConnectionOptions) -> ConnectionO
                 schema: options.schema,
                 pool_max_size: options.pool_max_size as usize,
                 stream_chunk_size: options.stream_chunk_size as usize,
+                driver: options.driver,
             })
         }
         _ => panic!("Failed to parse connection options: {options:?}"),

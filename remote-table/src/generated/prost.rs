@@ -116,6 +116,8 @@ pub struct DmConnectionOptions {
     pub pool_max_size: u32,
     #[prost(uint32, tag = "7")]
     pub stream_chunk_size: u32,
+    #[prost(string, tag = "8")]
+    pub driver: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Projection {

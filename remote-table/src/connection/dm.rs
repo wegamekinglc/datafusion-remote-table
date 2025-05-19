@@ -36,6 +36,7 @@ pub struct DmConnectionOptions {
     pub(crate) schema: Option<String>,
     pub(crate) pool_max_size: usize,
     pub(crate) stream_chunk_size: usize,
+    pub(crate) driver: String,
 }
 
 impl DmConnectionOptions {
@@ -53,6 +54,7 @@ impl DmConnectionOptions {
             schema: None,
             pool_max_size: 10,
             stream_chunk_size: 2048,
+            driver: "DM8 ODBC DRIVER".to_string(),
         }
     }
 }
@@ -73,8 +75,8 @@ impl Pool for DmPool {
     async fn get(&self) -> DFResult<Arc<dyn Connection>> {
         let env = ODBC_ENV.get_or_init(|| Environment::new().expect("failed to create ODBC env"));
         let mut connection_str = format!(
-            "Driver={};Server={};Port={};UID={};PWD={}",
-            "{DM8 ODBC DRIVER}",
+            "Driver={{{}}};Server={};Port={};UID={};PWD={}",
+            self.options.driver,
             self.options.host,
             self.options.port,
             self.options.username,
