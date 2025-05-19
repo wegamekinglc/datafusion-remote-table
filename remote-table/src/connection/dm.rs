@@ -257,10 +257,9 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
         odbc_api::DataType::Varchar { length } => {
             Ok(DmType::Varchar(length.map(|l| l.get() as u16)))
         }
-        odbc_api::DataType::Binary { length } => {
-            assert!(length.is_some());
-            Ok(DmType::Binary(length.unwrap().get() as u16))
-        }
+        odbc_api::DataType::Binary { length } => Ok(DmType::Binary(
+            length.expect("length should not be none").get() as u16,
+        )),
         odbc_api::DataType::Varbinary { length } => {
             Ok(DmType::Varbinary(length.map(|l| l.get() as u16)))
         }
@@ -373,14 +372,17 @@ macro_rules! handle_primitive_type {
                 DataFusionError::Execution(format!("Failed to get nullable slice for {:?}", $field))
             })?;
             for value in values {
-                builder.append_option(value.map($convert));
+                match value {
+                    Some(v) => builder.append_value($convert(v)?),
+                    None => builder.append_null(),
+                }
             }
         } else {
             let values = $col_slice.as_slice::<$value_ty>().ok_or_else(|| {
                 DataFusionError::Execution(format!("Failed to get slice for {:?}", $field))
             })?;
             for value in values {
-                builder.append_value($convert(value));
+                builder.append_value($convert(value)?);
             }
         }
     }};
@@ -439,7 +441,7 @@ fn buffer_to_batch(
                     nullable,
                     Bit,
                     col_slice,
-                    |bit: &Bit| bit.as_bool()
+                    |bit: &Bit| Ok::<_, DataFusionError>(bit.as_bool())
                 );
             }
             DataType::Int8 => {
@@ -450,7 +452,7 @@ fn buffer_to_batch(
                     nullable,
                     i8,
                     col_slice,
-                    |value: &i8| *value
+                    |value: &i8| Ok::<_, DataFusionError>(*value)
                 );
             }
             DataType::Int16 => {
@@ -461,7 +463,7 @@ fn buffer_to_batch(
                     nullable,
                     i16,
                     col_slice,
-                    |value: &i16| *value
+                    |value: &i16| Ok::<_, DataFusionError>(*value)
                 );
             }
             DataType::Int32 => {
@@ -472,7 +474,7 @@ fn buffer_to_batch(
                     nullable,
                     i32,
                     col_slice,
-                    |value: &i32| *value
+                    |value: &i32| Ok::<_, DataFusionError>(*value)
                 );
             }
             DataType::Int64 => {
@@ -483,7 +485,7 @@ fn buffer_to_batch(
                     nullable,
                     i64,
                     col_slice,
-                    |value: &i64| *value
+                    |value: &i64| Ok::<_, DataFusionError>(*value)
                 );
             }
             DataType::Float32 => {
@@ -494,7 +496,7 @@ fn buffer_to_batch(
                     nullable,
                     f32,
                     col_slice,
-                    |value: &f32| *value
+                    |value: &f32| Ok::<_, DataFusionError>(*value)
                 );
             }
             DataType::Float64 => {
@@ -505,7 +507,7 @@ fn buffer_to_batch(
                     nullable,
                     f64,
                     col_slice,
-                    |value: &f64| *value
+                    |value: &f64| Ok::<_, DataFusionError>(*value)
                 );
             }
             DataType::Decimal128(_, scale) => {
@@ -585,10 +587,14 @@ fn buffer_to_batch(
                             value.month as u32,
                             value.day as u32,
                         )
-                        .unwrap()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?
                         .and_hms_opt(value.hour as u32, value.minute as u32, value.second as u32)
-                        .unwrap();
-                        ndt.and_utc().timestamp()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?;
+                        Ok::<_, DataFusionError>(ndt.and_utc().timestamp())
                     }
                 );
             }
@@ -606,15 +612,19 @@ fn buffer_to_batch(
                             value.month as u32,
                             value.day as u32,
                         )
-                        .unwrap()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?
                         .and_hms_nano_opt(
                             value.hour as u32,
                             value.minute as u32,
                             value.second as u32,
                             value.fraction,
                         )
-                        .unwrap();
-                        ndt.and_utc().timestamp_millis()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?;
+                        Ok::<_, DataFusionError>(ndt.and_utc().timestamp_millis())
                     }
                 );
             }
@@ -632,15 +642,19 @@ fn buffer_to_batch(
                             value.month as u32,
                             value.day as u32,
                         )
-                        .unwrap()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?
                         .and_hms_nano_opt(
                             value.hour as u32,
                             value.minute as u32,
                             value.second as u32,
                             value.fraction,
                         )
-                        .unwrap();
-                        ndt.and_utc().timestamp_micros()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?;
+                        Ok::<_, DataFusionError>(ndt.and_utc().timestamp_micros())
                     }
                 );
             }
@@ -658,19 +672,24 @@ fn buffer_to_batch(
                             value.month as u32,
                             value.day as u32,
                         )
-                        .unwrap()
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?
                         .and_hms_nano_opt(
                             value.hour as u32,
                             value.minute as u32,
                             value.second as u32,
                             value.fraction,
                         )
-                        .unwrap();
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?;
 
-                        // TODO handle error
                         // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
                         // 2262-04-11T23:47:16.854775804
-                        ndt.and_utc().timestamp_nanos_opt().unwrap()
+                        ndt.and_utc().timestamp_nanos_opt().ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })
                     }
                 );
             }
@@ -685,8 +704,9 @@ fn buffer_to_batch(
                         let s = std::str::from_utf8(value).map_err(|_| {
                             DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", value))
                         })?;
-                        // TODO handle err
-                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").unwrap();
+                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").map_err(|e| {
+                            DataFusionError::Execution(format!("Failed to parse time: {e:?}"))
+                        })?;
                         Ok::<_, DataFusionError>(nt.num_seconds_from_midnight() as i32)
                     }
                 );
@@ -702,8 +722,9 @@ fn buffer_to_batch(
                         let s = std::str::from_utf8(value).map_err(|_| {
                             DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", value))
                         })?;
-                        // TODO handle err
-                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").unwrap();
+                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").map_err(|e| {
+                            DataFusionError::Execution(format!("Failed to parse time: {e:?}"))
+                        })?;
                         Ok::<_, DataFusionError>(
                             nt.num_seconds_from_midnight() as i32 * 1000
                                 + (nt.nanosecond() / 1000_000) as i32,
@@ -719,11 +740,12 @@ fn buffer_to_batch(
                     col_slice,
                     as_text_view,
                     |value: &[u8]| {
-                        // TODO handle err
                         let s = std::str::from_utf8(value).map_err(|_| {
                             DataFusionError::Execution(format!("Invalid UTF-8 string: {:?}", value))
                         })?;
-                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").unwrap();
+                        let nt = NaiveTime::parse_from_str(s, "%H:%M:%S%.f").map_err(|e| {
+                            DataFusionError::Execution(format!("Failed to parse time: {e:?}"))
+                        })?;
                         Ok::<_, DataFusionError>(
                             nt.num_seconds_from_midnight() as i64 * 1000_1000
                                 + (nt.nanosecond() / 1000) as i64,
@@ -740,22 +762,26 @@ fn buffer_to_batch(
                     odbc_api::sys::Date,
                     col_slice,
                     |value: &odbc_api::sys::Date| {
-                        let unix_epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+                        let unix_epoch =
+                            NaiveDate::from_ymd_opt(1970, 1, 1).expect("1970-01-01 is valid date");
                         let date = NaiveDate::from_ymd_opt(
                             value.year as i32,
                             value.month as u32,
                             value.day as u32,
                         )
-                        .unwrap();
+                        .ok_or_else(|| {
+                            DataFusionError::Execution(format!("Invalid timestamp: {value:?}"))
+                        })?;
                         let duration = date.signed_duration_since(unix_epoch);
-                        duration.num_days().try_into().unwrap()
+                        duration.num_days().try_into().map_err(|e| {
+                            DataFusionError::Execution(format!("Failed to convert to i32: {e:?}"))
+                        })
                     }
                 );
             }
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported field to build record batch: {:?}",
-                    field
+                    "Unsupported field to build record batch: {field:?}"
                 )));
             }
         }
