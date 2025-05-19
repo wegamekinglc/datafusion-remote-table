@@ -195,10 +195,12 @@ impl Connection for DmConnection {
                 yield Ok(batch);
             }
 
-            if let Err(e) = join_handle.await {
-                yield Err(DataFusionError::Execution(format!(
+            match join_handle.await {
+                Ok(Ok(())) => {},
+                Ok(Err(e)) => yield Err(e),
+                Err(e) => yield Err(DataFusionError::Execution(format!(
                     "Failed to execute ODBC query: {e}"
-                )))
+                ))),
             }
         };
 
