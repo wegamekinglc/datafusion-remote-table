@@ -34,7 +34,6 @@ pub struct DmConnectionOptions {
     pub(crate) username: String,
     pub(crate) password: String,
     pub(crate) schema: Option<String>,
-    pub(crate) pool_max_size: usize,
     pub(crate) stream_chunk_size: usize,
     pub(crate) driver: String,
 }
@@ -52,7 +51,6 @@ impl DmConnectionOptions {
             username: username.into(),
             password: password.into(),
             schema: None,
-            pool_max_size: 10,
             stream_chunk_size: 2048,
             driver: "DM8 ODBC DRIVER".to_string(),
         }

@@ -113,10 +113,8 @@ pub struct DmConnectionOptions {
     #[prost(string, optional, tag = "5")]
     pub schema: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(uint32, tag = "6")]
-    pub pool_max_size: u32,
-    #[prost(uint32, tag = "7")]
     pub stream_chunk_size: u32,
-    #[prost(string, tag = "8")]
+    #[prost(string, tag = "7")]
     pub driver: ::prost::alloc::string::String,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

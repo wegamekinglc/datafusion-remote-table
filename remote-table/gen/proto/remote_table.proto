@@ -67,9 +67,8 @@ message DmConnectionOptions {
   string username = 3;
   string password = 4;
   optional string schema = 5;
-  uint32 pool_max_size = 6;
-  uint32 stream_chunk_size = 7;
-  string driver = 8;
+  uint32 stream_chunk_size = 6;
+  string driver = 7;
 }
 
 message Projection {
