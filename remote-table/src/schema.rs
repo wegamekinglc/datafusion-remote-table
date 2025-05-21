@@ -275,6 +275,7 @@ impl SqliteType {
 }
 
 // https://eco.dameng.com/document/dm/zh-cn/pm/odbc-rogramming-guide.html
+// https://eco.dameng.com/document/dm/zh-cn/pm/dm8_sql-data-types-operators.html
 #[derive(Debug, Clone)]
 pub enum DmType {
     TinyInt,
