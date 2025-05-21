@@ -147,7 +147,7 @@ impl Connection for DmConnection {
                         while let Some(row) = cursor.next_row().map_err(|e| {
                             DataFusionError::Execution(format!("Failed to fetch row: {e:?}"))
                         })? {
-                            let batch = row_to_batch(row)?;
+                            let batch = row_to_batch(row, &table_schema, projection.as_ref())?;
                             batch_tx.blocking_send(batch).map_err(|e| {
                                 DataFusionError::Execution(format!("Failed to send batch: {e:?}"))
                             })?;
