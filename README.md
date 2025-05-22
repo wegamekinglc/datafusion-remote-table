@@ -59,8 +59,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [x] DM (达梦数据库)
   - [x] TinyInt / Smallint / Int / Bigint
   - [x] Real / Float / Double / Numeric / Decimal
-  - [x] Char / Varchar
-  - [x] Binary / Varbinary
+  - [x] Char / Varchar / Text
+  - [x] Binary / Varbinary / Image
   - [x] Bit / Timestamp / Time / Date
 
 ## Thanks

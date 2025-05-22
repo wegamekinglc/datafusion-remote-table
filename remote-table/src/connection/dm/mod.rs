@@ -312,3 +312,59 @@ fn dm_type_to_remote_type(data_type: odbc_api::DataType) -> DFResult<DmType> {
         ))),
     }
 }
+
+pub(crate) fn seconds_since_epoch(value: &odbc_api::sys::Timestamp) -> DFResult<i64> {
+    let ndt =
+        chrono::NaiveDate::from_ymd_opt(value.year as i32, value.month as u32, value.day as u32)
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?
+            .and_hms_opt(value.hour as u32, value.minute as u32, value.second as u32)
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?;
+    Ok::<_, DataFusionError>(ndt.and_utc().timestamp())
+}
+
+pub(crate) fn ms_since_epoch(value: &odbc_api::sys::Timestamp) -> DFResult<i64> {
+    let ndt =
+        chrono::NaiveDate::from_ymd_opt(value.year as i32, value.month as u32, value.day as u32)
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?
+            .and_hms_nano_opt(
+                value.hour as u32,
+                value.minute as u32,
+                value.second as u32,
+                value.fraction,
+            )
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?;
+    Ok::<_, DataFusionError>(ndt.and_utc().timestamp_millis())
+}
+
+pub(crate) fn us_since_epoch(value: &odbc_api::sys::Timestamp) -> DFResult<i64> {
+    let ndt =
+        chrono::NaiveDate::from_ymd_opt(value.year as i32, value.month as u32, value.day as u32)
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?
+            .and_hms_nano_opt(
+                value.hour as u32,
+                value.minute as u32,
+                value.second as u32,
+                value.fraction,
+            )
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?;
+    Ok::<_, DataFusionError>(ndt.and_utc().timestamp_micros())
+}
+
+pub(crate) fn ns_since_epoch(value: &odbc_api::sys::Timestamp) -> DFResult<i64> {
+    let ndt =
+        chrono::NaiveDate::from_ymd_opt(value.year as i32, value.month as u32, value.day as u32)
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?
+            .and_hms_nano_opt(
+                value.hour as u32,
+                value.minute as u32,
+                value.second as u32,
+                value.fraction,
+            )
+            .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))?;
+
+    // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
+    // 2262-04-11T23:47:16.854775804
+    ndt.and_utc()
+        .timestamp_nanos_opt()
+        .ok_or_else(|| DataFusionError::Execution(format!("Invalid timestamp: {value:?}")))
+}

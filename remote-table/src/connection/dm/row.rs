@@ -1,6 +1,8 @@
 use crate::DFResult;
-use crate::connection::projections_contains;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Timelike};
+use crate::connection::{
+    ms_since_epoch, ns_since_epoch, projections_contains, seconds_since_epoch, us_since_epoch,
+};
+use chrono::{NaiveDate, NaiveTime, Timelike};
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder,
     FixedSizeBinaryBuilder, Float32Builder, Float64Builder, Int8Builder, Int16Builder,
@@ -10,8 +12,31 @@ use datafusion::arrow::array::{
 };
 use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
-use odbc_api::{CursorRow, decimal_text_to_i128};
-use std::str::FromStr;
+use odbc_api::{Bit, CursorRow, decimal_text_to_i128};
+
+macro_rules! read_data {
+    ($builder:expr, $field:expr, $builder_ty:ty, $row:expr, $col_idx:expr, $value_ty:ty, $convert:expr) => {{
+        let builder = $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_ty>()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Failed to downcast builder to {} for {:?}",
+                    stringify!($builder_ty),
+                    $field,
+                )
+            });
+        let mut value = odbc_api::Nullable::<$value_ty>::null();
+        $row.get_data($col_idx, &mut value).map_err(|e| {
+            DataFusionError::Execution(format!("Failed to get value for field {:?}: {e:?}", $field))
+        })?;
+        let value = value.into_opt();
+        match value {
+            Some(v) => builder.append_value($convert(v)?),
+            None => builder.append_null(),
+        }
+    }};
+}
 
 macro_rules! read_text {
     ($builder:expr, $field:expr, $builder_ty:ty, $row:expr, $col_idx:expr, $convert:expr) => {{
@@ -60,83 +85,80 @@ pub(crate) fn row_to_batch(
         let odbc_col_idx = (idx + 1) as u16;
         match field.data_type() {
             DataType::Boolean => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     BooleanBuilder,
                     row,
                     odbc_col_idx,
-                    |v: String| {
-                        if v == "1" {
-                            Ok(true)
-                        } else if v == "0" {
-                            Ok(false)
-                        } else {
-                            Err(DataFusionError::Execution(format!(
-                                "Failed to convert value to boolean: {v:?}"
-                            )))
-                        }
-                    }
+                    Bit,
+                    |v: Bit| { Ok::<_, DataFusionError>(v.as_bool()) }
                 );
             }
             DataType::Int8 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Int8Builder,
                     row,
                     odbc_col_idx,
-                    parse_primitive
+                    i8,
+                    just_return
                 );
             }
             DataType::Int16 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Int16Builder,
                     row,
                     odbc_col_idx,
-                    parse_primitive
+                    i16,
+                    just_return
                 );
             }
             DataType::Int32 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Int32Builder,
                     row,
                     odbc_col_idx,
-                    parse_primitive
+                    i32,
+                    just_return
                 );
             }
             DataType::Int64 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Int64Builder,
                     row,
                     odbc_col_idx,
-                    parse_primitive
+                    i64,
+                    just_return
                 );
             }
             DataType::Float32 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Float32Builder,
                     row,
                     odbc_col_idx,
-                    parse_primitive
+                    f32,
+                    just_return
                 );
             }
             DataType::Float64 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Float64Builder,
                     row,
                     odbc_col_idx,
-                    parse_primitive
+                    f64,
+                    just_return
                 );
             }
             DataType::Decimal128(_precision, scale) => {
@@ -161,7 +183,7 @@ pub(crate) fn row_to_batch(
                     StringBuilder,
                     row,
                     odbc_col_idx,
-                    |v: String| Ok::<_, DataFusionError>(v)
+                    just_return
                 );
             }
             DataType::FixedSizeBinary(_) => {
@@ -205,78 +227,47 @@ pub(crate) fn row_to_batch(
                 }
             }
             DataType::Timestamp(TimeUnit::Second, _) => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     TimestampSecondBuilder,
                     row,
                     odbc_col_idx,
-                    |v: String| {
-                        let ndt = NaiveDateTime::parse_from_str(&v, "%Y-%m-%d %H:%M:%S%.f")
-                            .map_err(|e| {
-                                DataFusionError::Execution(format!(
-                                    "Failed to parse timestamp: {e:?}"
-                                ))
-                            })?;
-                        Ok::<_, DataFusionError>(ndt.and_utc().timestamp())
-                    }
+                    odbc_api::sys::Timestamp,
+                    |v| { seconds_since_epoch(&v) }
                 );
             }
             DataType::Timestamp(TimeUnit::Millisecond, _) => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     TimestampMillisecondBuilder,
                     row,
                     odbc_col_idx,
-                    |v: String| {
-                        let ndt = NaiveDateTime::parse_from_str(&v, "%Y-%m-%d %H:%M:%S%.f")
-                            .map_err(|e| {
-                                DataFusionError::Execution(format!(
-                                    "Failed to parse timestamp: {e:?}"
-                                ))
-                            })?;
-                        Ok::<_, DataFusionError>(ndt.and_utc().timestamp_millis())
-                    }
+                    odbc_api::sys::Timestamp,
+                    |v| { ms_since_epoch(&v) }
                 );
             }
             DataType::Timestamp(TimeUnit::Microsecond, _) => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     TimestampMicrosecondBuilder,
                     row,
                     odbc_col_idx,
-                    |v: String| {
-                        let ndt = NaiveDateTime::parse_from_str(&v, "%Y-%m-%d %H:%M:%S%.f")
-                            .map_err(|e| {
-                                DataFusionError::Execution(format!(
-                                    "Failed to parse timestamp: {e:?}"
-                                ))
-                            })?;
-                        Ok::<_, DataFusionError>(ndt.and_utc().timestamp_micros())
-                    }
+                    odbc_api::sys::Timestamp,
+                    |v| { us_since_epoch(&v) }
                 );
             }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     TimestampNanosecondBuilder,
                     row,
                     odbc_col_idx,
-                    |v: String| {
-                        let ndt = NaiveDateTime::parse_from_str(&v, "%Y-%m-%d %H:%M:%S%.f")
-                            .map_err(|e| {
-                                DataFusionError::Execution(format!(
-                                    "Failed to parse timestamp: {e:?}"
-                                ))
-                            })?;
-                        let nanos = ndt.and_utc().timestamp_nanos_opt().ok_or_else(|| {
-                            DataFusionError::Execution(format!("Timestamp out of range: {ndt}"))
-                        })?;
-                        Ok::<_, DataFusionError>(nanos)
-                    }
+                    odbc_api::sys::Timestamp,
+                    |v| { ns_since_epoch(&v) }
                 );
             }
             DataType::Time32(TimeUnit::Second) => {
@@ -331,16 +322,19 @@ pub(crate) fn row_to_batch(
                 );
             }
             DataType::Date32 => {
-                read_text!(
+                read_data!(
                     builder,
                     field,
                     Date32Builder,
                     row,
                     odbc_col_idx,
-                    |v: String| {
-                        let date = NaiveDate::parse_from_str(&v, "%Y-%m-%d").map_err(|e| {
-                            DataFusionError::Execution(format!("Failed to parse date: {e:?}"))
-                        })?;
+                    odbc_api::sys::Date,
+                    |v: odbc_api::sys::Date| {
+                        let date =
+                            NaiveDate::from_ymd_opt(v.year as i32, v.month as u32, v.day as u32)
+                                .ok_or_else(|| {
+                                    DataFusionError::Execution(format!("Invalid date: {v:?}"))
+                                })?;
                         Ok::<_, DataFusionError>(Date32Type::from_naive_date(date))
                     }
                 );
@@ -362,10 +356,6 @@ pub(crate) fn row_to_batch(
     Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
 }
 
-fn parse_primitive<T: FromStr>(s: String) -> DFResult<T>
-where
-    <T as FromStr>::Err: std::fmt::Debug,
-{
-    s.parse::<T>()
-        .map_err(|e| DataFusionError::Execution(format!("Failed to parse value: {e:?}")))
+fn just_return<T>(v: T) -> DFResult<T> {
+    Ok(v)
 }
