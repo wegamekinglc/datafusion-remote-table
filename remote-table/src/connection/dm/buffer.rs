@@ -1,6 +1,7 @@
 use crate::DFResult;
 use crate::connection::{
-    ms_since_epoch, ns_since_epoch, projections_contains, seconds_since_epoch, us_since_epoch,
+    just_deref, ms_since_epoch, ns_since_epoch, projections_contains, seconds_since_epoch,
+    us_since_epoch,
 };
 use chrono::{NaiveDate, NaiveTime, Timelike};
 use datafusion::arrow::array::{
@@ -187,7 +188,7 @@ pub(crate) fn buffer_to_batch(
                     nullable,
                     i8,
                     col_slice,
-                    |value: &i8| Ok::<_, DataFusionError>(*value)
+                    just_deref
                 );
             }
             DataType::Int16 => {
@@ -198,7 +199,7 @@ pub(crate) fn buffer_to_batch(
                     nullable,
                     i16,
                     col_slice,
-                    |value: &i16| Ok::<_, DataFusionError>(*value)
+                    just_deref
                 );
             }
             DataType::Int32 => {
@@ -209,7 +210,7 @@ pub(crate) fn buffer_to_batch(
                     nullable,
                     i32,
                     col_slice,
-                    |value: &i32| Ok::<_, DataFusionError>(*value)
+                    just_deref
                 );
             }
             DataType::Int64 => {
@@ -220,7 +221,7 @@ pub(crate) fn buffer_to_batch(
                     nullable,
                     i64,
                     col_slice,
-                    |value: &i64| Ok::<_, DataFusionError>(*value)
+                    just_deref
                 );
             }
             DataType::Float32 => {
@@ -231,7 +232,7 @@ pub(crate) fn buffer_to_batch(
                     nullable,
                     f32,
                     col_slice,
-                    |value: &f32| Ok::<_, DataFusionError>(*value)
+                    just_deref
                 );
             }
             DataType::Float64 => {
@@ -242,7 +243,7 @@ pub(crate) fn buffer_to_batch(
                     nullable,
                     f64,
                     col_slice,
-                    |value: &f64| Ok::<_, DataFusionError>(*value)
+                    just_deref
                 );
             }
             DataType::Decimal128(_, scale) => {
@@ -425,8 +426,4 @@ pub(crate) fn buffer_to_batch(
         arrays.push(builder.finish());
     }
     Ok(RecordBatch::try_new(projected_schema, arrays)?)
-}
-
-fn just_deref<T: Copy>(t: &T) -> DFResult<T> {
-    Ok(*t)
 }

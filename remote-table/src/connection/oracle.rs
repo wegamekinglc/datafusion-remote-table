@@ -1,4 +1,4 @@
-use crate::connection::{RemoteDbType, big_decimal_to_i128, projections_contains};
+use crate::connection::{RemoteDbType, big_decimal_to_i128, just_return, projections_contains};
 use crate::{
     Connection, ConnectionOptions, DFResult, OracleType, Pool, RemoteField, RemoteSchema,
     RemoteSchemaRef, RemoteType,
@@ -231,14 +231,28 @@ fn rows_to_batch(
             let col = row.column_info().get(idx);
             match field.data_type() {
                 DataType::Int16 => {
-                    handle_primitive_type!(builder, field, col, Int16Builder, i16, row, idx, |v| {
-                        Ok::<_, DataFusionError>(v)
-                    });
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Int16Builder,
+                        i16,
+                        row,
+                        idx,
+                        just_return
+                    );
                 }
                 DataType::Int32 => {
-                    handle_primitive_type!(builder, field, col, Int32Builder, i32, row, idx, |v| {
-                        Ok::<_, DataFusionError>(v)
-                    });
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Int32Builder,
+                        i32,
+                        row,
+                        idx,
+                        just_return
+                    );
                 }
                 DataType::Float32 => {
                     handle_primitive_type!(
@@ -249,7 +263,7 @@ fn rows_to_batch(
                         f32,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 DataType::Float64 => {
@@ -261,7 +275,7 @@ fn rows_to_batch(
                         f64,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 DataType::Utf8 => {
@@ -273,7 +287,7 @@ fn rows_to_batch(
                         String,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 DataType::LargeUtf8 => {
@@ -285,7 +299,7 @@ fn rows_to_batch(
                         String,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 DataType::Decimal128(_precision, scale) => {
@@ -367,7 +381,7 @@ fn rows_to_batch(
                         bool,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 DataType::Binary => {
@@ -379,7 +393,7 @@ fn rows_to_batch(
                         Vec<u8>,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 DataType::LargeBinary => {
@@ -391,7 +405,7 @@ fn rows_to_batch(
                         Vec<u8>,
                         row,
                         idx,
-                        |v| { Ok::<_, DataFusionError>(v) }
+                        just_return
                     );
                 }
                 _ => {

@@ -231,3 +231,13 @@ fn big_decimal_to_i128(decimal: &bigdecimal::BigDecimal, scale: Option<i32>) -> 
     let scale_decimal = bigdecimal::BigDecimal::from_f32(10f32.powi(scale))?;
     (decimal * scale_decimal).to_i128()
 }
+
+#[allow(unused)]
+fn just_return<T>(v: T) -> DFResult<T> {
+    Ok(v)
+}
+
+#[allow(unused)]
+fn just_deref<T: Copy>(t: &T) -> DFResult<T> {
+    Ok(*t)
+}

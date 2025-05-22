@@ -1,6 +1,7 @@
 use crate::DFResult;
 use crate::connection::{
-    ms_since_epoch, ns_since_epoch, projections_contains, seconds_since_epoch, us_since_epoch,
+    just_return, ms_since_epoch, ns_since_epoch, projections_contains, seconds_since_epoch,
+    us_since_epoch,
 };
 use chrono::{NaiveDate, NaiveTime, Timelike};
 use datafusion::arrow::array::{
@@ -354,8 +355,4 @@ pub(crate) fn row_to_batch(
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
     Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
-}
-
-fn just_return<T>(v: T) -> DFResult<T> {
-    Ok(v)
 }
