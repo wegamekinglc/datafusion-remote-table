@@ -13,7 +13,6 @@ use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-use datafusion::prelude::Expr;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::StreamExt;
@@ -111,11 +110,11 @@ impl Connection for OracleConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        unparsed_filters: &[String],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Oracle.try_rewrite_query(sql, filters, limit)?;
+        let sql = RemoteDbType::Oracle.try_rewrite_query(sql, unparsed_filters, limit)?;
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let result_set = self.conn.query(&sql, &[]).map_err(|e| {

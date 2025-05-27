@@ -11,7 +11,7 @@ message RemoteTableExec {
   datafusion_common.Schema table_schema = 3;
   RemoteSchema remote_schema = 4;
   Projection projection = 5;
-  repeated datafusion.LogicalExprNode filters = 6;
+  repeated string unparsed_filters = 6;
   optional uint32 limit = 7;
   optional bytes transform = 8;
 }

@@ -1,17 +1,15 @@
-use crate::connection::RemoteDbType;
 use crate::{
-    ConnectionOptions, DFResult, Pool, RemoteSchemaRef, RemoteTableExec, Transform, connect,
-    transform_schema,
+    ConnectionOptions, DFResult, DefaultUnparser, Pool, RemoteSchemaRef, RemoteTableExec,
+    Transform, Unparse, connect, transform_schema,
 };
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
-use datafusion::common::tree_node::{TreeNode, TreeNodeRecursion};
+use datafusion::common::Column;
+use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::datasource::TableType;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{Expr, TableProviderFilterPushDown};
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion::sql::unparser::Unparser;
-use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -23,6 +21,7 @@ pub struct RemoteTable {
     pub(crate) transformed_table_schema: SchemaRef,
     pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
+    pub(crate) unparser: Arc<dyn Unparse>,
     pub(crate) pool: Arc<dyn Pool>,
 }
 
@@ -97,6 +96,7 @@ impl RemoteTable {
             transformed_table_schema,
             remote_schema,
             transform,
+            unparser: Arc::new(DefaultUnparser {}),
             pool,
         })
     }
@@ -117,7 +117,7 @@ impl TableProvider for RemoteTable {
     }
 
     fn table_type(&self) -> TableType {
-        TableType::View
+        TableType::Base
     }
 
     async fn scan(
@@ -127,13 +127,31 @@ impl TableProvider for RemoteTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
+        let transformed_table_schema = transform_schema(
+            self.table_schema.clone(),
+            self.transform.as_ref(),
+            self.remote_schema.as_ref(),
+        )?;
+        let rewritten_filters = rewrite_filters_column(
+            filters.to_vec(),
+            &self.table_schema,
+            &transformed_table_schema,
+        )?;
+        let mut unparsed_filters = vec![];
+        for filter in rewritten_filters {
+            unparsed_filters.push(
+                self.unparser
+                    .unparse_filter(&filter, self.conn_options.db_type())?,
+            );
+        }
+
         Ok(Arc::new(RemoteTableExec::try_new(
             self.conn_options.clone(),
             self.sql.clone(),
             self.table_schema.clone(),
             self.remote_schema.clone(),
             projection.cloned(),
-            filters.to_vec(),
+            unparsed_filters,
             limit,
             self.transform.clone(),
             self.pool.get().await?,
@@ -144,41 +162,37 @@ impl TableProvider for RemoteTable {
         &self,
         filters: &[&Expr],
     ) -> DFResult<Vec<TableProviderFilterPushDown>> {
-        Ok(filters
-            .iter()
-            .map(|f| support_filter_pushdown(self.conn_options.db_type(), &self.sql, f))
-            .collect())
+        let mut pushdown = vec![];
+        for filter in filters {
+            pushdown.push(
+                self.unparser
+                    .support_filter_pushdown(filter, self.conn_options.db_type())?,
+            );
+        }
+        Ok(pushdown)
     }
 }
 
-pub(crate) fn support_filter_pushdown(
-    db_type: RemoteDbType,
-    sql: &str,
-    filter: &Expr,
-) -> TableProviderFilterPushDown {
-    if !db_type.support_rewrite_with_filters_limit(sql) {
-        return TableProviderFilterPushDown::Unsupported;
-    }
-    let unparser = match db_type {
-        RemoteDbType::Mysql => Unparser::new(&MySqlDialect {}),
-        RemoteDbType::Postgres => Unparser::new(&PostgreSqlDialect {}),
-        RemoteDbType::Sqlite => Unparser::new(&SqliteDialect {}),
-        RemoteDbType::Oracle => return TableProviderFilterPushDown::Unsupported,
-        RemoteDbType::Dm => return TableProviderFilterPushDown::Unsupported,
-    };
-    if unparser.expr_to_sql(filter).is_err() {
-        return TableProviderFilterPushDown::Unsupported;
-    }
-
-    let mut pushdown = TableProviderFilterPushDown::Exact;
-    filter
-        .apply(|e| {
-            if matches!(e, Expr::ScalarFunction(_)) {
-                pushdown = TableProviderFilterPushDown::Unsupported;
-            }
-            Ok(TreeNodeRecursion::Continue)
+pub(crate) fn rewrite_filters_column(
+    filters: Vec<Expr>,
+    table_schema: &SchemaRef,
+    transformed_table_schema: &SchemaRef,
+) -> DFResult<Vec<Expr>> {
+    filters
+        .into_iter()
+        .map(|f| {
+            f.transform_down(|e| {
+                if let Expr::Column(col) = e {
+                    let col_idx = transformed_table_schema.index_of(col.name())?;
+                    let row_name = table_schema.field(col_idx).name().to_string();
+                    Ok(Transformed::yes(Expr::Column(Column::new_unqualified(
+                        row_name,
+                    ))))
+                } else {
+                    Ok(Transformed::no(e))
+                }
+            })
+            .map(|trans| trans.data)
         })
-        .expect("won't fail");
-
-    pushdown
+        .collect::<DFResult<Vec<_>>>()
 }

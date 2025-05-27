@@ -95,7 +95,7 @@ async fn pushdown_filters() {
         RemoteDbType::Sqlite,
         "select * from simple_table",
         "select * from remote_table where id = 1",
-        "RemoteTableExec: limit=None, filters=[id = Int64(1)]\n",
+        "RemoteTableExec: limit=None, filters=[(`id` = 1)]\n",
         r#"+----+------+
 | id | name |
 +----+------+

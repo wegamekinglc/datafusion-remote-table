@@ -11,8 +11,8 @@ pub struct RemoteTableExec {
     pub remote_schema: ::core::option::Option<RemoteSchema>,
     #[prost(message, optional, tag = "5")]
     pub projection: ::core::option::Option<Projection>,
-    #[prost(message, repeated, tag = "6")]
-    pub filters: ::prost::alloc::vec::Vec<::datafusion_proto::protobuf::LogicalExprNode>,
+    #[prost(string, repeated, tag = "6")]
+    pub unparsed_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(uint32, optional, tag = "7")]
     pub limit: ::core::option::Option<u32>,
     #[prost(bytes = "vec", optional, tag = "8")]

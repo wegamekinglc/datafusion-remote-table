@@ -3,8 +3,6 @@ use crate::{
     transform_schema,
 };
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::common::Column;
-use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::execution::{SendableRecordBatchStream, TaskContext};
 use datafusion::physical_expr::{EquivalenceProperties, Partitioning};
 use datafusion::physical_plan::execution_plan::{Boundedness, EmissionType};
@@ -12,7 +10,6 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
     DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, project_schema,
 };
-use datafusion::prelude::Expr;
 use futures::TryStreamExt;
 use std::any::Any;
 use std::sync::Arc;
@@ -24,7 +21,7 @@ pub struct RemoteTableExec {
     pub(crate) table_schema: SchemaRef,
     pub(crate) remote_schema: Option<RemoteSchemaRef>,
     pub(crate) projection: Option<Vec<usize>>,
-    pub(crate) filters: Vec<Expr>,
+    pub(crate) unparsed_filters: Vec<String>,
     pub(crate) limit: Option<usize>,
     pub(crate) transform: Option<Arc<dyn Transform>>,
     conn: Arc<dyn Connection>,
@@ -39,7 +36,7 @@ impl RemoteTableExec {
         table_schema: SchemaRef,
         remote_schema: Option<RemoteSchemaRef>,
         projection: Option<Vec<usize>>,
-        filters: Vec<Expr>,
+        unparsed_filters: Vec<String>,
         limit: Option<usize>,
         transform: Option<Arc<dyn Transform>>,
         conn: Arc<dyn Connection>,
@@ -62,7 +59,7 @@ impl RemoteTableExec {
             table_schema,
             remote_schema,
             projection,
-            filters,
+            unparsed_filters,
             limit,
             transform,
             conn,
@@ -109,7 +106,7 @@ impl ExecutionPlan for RemoteTableExec {
             self.table_schema.clone(),
             self.remote_schema.clone(),
             self.projection.clone(),
-            self.filters.clone(),
+            self.unparsed_filters.clone(),
             self.limit,
             self.transform.clone(),
         );
@@ -129,7 +126,7 @@ impl ExecutionPlan for RemoteTableExec {
                 table_schema: self.table_schema.clone(),
                 remote_schema: self.remote_schema.clone(),
                 projection: self.projection.clone(),
-                filters: self.filters.clone(),
+                unparsed_filters: self.unparsed_filters.clone(),
                 limit,
                 transform: self.transform.clone(),
                 conn: self.conn.clone(),
@@ -153,19 +150,10 @@ async fn build_and_transform_stream(
     table_schema: SchemaRef,
     remote_schema: Option<RemoteSchemaRef>,
     projection: Option<Vec<usize>>,
-    filters: Vec<Expr>,
+    unparsed_filters: Vec<String>,
     limit: Option<usize>,
     transform: Option<Arc<dyn Transform>>,
 ) -> DFResult<SendableRecordBatchStream> {
-    let transformed_table_schema = transform_schema(
-        table_schema.clone(),
-        transform.as_ref(),
-        remote_schema.as_ref(),
-    )?;
-
-    let rewritten_filters =
-        rewrite_filters_column(filters, &table_schema, &transformed_table_schema)?;
-
     let limit = if conn_options
         .db_type()
         .support_rewrite_with_filters_limit(&sql)
@@ -181,7 +169,7 @@ async fn build_and_transform_stream(
             &sql,
             table_schema.clone(),
             projection.as_ref(),
-            rewritten_filters.as_slice(),
+            unparsed_filters.as_slice(),
             limit,
         )
         .await?;
@@ -199,41 +187,13 @@ async fn build_and_transform_stream(
     }
 }
 
-fn rewrite_filters_column(
-    filters: Vec<Expr>,
-    table_schema: &SchemaRef,
-    transformed_table_schema: &SchemaRef,
-) -> DFResult<Vec<Expr>> {
-    filters
-        .into_iter()
-        .map(|f| {
-            f.transform_down(|e| {
-                if let Expr::Column(col) = e {
-                    let col_idx = transformed_table_schema.index_of(col.name())?;
-                    let row_name = table_schema.field(col_idx).name().to_string();
-                    Ok(Transformed::yes(Expr::Column(Column::new_unqualified(
-                        row_name,
-                    ))))
-                } else {
-                    Ok(Transformed::no(e))
-                }
-            })
-            .map(|trans| trans.data)
-        })
-        .collect::<DFResult<Vec<_>>>()
-}
-
 impl DisplayAs for RemoteTableExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
             "RemoteTableExec: limit={:?}, filters=[{}]",
             self.limit,
-            self.filters
-                .iter()
-                .map(|e| format!("{e}"))
-                .collect::<Vec<_>>()
-                .join(", ")
+            self.unparsed_filters.join(", ")
         )
     }
 }

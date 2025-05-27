@@ -18,9 +18,6 @@ use datafusion::common::DataFusionError;
 use datafusion::execution::FunctionRegistry;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_proto::convert_required;
-use datafusion_proto::logical_plan::from_proto::parse_exprs;
-use datafusion_proto::logical_plan::to_proto::serialize_exprs;
-use datafusion_proto::logical_plan::{DefaultLogicalExtensionCodec, LogicalExtensionCodec};
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 use datafusion_proto::protobuf::proto_error;
 use derive_with::With;
@@ -38,14 +35,12 @@ pub trait TransformCodec: Debug + Send + Sync {
 #[derive(Debug, With)]
 pub struct RemotePhysicalCodec {
     transform_codec: Option<Arc<dyn TransformCodec>>,
-    logical_extension_codec: Arc<dyn LogicalExtensionCodec>,
 }
 
 impl RemotePhysicalCodec {
     pub fn new() -> Self {
         Self {
             transform_codec: None,
-            logical_extension_codec: Arc::new(DefaultLogicalExtensionCodec {}),
         }
     }
 }
@@ -61,7 +56,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
         &self,
         buf: &[u8],
         _inputs: &[Arc<dyn ExecutionPlan>],
-        registry: &dyn FunctionRegistry,
+        _registry: &dyn FunctionRegistry,
     ) -> DFResult<Arc<dyn ExecutionPlan>> {
         let proto = protobuf::RemoteTableExec::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -89,11 +84,6 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             .projection
             .map(|p| p.projection.iter().map(|n| *n as usize).collect());
 
-        let filters = parse_exprs(
-            &proto.filters,
-            registry,
-            self.logical_extension_codec.as_ref(),
-        )?;
         let limit = proto.limit.map(|l| l as usize);
 
         let conn_options = parse_connection_options(proto.conn_options.unwrap());
@@ -111,7 +101,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             table_schema,
             remote_schema,
             projection,
-            filters,
+            proto.unparsed_filters,
             limit,
             transform,
             conn,
@@ -134,8 +124,6 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
 
             let serialized_connection_options = serialize_connection_options(&exec.conn_options);
             let remote_schema = exec.remote_schema.as_ref().map(serialize_remote_schema);
-            let serialized_filters =
-                serialize_exprs(&exec.filters, self.logical_extension_codec.as_ref())?;
 
             let proto = protobuf::RemoteTableExec {
                 conn_options: Some(serialized_connection_options),
@@ -146,7 +134,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
                     .projection
                     .as_ref()
                     .map(|p| serialize_projection(p.as_slice())),
-                filters: serialized_filters,
+                unparsed_filters: exec.unparsed_filters.clone(),
                 limit: exec.limit.map(|l| l as u32),
                 transform: serialized_transform,
             };

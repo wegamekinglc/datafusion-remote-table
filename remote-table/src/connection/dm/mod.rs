@@ -122,11 +122,11 @@ impl Connection for DmConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        unparsed_filters: &[String],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Dm.try_rewrite_query(sql, filters, limit)?;
+        let sql = RemoteDbType::Dm.try_rewrite_query(sql, unparsed_filters, limit)?;
         let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
         let projection = projection.cloned();

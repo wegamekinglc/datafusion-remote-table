@@ -24,7 +24,6 @@ use crate::{DFResult, RemoteSchemaRef};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
-use datafusion::prelude::Expr;
 use datafusion::sql::unparser::Unparser;
 use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::fmt::Debug;
@@ -48,7 +47,7 @@ pub trait Connection: Debug + Send + Sync {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        unparsed_filters: &[String],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream>;
 }
@@ -159,27 +158,15 @@ impl RemoteDbType {
     pub(crate) fn try_rewrite_query(
         &self,
         sql: &str,
-        filters: &[Expr],
+        unparsed_filters: &[String],
         limit: Option<usize>,
     ) -> DFResult<String> {
         match self {
             RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
-                let where_clause = if filters.is_empty() {
+                let where_clause = if unparsed_filters.is_empty() {
                     "".to_string()
                 } else {
-                    let unparser = self.create_unparser()?;
-                    let filters_ast = filters
-                        .iter()
-                        .map(|f| unparser.expr_to_sql(f))
-                        .collect::<DFResult<Vec<_>>>()?;
-                    format!(
-                        " WHERE {}",
-                        filters_ast
-                            .iter()
-                            .map(|f| format!("{f}"))
-                            .collect::<Vec<_>>()
-                            .join(" AND ")
-                    )
+                    format!(" WHERE {}", unparsed_filters.join(" AND "))
                 };
                 let limit_clause = if let Some(limit) = limit {
                     format!(" LIMIT {limit}")

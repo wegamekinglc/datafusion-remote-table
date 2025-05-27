@@ -11,7 +11,6 @@ use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
-use datafusion::prelude::Expr;
 use derive_getters::Getters;
 use derive_with::With;
 use itertools::Itertools;
@@ -90,11 +89,11 @@ impl Connection for SqliteConnection {
         sql: &str,
         table_schema: SchemaRef,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
+        unparsed_filters: &[String],
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
-        let sql = RemoteDbType::Sqlite.try_rewrite_query(sql, filters, limit)?;
+        let sql = RemoteDbType::Sqlite.try_rewrite_query(sql, unparsed_filters, limit)?;
         let conn = self.conn.clone();
         let projection = projection.cloned();
         let limit = conn_options.stream_chunk_size();
