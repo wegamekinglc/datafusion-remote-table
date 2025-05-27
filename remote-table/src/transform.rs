@@ -2,14 +2,15 @@ use crate::{DFResult, RemoteField, RemoteSchemaRef};
 use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, BinaryViewArray, BooleanArray, Date32Array, Date64Array,
     Decimal128Array, Decimal256Array, FixedSizeBinaryArray, FixedSizeListArray, Float16Array,
-    Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array, LargeBinaryArray,
+    Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
+    IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeBinaryArray,
     LargeListArray, LargeListViewArray, LargeStringArray, ListArray, ListViewArray, NullArray,
     RecordBatch, StringArray, StringViewArray, Time32MillisecondArray, Time32SecondArray,
     Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
     TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, Schema, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use futures::{Stream, StreamExt};
@@ -263,6 +264,30 @@ pub trait Transform: Debug + Send + Sync {
     fn transform_time64_nanosecond(
         &self,
         array: &Time64NanosecondArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_interval_year_month(
+        &self,
+        array: &IntervalYearMonthArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_interval_day_time(
+        &self,
+        array: &IntervalDayTimeArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_interval_month_day_nano(
+        &self,
+        array: &IntervalMonthDayNanoArray,
         args: TransformArgs,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), args.field.clone()))
@@ -551,6 +576,36 @@ pub(crate) fn transform_batch(
                     Time64NanosecondArray,
                     transform,
                     transform_time64_nanosecond,
+                    args
+                )
+            }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    IntervalYearMonthArray,
+                    transform,
+                    transform_interval_year_month,
+                    args
+                )
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    IntervalDayTimeArray,
+                    transform,
+                    transform_interval_day_time,
+                    args
+                )
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    IntervalMonthDayNanoArray,
+                    transform,
+                    transform_interval_month_day_nano,
                     args
                 )
             }
