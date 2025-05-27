@@ -1,9 +1,11 @@
 use crate::{DFResult, RemoteField, RemoteSchemaRef};
 use datafusion::arrow::array::{
-    Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Float16Array,
+    Array, ArrayRef, BinaryArray, BinaryViewArray, BooleanArray, Date32Array, Date64Array,
+    Decimal128Array, Decimal256Array, FixedSizeBinaryArray, FixedSizeListArray, Float16Array,
     Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array, LargeBinaryArray,
-    LargeStringArray, ListArray, NullArray, RecordBatch, StringArray, Time32MillisecondArray,
-    Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
+    LargeListArray, LargeListViewArray, LargeStringArray, ListArray, ListViewArray, NullArray,
+    RecordBatch, StringArray, StringViewArray, Time32MillisecondArray, Time32SecondArray,
+    Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
     TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     UInt16Array, UInt32Array, UInt64Array,
 };
@@ -130,6 +132,38 @@ pub trait Transform: Debug + Send + Sync {
         Ok((Arc::new(array.clone()), args.field.clone()))
     }
 
+    fn transform_binary(
+        &self,
+        array: &BinaryArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_fixed_size_binary(
+        &self,
+        array: &FixedSizeBinaryArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_large_binary(
+        &self,
+        array: &LargeBinaryArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_binary_view(
+        &self,
+        array: &BinaryViewArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
     fn transform_utf8(
         &self,
         array: &StringArray,
@@ -146,17 +180,9 @@ pub trait Transform: Debug + Send + Sync {
         Ok((Arc::new(array.clone()), args.field.clone()))
     }
 
-    fn transform_binary(
+    fn transform_utf8_view(
         &self,
-        array: &BinaryArray,
-        args: TransformArgs,
-    ) -> DFResult<(ArrayRef, Field)> {
-        Ok((Arc::new(array.clone()), args.field.clone()))
-    }
-
-    fn transform_large_binary(
-        &self,
-        array: &LargeBinaryArray,
+        array: &StringViewArray,
         args: TransformArgs,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), args.field.clone()))
@@ -245,6 +271,54 @@ pub trait Transform: Debug + Send + Sync {
     fn transform_list(
         &self,
         array: &ListArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_list_view(
+        &self,
+        array: &ListViewArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_fixed_size_list(
+        &self,
+        array: &FixedSizeListArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_large_list(
+        &self,
+        array: &LargeListArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_large_list_view(
+        &self,
+        array: &LargeListViewArray,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_decimal128(
+        &self,
+        array: &Decimal128Array,
+        args: TransformArgs,
+    ) -> DFResult<(ArrayRef, Field)> {
+        Ok((Arc::new(array.clone()), args.field.clone()))
+    }
+
+    fn transform_decimal256(
+        &self,
+        array: &Decimal256Array,
         args: TransformArgs,
     ) -> DFResult<(ArrayRef, Field)> {
         Ok((Arc::new(array.clone()), args.field.clone()))
@@ -480,6 +554,39 @@ pub(crate) fn transform_batch(
                     args
                 )
             }
+            DataType::Binary => {
+                handle_transform!(batch, idx, BinaryArray, transform, transform_binary, args)
+            }
+            DataType::FixedSizeBinary(_) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    FixedSizeBinaryArray,
+                    transform,
+                    transform_fixed_size_binary,
+                    args
+                )
+            }
+            DataType::LargeBinary => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    LargeBinaryArray,
+                    transform,
+                    transform_large_binary,
+                    args
+                )
+            }
+            DataType::BinaryView => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    BinaryViewArray,
+                    transform,
+                    transform_binary_view,
+                    args
+                )
+            }
             DataType::Utf8 => {
                 handle_transform!(batch, idx, StringArray, transform, transform_utf8, args)
             }
@@ -493,25 +600,82 @@ pub(crate) fn transform_batch(
                     args
                 )
             }
-            DataType::Binary => {
-                handle_transform!(batch, idx, BinaryArray, transform, transform_binary, args)
-            }
-            DataType::LargeBinary => {
+            DataType::Utf8View => {
                 handle_transform!(
                     batch,
                     idx,
-                    LargeBinaryArray,
+                    StringViewArray,
                     transform,
-                    transform_large_binary,
+                    transform_utf8_view,
                     args
                 )
             }
             DataType::List(_field) => {
                 handle_transform!(batch, idx, ListArray, transform, transform_list, args)
             }
+            DataType::ListView(_field) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    ListViewArray,
+                    transform,
+                    transform_list_view,
+                    args
+                )
+            }
+            DataType::FixedSizeList(_, _) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    FixedSizeListArray,
+                    transform,
+                    transform_fixed_size_list,
+                    args
+                )
+            }
+            DataType::LargeList(_field) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    LargeListArray,
+                    transform,
+                    transform_large_list,
+                    args
+                )
+            }
+            DataType::LargeListView(_field) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    LargeListViewArray,
+                    transform,
+                    transform_large_list_view,
+                    args
+                )
+            }
+            DataType::Decimal128(_, _) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    Decimal128Array,
+                    transform,
+                    transform_decimal128,
+                    args
+                )
+            }
+            DataType::Decimal256(_, _) => {
+                handle_transform!(
+                    batch,
+                    idx,
+                    Decimal256Array,
+                    transform,
+                    transform_decimal256,
+                    args
+                )
+            }
             data_type => {
                 return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported arrow type {data_type:?}",
+                    "Unsupported transform arrow type {data_type:?}",
                 )));
             }
         };
