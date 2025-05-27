@@ -9,7 +9,11 @@ use crate::PostgresConnectionOptions;
 #[cfg(feature = "sqlite")]
 use crate::SqliteConnectionOptions;
 use crate::generated::prost as protobuf;
-use crate::{ConnectionOptions, DFResult, DmType, MysqlType, OracleType, PostgresType, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect, DefaultTransform};
+use crate::{
+    ConnectionOptions, DFResult, DefaultTransform, DmType, MysqlType, OracleType, PostgresType,
+    RemoteField, RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform,
+    connect,
+};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
 use datafusion::execution::FunctionRegistry;
@@ -39,7 +43,9 @@ impl TransformCodec for DefaultTransformCodec {
         if value.as_any().is::<DefaultTransform>() {
             Ok(DEFAULT_TRANSFORM_ID.as_bytes().to_vec())
         } else {
-            Err(DataFusionError::Execution(format!("DefaultTransformCodec does not support transform: {value:?}, please implement a custom TransformCodec.")))
+            Err(DataFusionError::Execution(format!(
+                "DefaultTransformCodec does not support transform: {value:?}, please implement a custom TransformCodec."
+            )))
         }
     }
 
@@ -47,7 +53,9 @@ impl TransformCodec for DefaultTransformCodec {
         if value == DEFAULT_TRANSFORM_ID.as_bytes() {
             Ok(Arc::new(DefaultTransform {}))
         } else {
-            Err(DataFusionError::Execution("DefaultTransformCodec only supports DefaultTransform".to_string()))
+            Err(DataFusionError::Execution(
+                "DefaultTransformCodec only supports DefaultTransform".to_string(),
+            ))
         }
     }
 }

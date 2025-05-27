@@ -1,4 +1,7 @@
-use crate::{ConnectionOptions, DFResult, DefaultUnparser, Pool, RemoteSchemaRef, RemoteTableExec, Transform, Unparse, connect, transform_schema, DefaultTransform};
+use crate::{
+    ConnectionOptions, DFResult, DefaultTransform, DefaultUnparser, Pool, RemoteSchemaRef,
+    RemoteTableExec, Transform, Unparse, connect, transform_schema,
+};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::Column;

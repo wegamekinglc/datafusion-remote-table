@@ -82,9 +82,8 @@ async fn transform_serialization() {
     let result = collect(exec_plan.clone(), ctx.task_ctx()).await.unwrap();
     println!("{}", pretty_format_batches(&result).unwrap());
 
-    let codec = RemotePhysicalCodec::new().with_transform_codec(
-        Arc::new(MyTransformCodec {}) as Arc<dyn TransformCodec>,
-    );
+    let codec = RemotePhysicalCodec::new()
+        .with_transform_codec(Arc::new(MyTransformCodec {}) as Arc<dyn TransformCodec>);
     let mut plan_buf: Vec<u8> = vec![];
     let plan_proto = PhysicalPlanNode::try_from_physical_plan(exec_plan, &codec).unwrap();
     plan_proto.try_encode(&mut plan_buf).unwrap();
