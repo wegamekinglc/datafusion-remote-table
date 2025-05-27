@@ -162,6 +162,16 @@ impl TableProvider for RemoteTable {
         &self,
         filters: &[&Expr],
     ) -> DFResult<Vec<TableProviderFilterPushDown>> {
+        if !self
+            .conn_options
+            .db_type()
+            .support_rewrite_with_filters_limit(&self.sql)
+        {
+            return Ok(vec![
+                TableProviderFilterPushDown::Unsupported;
+                filters.len()
+            ]);
+        }
         let mut pushdown = vec![];
         for filter in filters {
             pushdown.push(
