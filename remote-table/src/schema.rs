@@ -179,7 +179,7 @@ impl MysqlType {
             MysqlType::Date => DataType::Date32,
             MysqlType::Datetime => DataType::Timestamp(TimeUnit::Microsecond, None),
             MysqlType::Time => DataType::Time64(TimeUnit::Nanosecond),
-            MysqlType::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
+            MysqlType::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, Some("UTC".into())),
             MysqlType::Year => DataType::Int16,
             MysqlType::Char => DataType::Utf8,
             MysqlType::Varchar => DataType::Utf8,

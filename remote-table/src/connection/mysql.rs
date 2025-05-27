@@ -10,8 +10,8 @@ use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder, Float32Builder,
     Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder, LargeBinaryBuilder,
     LargeStringBuilder, RecordBatch, StringBuilder, Time32SecondBuilder, Time64NanosecondBuilder,
-    TimestampMicrosecondBuilder, TimestampNanosecondBuilder, UInt8Builder, UInt16Builder,
-    UInt32Builder, UInt64Builder, make_builder,
+    TimestampMicrosecondBuilder, UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder,
+    make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit, i256};
 use datafusion::common::{DataFusionError, project_schema};
@@ -73,6 +73,7 @@ pub(crate) fn connect_mysql(options: &MysqlConnectionOptions) -> DFResult<MysqlP
         .user(Some(options.username.clone()))
         .pass(Some(options.password.clone()))
         .db_name(options.database.clone())
+        .init(vec!["set time_zone='+00:00'".to_string()])
         .pool_opts(pool_opts);
     let pool = mysql_async::Pool::new(opts_builder);
     Ok(MysqlPool { pool })
@@ -486,7 +487,19 @@ fn rows_to_batch(
                         }
                     );
                 }
-                DataType::Timestamp(TimeUnit::Microsecond, None) => {
+                DataType::Timestamp(TimeUnit::Microsecond, tz_opt) => {
+                    match tz_opt {
+                        None => {}
+                        Some(tz) => {
+                            if !tz.eq_ignore_ascii_case("utc") {
+                                return Err(DataFusionError::NotImplemented(format!(
+                                    "Unsupported data type {:?} for col: {:?}",
+                                    field.data_type(),
+                                    col
+                                )));
+                            }
+                        }
+                    }
                     handle_primitive_type!(
                         builder,
                         field,
@@ -499,22 +512,6 @@ fn rows_to_batch(
                             let timestamp_micros =
                                 (v.assume_utc().unix_timestamp_nanos() / 1_000) as i64;
                             Ok::<_, DataFusionError>(timestamp_micros)
-                        }
-                    );
-                }
-                DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                    handle_primitive_type!(
-                        builder,
-                        field,
-                        col,
-                        TimestampNanosecondBuilder,
-                        chrono::NaiveTime,
-                        row,
-                        idx,
-                        |v: chrono::NaiveTime| {
-                            let t = i64::from(v.num_seconds_from_midnight()) * 1_000_000_000
-                                + i64::from(v.nanosecond());
-                            Ok::<_, DataFusionError>(t)
                         }
                     );
                 }

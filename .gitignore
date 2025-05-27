@@ -1,3 +1,4 @@
 /target
 .idea
 remote-table/examples/dm.rs
+remote-table/examples/mysql.rs
