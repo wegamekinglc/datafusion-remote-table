@@ -23,7 +23,7 @@ pub struct RemoteTableExec {
     pub(crate) projection: Option<Vec<usize>>,
     pub(crate) unparsed_filters: Vec<String>,
     pub(crate) limit: Option<usize>,
-    pub(crate) transform: Option<Arc<dyn Transform>>,
+    pub(crate) transform: Arc<dyn Transform>,
     conn: Arc<dyn Connection>,
     plan_properties: PlanProperties,
 }
@@ -38,7 +38,7 @@ impl RemoteTableExec {
         projection: Option<Vec<usize>>,
         unparsed_filters: Vec<String>,
         limit: Option<usize>,
-        transform: Option<Arc<dyn Transform>>,
+        transform: Arc<dyn Transform>,
         conn: Arc<dyn Connection>,
     ) -> DFResult<Self> {
         let transformed_table_schema = transform_schema(
@@ -152,7 +152,7 @@ async fn build_and_transform_stream(
     projection: Option<Vec<usize>>,
     unparsed_filters: Vec<String>,
     limit: Option<usize>,
-    transform: Option<Arc<dyn Transform>>,
+    transform: Arc<dyn Transform>,
 ) -> DFResult<SendableRecordBatchStream> {
     let limit = if conn_options
         .db_type()
@@ -174,17 +174,13 @@ async fn build_and_transform_stream(
         )
         .await?;
 
-    if let Some(transform) = transform.as_ref() {
-        Ok(Box::pin(TransformStream::try_new(
-            stream,
-            transform.clone(),
-            table_schema,
-            projection,
-            remote_schema,
-        )?))
-    } else {
-        Ok(stream)
-    }
+    Ok(Box::pin(TransformStream::try_new(
+        stream,
+        transform.clone(),
+        table_schema,
+        projection,
+        remote_schema,
+    )?))
 }
 
 impl DisplayAs for RemoteTableExec {

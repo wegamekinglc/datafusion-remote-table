@@ -15,16 +15,15 @@ pub struct RemoteTableExec {
     pub unparsed_filters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(uint32, optional, tag = "7")]
     pub limit: ::core::option::Option<u32>,
-    #[prost(bytes = "vec", optional, tag = "8")]
-    pub transform: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
+    #[prost(bytes = "vec", tag = "8")]
+    pub transform: ::prost::alloc::vec::Vec<u8>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConnectionOptions {
-    #[prost(
-        oneof = "connection_options::ConnectionOptions",
-        tags = "1, 2, 3, 4, 5"
-    )]
-    pub connection_options: ::core::option::Option<connection_options::ConnectionOptions>,
+    #[prost(oneof = "connection_options::ConnectionOptions", tags = "1, 2, 3, 4, 5")]
+    pub connection_options: ::core::option::Option<
+        connection_options::ConnectionOptions,
+    >,
 }
 /// Nested message and enum types in `ConnectionOptions`.
 pub mod connection_options {

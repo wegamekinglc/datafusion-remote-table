@@ -9,10 +9,7 @@ use crate::PostgresConnectionOptions;
 #[cfg(feature = "sqlite")]
 use crate::SqliteConnectionOptions;
 use crate::generated::prost as protobuf;
-use crate::{
-    ConnectionOptions, DFResult, DmType, MysqlType, OracleType, PostgresType, RemoteField,
-    RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect,
-};
+use crate::{ConnectionOptions, DFResult, DmType, MysqlType, OracleType, PostgresType, RemoteField, RemoteSchema, RemoteSchemaRef, RemoteTableExec, RemoteType, SqliteType, Transform, connect, DefaultTransform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::common::DataFusionError;
 use datafusion::execution::FunctionRegistry;
@@ -32,15 +29,38 @@ pub trait TransformCodec: Debug + Send + Sync {
     fn try_decode(&self, value: &[u8]) -> DFResult<Arc<dyn Transform>>;
 }
 
+#[derive(Debug)]
+pub struct DefaultTransformCodec {}
+
+const DEFAULT_TRANSFORM_ID: &str = "__default";
+
+impl TransformCodec for DefaultTransformCodec {
+    fn try_encode(&self, value: &dyn Transform) -> DFResult<Vec<u8>> {
+        if value.as_any().is::<DefaultTransform>() {
+            Ok(DEFAULT_TRANSFORM_ID.as_bytes().to_vec())
+        } else {
+            Err(DataFusionError::Execution(format!("DefaultTransformCodec does not support transform: {value:?}, please implement a custom TransformCodec.")))
+        }
+    }
+
+    fn try_decode(&self, value: &[u8]) -> DFResult<Arc<dyn Transform>> {
+        if value == DEFAULT_TRANSFORM_ID.as_bytes() {
+            Ok(Arc::new(DefaultTransform {}))
+        } else {
+            Err(DataFusionError::Execution("DefaultTransformCodec only supports DefaultTransform".to_string()))
+        }
+    }
+}
+
 #[derive(Debug, With)]
 pub struct RemotePhysicalCodec {
-    transform_codec: Option<Arc<dyn TransformCodec>>,
+    transform_codec: Arc<dyn TransformCodec>,
 }
 
 impl RemotePhysicalCodec {
     pub fn new() -> Self {
         Self {
-            transform_codec: None,
+            transform_codec: Arc::new(DefaultTransformCodec {}),
         }
     }
 }
@@ -64,16 +84,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             ))
         })?;
 
-        let transform = if let Some(bytes) = proto.transform {
-            let Some(transform_codec) = self.transform_codec.as_ref() else {
-                return Err(DataFusionError::Execution(
-                    "No transform codec found".to_string(),
-                ));
-            };
-            Some(transform_codec.try_decode(&bytes)?)
-        } else {
-            None
-        };
+        let transform = self.transform_codec.try_decode(&proto.transform)?;
 
         let table_schema: SchemaRef = Arc::new(convert_required!(&proto.table_schema)?);
         let remote_schema = proto
@@ -110,17 +121,7 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
 
     fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> DFResult<()> {
         if let Some(exec) = node.as_any().downcast_ref::<RemoteTableExec>() {
-            let serialized_transform = if let Some(transform) = exec.transform.as_ref() {
-                let Some(transform_codec) = self.transform_codec.as_ref() else {
-                    return Err(DataFusionError::Execution(
-                        "No transform codec found".to_string(),
-                    ));
-                };
-                let bytes = transform_codec.try_encode(transform.as_ref())?;
-                Some(bytes)
-            } else {
-                None
-            };
+            let serialized_transform = self.transform_codec.try_encode(exec.transform.as_ref())?;
 
             let serialized_connection_options = serialize_connection_options(&exec.conn_options);
             let remote_schema = exec.remote_schema.as_ref().map(serialize_remote_schema);

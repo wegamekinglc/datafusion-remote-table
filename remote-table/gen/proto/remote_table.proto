@@ -13,7 +13,7 @@ message RemoteTableExec {
   Projection projection = 5;
   repeated string unparsed_filters = 6;
   optional uint32 limit = 7;
-  optional bytes transform = 8;
+  bytes transform = 8;
 }
 
 message ConnectionOptions {

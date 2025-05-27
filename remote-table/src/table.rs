@@ -1,7 +1,4 @@
-use crate::{
-    ConnectionOptions, DFResult, DefaultUnparser, Pool, RemoteSchemaRef, RemoteTableExec,
-    Transform, Unparse, connect, transform_schema,
-};
+use crate::{ConnectionOptions, DFResult, DefaultUnparser, Pool, RemoteSchemaRef, RemoteTableExec, Transform, Unparse, connect, transform_schema, DefaultTransform};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::Column;
@@ -20,7 +17,7 @@ pub struct RemoteTable {
     pub(crate) table_schema: SchemaRef,
     pub(crate) transformed_table_schema: SchemaRef,
     pub(crate) remote_schema: Option<RemoteSchemaRef>,
-    pub(crate) transform: Option<Arc<dyn Transform>>,
+    pub(crate) transform: Arc<dyn Transform>,
     pub(crate) unparser: Arc<dyn Unparse>,
     pub(crate) pool: Arc<dyn Pool>,
 }
@@ -30,7 +27,14 @@ impl RemoteTable {
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
     ) -> DFResult<Self> {
-        Self::try_new_with_schema_transform(conn_options, sql, None, None).await
+        Self::try_new_with_schema_transform_unparser(
+            conn_options,
+            sql,
+            None,
+            Arc::new(DefaultTransform {}),
+            Arc::new(DefaultUnparser {}),
+        )
+        .await
     }
 
     pub async fn try_new_with_schema(
@@ -38,7 +42,14 @@ impl RemoteTable {
         sql: impl Into<String>,
         table_schema: SchemaRef,
     ) -> DFResult<Self> {
-        Self::try_new_with_schema_transform(conn_options, sql, Some(table_schema), None).await
+        Self::try_new_with_schema_transform_unparser(
+            conn_options,
+            sql,
+            Some(table_schema),
+            Arc::new(DefaultTransform {}),
+            Arc::new(DefaultUnparser {}),
+        )
+        .await
     }
 
     pub async fn try_new_with_transform(
@@ -46,25 +57,33 @@ impl RemoteTable {
         sql: impl Into<String>,
         transform: Arc<dyn Transform>,
     ) -> DFResult<Self> {
-        Self::try_new_with_schema_transform(conn_options, sql, None, Some(transform)).await
+        Self::try_new_with_schema_transform_unparser(
+            conn_options,
+            sql,
+            None,
+            transform,
+            Arc::new(DefaultUnparser {}),
+        )
+        .await
     }
 
-    pub async fn try_new_with_schema_transform(
+    pub async fn try_new_with_schema_transform_unparser(
         conn_options: ConnectionOptions,
         sql: impl Into<String>,
         table_schema: Option<SchemaRef>,
-        transform: Option<Arc<dyn Transform>>,
+        transform: Arc<dyn Transform>,
+        unparser: Arc<dyn Unparse>,
     ) -> DFResult<Self> {
         let sql = sql.into();
         let pool = connect(&conn_options).await?;
 
         let (table_schema, remote_schema) = if let Some(table_schema) = table_schema {
-            let remote_schema = if transform.is_some() {
+            let remote_schema = if transform.as_any().is::<DefaultTransform>() {
+                None
+            } else {
                 // Infer remote schema
                 let conn = pool.get().await?;
                 conn.infer_schema(&sql).await.ok()
-            } else {
-                None
             };
             (table_schema, remote_schema)
         } else {
@@ -96,7 +115,7 @@ impl RemoteTable {
             transformed_table_schema,
             remote_schema,
             transform,
-            unparser: Arc::new(DefaultUnparser {}),
+            unparser,
             pool,
         })
     }

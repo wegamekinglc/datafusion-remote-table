@@ -251,6 +251,15 @@ pub trait Transform: Debug + Send + Sync {
     }
 }
 
+#[derive(Debug)]
+pub struct DefaultTransform {}
+
+impl Transform for DefaultTransform {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
 pub(crate) struct TransformStream {
     input: SendableRecordBatchStream,
     transform: Arc<dyn Transform>,
@@ -515,20 +524,16 @@ pub(crate) fn transform_batch(
 
 pub(crate) fn transform_schema(
     schema: SchemaRef,
-    transform: Option<&Arc<dyn Transform>>,
+    transform: &dyn Transform,
     remote_schema: Option<&RemoteSchemaRef>,
 ) -> DFResult<SchemaRef> {
-    if let Some(transform) = transform {
         let empty_record = RecordBatch::new_empty(schema.clone());
         transform_batch(
             empty_record,
-            transform.as_ref(),
+            transform,
             &schema,
             None,
             remote_schema,
         )
         .map(|batch| batch.schema())
-    } else {
-        Ok(schema)
-    }
 }
