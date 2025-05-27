@@ -1387,9 +1387,9 @@ dependencies = [
 
 [[package]]
 name = "derive-with"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "992217a3266a8ec291ddcb89766ec32f6ec01a8dfa9ff5f0ad5e89d08f59ed5c"
+checksum = "b843bde9187ed083594f7dad609760678601bf0eba95046f6222eb92f4e8d8c8"
 dependencies = [
  "proc-macro2",
  "quote",

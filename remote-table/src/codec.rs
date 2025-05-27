@@ -20,6 +20,7 @@ use datafusion::physical_plan::ExecutionPlan;
 use datafusion_proto::convert_required;
 use datafusion_proto::physical_plan::PhysicalExtensionCodec;
 use datafusion_proto::protobuf::proto_error;
+use derive_with::With;
 use prost::Message;
 use std::fmt::Debug;
 #[cfg(feature = "sqlite")]
@@ -31,8 +32,7 @@ pub trait TransformCodec: Debug + Send + Sync {
     fn try_decode(&self, value: &[u8]) -> DFResult<Arc<dyn Transform>>;
 }
 
-// TODO update derive-with
-#[derive(Debug)]
+#[derive(Debug, With)]
 pub struct RemotePhysicalCodec {
     transform_codec: Option<Arc<dyn TransformCodec>>,
 }
@@ -41,15 +41,6 @@ impl RemotePhysicalCodec {
     pub fn new() -> Self {
         Self {
             transform_codec: None,
-        }
-    }
-
-    pub fn with_transform_codec(
-        self,
-        transform_codec: impl Into<Option<Arc<dyn TransformCodec>>>,
-    ) -> Self {
-        Self {
-            transform_codec: transform_codec.into(),
         }
     }
 }
