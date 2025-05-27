@@ -92,7 +92,11 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
             ))
         })?;
 
-        let transform = self.transform_codec.try_decode(&proto.transform)?;
+        let transform = if proto.transform == DEFAULT_TRANSFORM_ID.as_bytes() {
+            Arc::new(DefaultTransform {})
+        } else {
+            self.transform_codec.try_decode(&proto.transform)?
+        };
 
         let table_schema: SchemaRef = Arc::new(convert_required!(&proto.table_schema)?);
         let remote_schema = proto
@@ -129,7 +133,13 @@ impl PhysicalExtensionCodec for RemotePhysicalCodec {
 
     fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> DFResult<()> {
         if let Some(exec) = node.as_any().downcast_ref::<RemoteTableExec>() {
-            let serialized_transform = self.transform_codec.try_encode(exec.transform.as_ref())?;
+            let serialized_transform = if exec.transform.as_any().is::<DefaultTransform>() {
+                DefaultTransformCodec {}.try_encode(exec.transform.as_ref())?
+            } else {
+                let bytes = self.transform_codec.try_encode(exec.transform.as_ref())?;
+                assert_ne!(bytes, DEFAULT_TRANSFORM_ID.as_bytes());
+                bytes
+            };
 
             let serialized_connection_options = serialize_connection_options(&exec.conn_options);
             let remote_schema = exec.remote_schema.as_ref().map(serialize_remote_schema);
