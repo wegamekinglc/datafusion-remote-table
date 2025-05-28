@@ -101,7 +101,7 @@ pub struct DmConnection {
 #[async_trait::async_trait]
 impl Connection for DmConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
-        let sql = RemoteDbType::Dm.query_limit_1(sql)?;
+        let sql = RemoteDbType::Dm.query_limit_1(sql);
         let conn = self.conn.lock().await;
         let cursor_opt = conn
             .execute(&sql, (), None)
@@ -128,7 +128,7 @@ impl Connection for DmConnection {
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
 
-        let sql = RemoteDbType::Dm.try_rewrite_query(sql, unparsed_filters, limit)?;
+        let sql = RemoteDbType::Dm.rewrite_query(sql, unparsed_filters, limit);
         debug!("[remote-table] executing dm query: {sql}");
 
         let chunk_size = conn_options.stream_chunk_size();

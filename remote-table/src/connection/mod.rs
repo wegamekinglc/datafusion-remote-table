@@ -155,14 +155,17 @@ impl RemoteDbType {
         }
     }
 
-    pub(crate) fn try_rewrite_query(
+    pub(crate) fn rewrite_query(
         &self,
         sql: &str,
         unparsed_filters: &[String],
         limit: Option<usize>,
-    ) -> DFResult<String> {
+    ) -> String {
         match self {
-            RemoteDbType::Postgres | RemoteDbType::Mysql | RemoteDbType::Sqlite => {
+            RemoteDbType::Postgres
+            | RemoteDbType::Mysql
+            | RemoteDbType::Sqlite
+            | RemoteDbType::Dm => {
                 let where_clause = if unparsed_filters.is_empty() {
                     "".to_string()
                 } else {
@@ -175,27 +178,37 @@ impl RemoteDbType {
                 };
 
                 if where_clause.is_empty() && limit_clause.is_empty() {
-                    Ok(sql.to_string())
+                    sql.to_string()
                 } else {
-                    Ok(format!(
-                        "SELECT * FROM ({sql}) as __subquery{where_clause}{limit_clause}"
-                    ))
+                    format!("SELECT * FROM ({sql}) as __subquery{where_clause}{limit_clause}")
                 }
             }
-            RemoteDbType::Oracle => Ok(limit
-                .map(|l| format!("SELECT * FROM ({sql}) WHERE ROWNUM <= {l}"))
-                .unwrap_or_else(|| sql.to_string())),
-            RemoteDbType::Dm => Ok(limit
-                .map(|l| format!("SELECT * FROM ({sql}) LIMIT {l}"))
-                .unwrap_or_else(|| sql.to_string())),
+            RemoteDbType::Oracle => {
+                let mut all_filters: Vec<String> = vec![];
+                all_filters.extend_from_slice(unparsed_filters);
+                if let Some(limit) = limit {
+                    all_filters.push(format!("ROWNUM <= {limit}"))
+                }
+
+                let where_clause = if all_filters.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(" WHERE {}", all_filters.join(" AND "))
+                };
+                if where_clause.is_empty() {
+                    sql.to_string()
+                } else {
+                    format!("SELECT * FROM ({sql}){where_clause}")
+                }
+            }
         }
     }
 
-    pub(crate) fn query_limit_1(&self, sql: &str) -> DFResult<String> {
+    pub(crate) fn query_limit_1(&self, sql: &str) -> String {
         if !self.support_rewrite_with_filters_limit(sql) {
-            return Ok(sql.to_string());
+            return sql.to_string();
         }
-        self.try_rewrite_query(sql, &[], Some(1))
+        self.rewrite_query(sql, &[], Some(1))
     }
 }
 

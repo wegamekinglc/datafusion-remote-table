@@ -111,7 +111,7 @@ pub(crate) struct PostgresConnection {
 #[async_trait::async_trait]
 impl Connection for PostgresConnection {
     async fn infer_schema(&self, sql: &str) -> DFResult<RemoteSchemaRef> {
-        let sql = RemoteDbType::Postgres.query_limit_1(sql)?;
+        let sql = RemoteDbType::Postgres.query_limit_1(sql);
         let row = self.conn.query_one(&sql, &[]).await.map_err(|e| {
             DataFusionError::Execution(format!("Failed to execute query {sql} on postgres: {e:?}",))
         })?;
@@ -130,7 +130,7 @@ impl Connection for PostgresConnection {
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
 
-        let sql = RemoteDbType::Postgres.try_rewrite_query(sql, unparsed_filters, limit)?;
+        let sql = RemoteDbType::Postgres.rewrite_query(sql, unparsed_filters, limit);
         debug!("[remote-table] executing postgres query: {sql}");
 
         let projection = projection.cloned();
