@@ -16,6 +16,7 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::StreamExt;
+use log::debug;
 use oracle::sql_type::OracleType as ColumnType;
 use oracle::{Connector, Row};
 use std::sync::Arc;
@@ -114,7 +115,10 @@ impl Connection for OracleConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
+
         let sql = RemoteDbType::Oracle.try_rewrite_query(sql, unparsed_filters, limit)?;
+        debug!("[remote-table] executing oracle query: {sql}");
+
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let result_set = self.conn.query(&sql, &[]).map_err(|e| {

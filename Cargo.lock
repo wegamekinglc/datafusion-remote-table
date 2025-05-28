@@ -1336,6 +1336,7 @@ dependencies = [
  "derive-with",
  "futures",
  "itertools 0.14.0",
+ "log",
  "mysql_async",
  "num-bigint",
  "odbc-api",

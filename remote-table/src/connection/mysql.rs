@@ -21,6 +21,7 @@ use derive_getters::Getters;
 use derive_with::With;
 use futures::StreamExt;
 use futures::lock::Mutex;
+use log::debug;
 use mysql_async::consts::{ColumnFlags, ColumnType};
 use mysql_async::prelude::Queryable;
 use mysql_async::{Column, FromValueError, Row, Value};
@@ -123,7 +124,10 @@ impl Connection for MysqlConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
+
         let sql = RemoteDbType::Mysql.try_rewrite_query(sql, unparsed_filters, limit)?;
+        debug!("[remote-table] executing mysql query: {sql}");
+
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);

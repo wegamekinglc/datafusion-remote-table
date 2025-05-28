@@ -14,6 +14,7 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
 use itertools::Itertools;
+use log::debug;
 use rusqlite::types::ValueRef;
 use rusqlite::{Column, Row, Rows};
 use std::collections::HashMap;
@@ -94,6 +95,8 @@ impl Connection for SqliteConnection {
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
         let sql = RemoteDbType::Sqlite.try_rewrite_query(sql, unparsed_filters, limit)?;
+        debug!("[remote-table] executing sqlite query: {sql}");
+
         let conn = self.conn.clone();
         let projection = projection.cloned();
         let limit = conn_options.stream_chunk_size();

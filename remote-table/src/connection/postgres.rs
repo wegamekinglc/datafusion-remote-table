@@ -26,6 +26,7 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::StreamExt;
+use log::debug;
 use num_bigint::{BigInt, Sign};
 use std::string::ToString;
 use std::sync::Arc;
@@ -128,7 +129,10 @@ impl Connection for PostgresConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
+
         let sql = RemoteDbType::Postgres.try_rewrite_query(sql, unparsed_filters, limit)?;
+        debug!("[remote-table] executing postgres query: {sql}");
+
         let projection = projection.cloned();
         let chunk_size = conn_options.stream_chunk_size();
         let stream = self

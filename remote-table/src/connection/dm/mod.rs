@@ -16,6 +16,7 @@ use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use derive_getters::Getters;
 use derive_with::With;
 use futures::lock::Mutex;
+use log::debug;
 use odbc_api::buffers::ColumnarAnyBuffer;
 use odbc_api::handles::StatementImpl;
 use odbc_api::{Cursor, CursorImpl, Environment, ResultSetMetadata};
@@ -126,7 +127,10 @@ impl Connection for DmConnection {
         limit: Option<usize>,
     ) -> DFResult<SendableRecordBatchStream> {
         let projected_schema = project_schema(&table_schema, projection)?;
+
         let sql = RemoteDbType::Dm.try_rewrite_query(sql, unparsed_filters, limit)?;
+        debug!("[remote-table] executing dm query: {sql}");
+
         let chunk_size = conn_options.stream_chunk_size();
         let conn = Arc::clone(&self.conn);
         let projection = projection.cloned();
