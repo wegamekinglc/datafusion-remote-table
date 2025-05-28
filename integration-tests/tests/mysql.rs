@@ -121,3 +121,18 @@ async fn pushdown_filters() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn empty_projection() {
+    assert_result(
+        RemoteDbType::Mysql,
+        "select * from simple_table",
+        "select count(*) from remote_table",
+        r#"+----------+
+| count(*) |
++----------+
+| 3        |
++----------+"#,
+    )
+    .await;
+}

@@ -7,7 +7,8 @@ use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, BooleanBuilder, Date64Builder, Decimal128Builder, Float32Builder,
     Float64Builder, Int16Builder, Int32Builder, LargeBinaryBuilder, LargeStringBuilder,
-    RecordBatch, StringBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
+    RecordBatch, RecordBatchOptions, StringBuilder, TimestampNanosecondBuilder,
+    TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
@@ -428,5 +429,10 @@ fn rows_to_batch(
         .filter(|(idx, _)| projections_contains(projection, *idx))
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
-    Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+    let options = RecordBatchOptions::new().with_row_count(Some(rows.len()));
+    Ok(RecordBatch::try_new_with_options(
+        projected_schema,
+        projected_columns,
+        &options,
+    )?)
 }

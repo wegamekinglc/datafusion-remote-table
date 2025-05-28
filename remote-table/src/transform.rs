@@ -5,8 +5,8 @@ use datafusion::arrow::array::{
     Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
     IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeBinaryArray,
     LargeListArray, LargeListViewArray, LargeStringArray, ListArray, ListViewArray, NullArray,
-    RecordBatch, StringArray, StringViewArray, Time32MillisecondArray, Time32SecondArray,
-    Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
+    RecordBatch, RecordBatchOptions, StringArray, StringViewArray, Time32MillisecondArray,
+    Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
     TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     UInt16Array, UInt32Array, UInt64Array,
 };
@@ -738,7 +738,10 @@ pub(crate) fn transform_batch(
         new_fields.push(new_field);
     }
     let new_schema = Arc::new(Schema::new(new_fields));
-    Ok(RecordBatch::try_new(new_schema, new_arrays)?)
+    let options = RecordBatchOptions::new().with_row_count(Some(batch.num_rows()));
+    Ok(RecordBatch::try_new_with_options(
+        new_schema, new_arrays, &options,
+    )?)
 }
 
 pub(crate) fn transform_schema(

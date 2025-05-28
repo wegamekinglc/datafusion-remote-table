@@ -7,7 +7,7 @@ use chrono::{NaiveDate, NaiveTime, Timelike};
 use datafusion::arrow::array::{
     BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder, FixedSizeBinaryBuilder,
     Float32Builder, Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder,
-    RecordBatch, StringBuilder, Time32MillisecondBuilder, Time32SecondBuilder,
+    RecordBatch, RecordBatchOptions, StringBuilder, Time32MillisecondBuilder, Time32SecondBuilder,
     Time64MicrosecondBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
     TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
 };
@@ -425,5 +425,10 @@ pub(crate) fn buffer_to_batch(
         }
         arrays.push(builder.finish());
     }
-    Ok(RecordBatch::try_new(projected_schema, arrays)?)
+    let options = RecordBatchOptions::new().with_row_count(Some(buffer.num_rows()));
+    Ok(RecordBatch::try_new_with_options(
+        projected_schema,
+        arrays,
+        &options,
+    )?)
 }

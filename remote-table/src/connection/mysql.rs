@@ -9,9 +9,9 @@ use chrono::Timelike;
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, Date32Builder, Decimal128Builder, Decimal256Builder, Float32Builder,
     Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder, LargeBinaryBuilder,
-    LargeStringBuilder, RecordBatch, StringBuilder, Time32SecondBuilder, Time64NanosecondBuilder,
-    TimestampMicrosecondBuilder, UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder,
-    make_builder,
+    LargeStringBuilder, RecordBatch, RecordBatchOptions, StringBuilder, Time32SecondBuilder,
+    Time64NanosecondBuilder, TimestampMicrosecondBuilder, UInt8Builder, UInt16Builder,
+    UInt32Builder, UInt64Builder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit, i256};
 use datafusion::common::{DataFusionError, project_schema};
@@ -612,7 +612,12 @@ fn rows_to_batch(
         .filter(|(idx, _)| projections_contains(projection, *idx))
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
-    Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+    let options = RecordBatchOptions::new().with_row_count(Some(rows.len()));
+    Ok(RecordBatch::try_new_with_options(
+        projected_schema,
+        projected_columns,
+        &options,
+    )?)
 }
 
 fn to_decimal_256(decimal: &BigDecimal) -> i256 {

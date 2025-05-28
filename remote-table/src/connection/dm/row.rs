@@ -7,9 +7,10 @@ use chrono::{NaiveDate, NaiveTime, Timelike};
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder,
     FixedSizeBinaryBuilder, Float32Builder, Float64Builder, Int8Builder, Int16Builder,
-    Int32Builder, Int64Builder, RecordBatch, StringBuilder, Time32MillisecondBuilder,
-    Time32SecondBuilder, Time64MicrosecondBuilder, TimestampMicrosecondBuilder,
-    TimestampMillisecondBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder, make_builder,
+    Int32Builder, Int64Builder, RecordBatch, RecordBatchOptions, StringBuilder,
+    Time32MillisecondBuilder, Time32SecondBuilder, Time64MicrosecondBuilder,
+    TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
+    TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, Date32Type, SchemaRef, TimeUnit};
 use datafusion::common::{DataFusionError, project_schema};
@@ -354,5 +355,10 @@ pub(crate) fn row_to_batch(
         .filter(|(idx, _)| projections_contains(projection, *idx))
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
-    Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+    let options = RecordBatchOptions::new().with_row_count(Some(1));
+    Ok(RecordBatch::try_new_with_options(
+        projected_schema,
+        projected_columns,
+        &options,
+    )?)
 }

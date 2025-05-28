@@ -12,8 +12,8 @@ use chrono::Timelike;
 use datafusion::arrow::array::{
     ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, Decimal128Builder,
     Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder,
-    IntervalMonthDayNanoBuilder, LargeStringBuilder, ListBuilder, RecordBatch, StringBuilder,
-    Time64MicrosecondBuilder, Time64NanosecondBuilder, TimestampMicrosecondBuilder,
+    IntervalMonthDayNanoBuilder, LargeStringBuilder, ListBuilder, RecordBatch, RecordBatchOptions,
+    StringBuilder, Time64MicrosecondBuilder, Time64NanosecondBuilder, TimestampMicrosecondBuilder,
     TimestampNanosecondBuilder, UInt32Builder, make_builder,
 };
 use datafusion::arrow::datatypes::{
@@ -874,5 +874,10 @@ fn rows_to_batch(
         .filter(|(idx, _)| projections_contains(projection, *idx))
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
-    Ok(RecordBatch::try_new(projected_schema, projected_columns)?)
+    let options = RecordBatchOptions::new().with_row_count(Some(rows.len()));
+    Ok(RecordBatch::try_new_with_options(
+        projected_schema,
+        projected_columns,
+        &options,
+    )?)
 }

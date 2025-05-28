@@ -5,7 +5,7 @@ use crate::{
 };
 use datafusion::arrow::array::{
     ArrayBuilder, ArrayRef, BinaryBuilder, Float64Builder, Int32Builder, Int64Builder, NullBuilder,
-    RecordBatch, StringBuilder, make_builder,
+    RecordBatch, RecordBatchOptions, StringBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef};
 use datafusion::common::{DataFusionError, project_schema};
@@ -289,10 +289,12 @@ fn rows_to_batch(
     }
 
     let mut is_empty = true;
+    let mut row_count = 0;
     while let Some(row) = rows.next().map_err(|e| {
         DataFusionError::Execution(format!("Failed to get next row from sqlite: {e:?}"))
     })? {
         is_empty = false;
+        row_count += 1;
         append_rows_to_array_builders(
             row,
             table_schema,
@@ -308,8 +310,9 @@ fn rows_to_batch(
         .filter(|(idx, _)| projections_contains(projection, *idx))
         .map(|(_, mut builder)| builder.finish())
         .collect::<Vec<ArrayRef>>();
+    let options = RecordBatchOptions::new().with_row_count(Some(row_count));
     Ok((
-        RecordBatch::try_new(projected_schema, projected_columns)?,
+        RecordBatch::try_new_with_options(projected_schema, projected_columns, &options)?,
         is_empty,
     ))
 }
