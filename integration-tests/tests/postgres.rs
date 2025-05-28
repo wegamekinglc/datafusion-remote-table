@@ -118,6 +118,7 @@ async fn pushdown_filters() {
 
 #[tokio::test]
 async fn empty_projection() {
+    setup_shared_containers();
     assert_result(
         RemoteDbType::Postgres,
         "select * from simple_table",

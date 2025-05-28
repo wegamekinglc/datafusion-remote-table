@@ -124,6 +124,10 @@ async fn pushdown_filters() {
 
 #[tokio::test]
 async fn empty_projection() {
+    setup_shared_containers();
+    // Wait for the database to be ready to connect
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
     assert_result(
         RemoteDbType::Mysql,
         "select * from simple_table",

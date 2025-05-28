@@ -87,6 +87,8 @@ async fn pushdown_filters() {
 
 #[tokio::test]
 async fn empty_projection() {
+    setup_shared_containers();
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
     assert_result(
         RemoteDbType::Oracle,
         "select * from SYS.simple_table",
