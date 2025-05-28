@@ -2,7 +2,7 @@ use datafusion_remote_table::RemoteDbType;
 use integration_tests::shared_containers::setup_shared_containers;
 use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn supported_postgres_types() {
     setup_shared_containers();
     assert_result(
@@ -31,7 +31,7 @@ pub async fn supported_postgres_types() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn table_columns() {
     setup_shared_containers();
     let sql = format!(
@@ -71,7 +71,7 @@ ORDER BY
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn various_sqls() {
     setup_shared_containers();
 
@@ -82,7 +82,7 @@ pub async fn various_sqls() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn pushdown_limit() {
     setup_shared_containers();
     assert_plan_and_result(
@@ -99,7 +99,7 @@ async fn pushdown_limit() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn pushdown_filters() {
     setup_shared_containers();
     assert_plan_and_result(
@@ -116,13 +116,14 @@ async fn pushdown_filters() {
     .await;
 }
 
-#[tokio::test]
-async fn empty_projection() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn count1_agg() {
     setup_shared_containers();
-    assert_result(
+    assert_plan_and_result(
         RemoteDbType::Postgres,
         "select * from simple_table",
         "select count(*) from remote_table",
+        "ProjectionExec: expr=[3 as count(*)]\n  PlaceholderRowExec\n",
         r#"+----------+
 | count(*) |
 +----------+

@@ -210,6 +210,19 @@ impl RemoteDbType {
         }
         self.rewrite_query(sql, &[], Some(1))
     }
+
+    pub(crate) fn try_count1_query(&self, sql: &str) -> Option<String> {
+        if !self.support_rewrite_with_filters_limit(sql) {
+            return None;
+        }
+        match self {
+            RemoteDbType::Postgres
+            | RemoteDbType::Mysql
+            | RemoteDbType::Sqlite
+            | RemoteDbType::Dm => Some(format!("SELECT COUNT(1) FROM ({sql}) AS __subquery")),
+            RemoteDbType::Oracle => Some(format!("SELECT COUNT(1) FROM ({sql})")),
+        }
+    }
 }
 
 pub(crate) fn projections_contains(projection: Option<&Vec<usize>>, col_idx: usize) -> bool {

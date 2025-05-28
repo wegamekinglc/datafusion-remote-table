@@ -9,7 +9,7 @@ use integration_tests::shared_containers::setup_sqlite_db;
 use integration_tests::utils::{assert_plan_and_result, assert_result};
 use std::sync::Arc;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn supported_sqlite_types() {
     assert_result(
         RemoteDbType::Sqlite,
@@ -37,7 +37,7 @@ pub async fn supported_sqlite_types() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn streaming_execution() {
     let db_path = setup_sqlite_db();
     let options = ConnectionOptions::Sqlite(
@@ -73,7 +73,7 @@ async fn streaming_execution() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn pushdown_limit() {
     assert_plan_and_result(
         RemoteDbType::Sqlite,
@@ -89,7 +89,7 @@ async fn pushdown_limit() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn pushdown_filters() {
     assert_plan_and_result(
         RemoteDbType::Sqlite,
@@ -105,12 +105,13 @@ async fn pushdown_filters() {
     .await;
 }
 
-#[tokio::test]
-async fn empty_projection() {
-    assert_result(
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn count1_agg() {
+    assert_plan_and_result(
         RemoteDbType::Sqlite,
         "select * from simple_table",
         "select count(*) from remote_table",
+        "ProjectionExec: expr=[3 as count(*)]\n  PlaceholderRowExec\n",
         r#"+----------+
 | count(*) |
 +----------+

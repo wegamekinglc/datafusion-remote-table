@@ -17,7 +17,7 @@ use integration_tests::shared_containers::setup_sqlite_db;
 use std::any::Any;
 use std::sync::Arc;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn transform() {
     let db_path = setup_sqlite_db();
     let options = ConnectionOptions::Sqlite(SqliteConnectionOptions::new(db_path));

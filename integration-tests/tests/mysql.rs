@@ -2,7 +2,7 @@ use datafusion_remote_table::RemoteDbType;
 use integration_tests::shared_containers::setup_shared_containers;
 use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn supported_mysql_types() {
     setup_shared_containers();
     // Wait for the database to be ready to connect
@@ -20,7 +20,7 @@ pub async fn supported_mysql_types() {
     ).await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn describe_table() {
     setup_shared_containers();
     // Wait for the database to be ready to connect
@@ -39,7 +39,7 @@ pub async fn describe_table() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn various_sqls() {
     setup_shared_containers();
     // Wait for the database to be ready to connect
@@ -52,7 +52,7 @@ pub async fn various_sqls() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn pushdown_limit() {
     setup_shared_containers();
     // Wait for the database to be ready to connect
@@ -84,7 +84,7 @@ async fn pushdown_limit() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn pushdown_filters() {
     setup_shared_containers();
     // Wait for the database to be ready to connect
@@ -122,16 +122,17 @@ async fn pushdown_filters() {
     .await;
 }
 
-#[tokio::test]
-async fn empty_projection() {
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn count1_agg() {
     setup_shared_containers();
     // Wait for the database to be ready to connect
     tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
 
-    assert_result(
+    assert_plan_and_result(
         RemoteDbType::Mysql,
         "select * from simple_table",
         "select count(*) from remote_table",
+        "ProjectionExec: expr=[3 as count(*)]\n  PlaceholderRowExec\n",
         r#"+----------+
 | count(*) |
 +----------+
