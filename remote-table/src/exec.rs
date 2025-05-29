@@ -154,12 +154,7 @@ impl ExecutionPlan for RemoteTableExec {
 
             match row_count_result {
                 Ok(row_count) => {
-                    let transformed_table_schema = transform_schema(
-                        self.table_schema.clone(),
-                        self.transform.as_ref(),
-                        self.remote_schema.as_ref(),
-                    )?;
-                    let column_stat = Statistics::unknown_column(transformed_table_schema.as_ref());
+                    let column_stat = Statistics::unknown_column(self.schema().as_ref());
                     Ok(Statistics {
                         num_rows: Precision::Exact(row_count as usize),
                         total_byte_size: Precision::Absent,
@@ -176,10 +171,7 @@ impl ExecutionPlan for RemoteTableExec {
                 "[remote-table] Query can not be rewritten as count1 query: {}",
                 self.sql
             );
-            Err(DataFusionError::Execution(format!(
-                "Query can not be rewritten as count1 query: {}",
-                self.sql
-            )))
+            Ok(Statistics::new_unknown(self.schema().as_ref()))
         }
     }
 
