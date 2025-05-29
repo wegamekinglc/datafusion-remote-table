@@ -110,7 +110,16 @@ async fn count1_agg() {
         RemoteDbType::Oracle,
         "select * from SYS.simple_table",
         r#"select count(*) from remote_table where "ID" > 1"#,
-        "ProjectionExec: expr=[2 as count(*)]\n  PlaceholderRowExec\n",
+        r#"ProjectionExec: expr=[count(Int64(1))@0 as count(*)]
+  AggregateExec: mode=Final, gby=[], aggr=[count(Int64(1))]
+    CoalescePartitionsExec
+      AggregateExec: mode=Partial, gby=[], aggr=[count(Int64(1))]
+        RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1
+          ProjectionExec: expr=[]
+            CoalesceBatchesExec: target_batch_size=8192
+              FilterExec: ID@0 > Some(1),38,0
+                RemoteTableExec: limit=None, filters=[]
+"#,
         r#"+----------+
 | count(*) |
 +----------+
