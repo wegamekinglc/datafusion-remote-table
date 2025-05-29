@@ -6,8 +6,8 @@ use crate::{
 use bb8_oracle::OracleConnectionManager;
 use datafusion::arrow::array::{
     ArrayRef, BinaryBuilder, BooleanBuilder, Date64Builder, Decimal128Builder, Float32Builder,
-    Float64Builder, Int16Builder, Int32Builder, LargeBinaryBuilder, LargeStringBuilder,
-    RecordBatch, RecordBatchOptions, StringBuilder, TimestampNanosecondBuilder,
+    Float64Builder, Int16Builder, Int32Builder, Int64Builder, LargeBinaryBuilder,
+    LargeStringBuilder, RecordBatch, RecordBatchOptions, StringBuilder, TimestampNanosecondBuilder,
     TimestampSecondBuilder, make_builder,
 };
 use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
@@ -253,6 +253,18 @@ fn rows_to_batch(
                         col,
                         Int32Builder,
                         i32,
+                        row,
+                        idx,
+                        just_return
+                    );
+                }
+                DataType::Int64 => {
+                    handle_primitive_type!(
+                        builder,
+                        field,
+                        col,
+                        Int64Builder,
+                        i64,
                         row,
                         idx,
                         just_return
