@@ -121,25 +121,29 @@ async fn count1_agg() {
     .await;
 }
 
-// #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
-// async fn empty_projection() {
-//     let options = build_conn_options(RemoteDbType::Sqlite);
-//     let table = RemoteTable::try_new(options, "select * from simple_table")
-//         .await
-//         .unwrap();
-//
-//     let config = SessionConfig::new().with_target_partitions(12);
-//     let ctx = SessionContext::new_with_config(config);
-//
-//     let df = ctx.read_table(Arc::new(table)).unwrap();
-//     let df = df.select_columns(&[]).unwrap();
-//
-//     let exec_plan = df.create_physical_plan().await.unwrap();
-//     println!(
-//         "{}",
-//         DisplayableExecutionPlan::new(exec_plan.as_ref()).indent(true)
-//     );
-//     let result = collect(exec_plan, ctx.task_ctx()).await.unwrap();
-//     println!("{}", pretty_format_batches(&result).unwrap());
-//     assert_eq!(result.len(), 0);
-// }
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn empty_projection() {
+    let options = build_conn_options(RemoteDbType::Sqlite);
+    let table = RemoteTable::try_new(options, "select * from simple_table")
+        .await
+        .unwrap();
+
+    let config = SessionConfig::new().with_target_partitions(12);
+    let ctx = SessionContext::new_with_config(config);
+
+    let df = ctx.read_table(Arc::new(table)).unwrap();
+    let df = df.select_columns(&[]).unwrap();
+
+    let exec_plan = df.create_physical_plan().await.unwrap();
+    let plan_display = DisplayableExecutionPlan::new(exec_plan.as_ref())
+        .indent(true)
+        .to_string();
+    println!("{plan_display}");
+    assert_eq!(plan_display, "RemoteTableExec: limit=None, filters=[]\n");
+
+    let result = collect(exec_plan, ctx.task_ctx()).await.unwrap();
+    assert_eq!(result.len(), 1);
+    let batch = &result[0];
+    assert_eq!(batch.num_columns(), 0);
+    assert_eq!(batch.num_rows(), 3);
+}

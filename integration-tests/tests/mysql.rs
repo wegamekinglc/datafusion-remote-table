@@ -1,6 +1,12 @@
-use datafusion_remote_table::RemoteDbType;
+use datafusion::physical_plan::collect;
+use datafusion::physical_plan::display::DisplayableExecutionPlan;
+use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion_remote_table::{RemoteDbType, RemoteTable};
 use integration_tests::shared_containers::setup_shared_containers;
-use integration_tests::utils::{assert_plan_and_result, assert_result, assert_sqls};
+use integration_tests::utils::{
+    assert_plan_and_result, assert_result, assert_sqls, build_conn_options,
+};
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 pub async fn supported_mysql_types() {
@@ -110,7 +116,8 @@ async fn pushdown_filters() {
         r#"SELECT * FROM remote_table where "Key" = 'PRI'"#,
         r#"CoalesceBatchesExec: target_batch_size=8192
   FilterExec: Key@3 = PRI
-    RemoteTableExec: limit=None, filters=[]
+    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1
+      RemoteTableExec: limit=None, filters=[]
 "#,
         r#"+-------+------+------+-----+---------+-------+
 | Field | Type | Null | Key | Default | Extra |
@@ -139,4 +146,31 @@ async fn count1_agg() {
 +----------+"#,
     )
     .await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn empty_projection() {
+    let options = build_conn_options(RemoteDbType::Mysql);
+    let table = RemoteTable::try_new(options, "select * from simple_table")
+        .await
+        .unwrap();
+
+    let config = SessionConfig::new().with_target_partitions(12);
+    let ctx = SessionContext::new_with_config(config);
+
+    let df = ctx.read_table(Arc::new(table)).unwrap();
+    let df = df.select_columns(&[]).unwrap();
+
+    let exec_plan = df.create_physical_plan().await.unwrap();
+    let plan_display = DisplayableExecutionPlan::new(exec_plan.as_ref())
+        .indent(true)
+        .to_string();
+    println!("{plan_display}");
+    assert_eq!(plan_display, "RemoteTableExec: limit=None, filters=[]\n");
+
+    let result = collect(exec_plan, ctx.task_ctx()).await.unwrap();
+    assert_eq!(result.len(), 1);
+    let batch = &result[0];
+    assert_eq!(batch.num_columns(), 0);
+    assert_eq!(batch.num_rows(), 3);
 }
