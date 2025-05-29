@@ -109,6 +109,9 @@ async fn count1_agg() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn empty_projection() {
+    setup_shared_containers();
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
     let options = build_conn_options(RemoteDbType::Oracle);
     let table = RemoteTable::try_new(options, "select * from SYS.simple_table")
         .await

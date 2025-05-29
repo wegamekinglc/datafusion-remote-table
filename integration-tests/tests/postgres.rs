@@ -141,6 +141,8 @@ async fn count1_agg() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn empty_projection() {
+    setup_shared_containers();
+
     let options = build_conn_options(RemoteDbType::Postgres);
     let table = RemoteTable::try_new(options, "select * from simple_table")
         .await

@@ -150,6 +150,10 @@ async fn count1_agg() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn empty_projection() {
+    setup_shared_containers();
+    // Wait for the database to be ready to connect
+    tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
     let options = build_conn_options(RemoteDbType::Mysql);
     let table = RemoteTable::try_new(options, "select * from simple_table")
         .await
