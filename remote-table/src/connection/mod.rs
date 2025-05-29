@@ -20,10 +20,11 @@ pub use postgres::*;
 #[cfg(feature = "sqlite")]
 pub use sqlite::*;
 
-use crate::{DFResult, RemoteSchemaRef};
-use datafusion::arrow::datatypes::SchemaRef;
+use crate::{DFResult, RemoteSchemaRef, extract_primitive_array};
+use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, SchemaRef};
 use datafusion::common::DataFusionError;
 use datafusion::execution::SendableRecordBatchStream;
+use datafusion::physical_plan::common::collect;
 use datafusion::sql::unparser::Unparser;
 use datafusion::sql::unparser::dialect::{MySqlDialect, PostgreSqlDialect, SqliteDialect};
 use std::fmt::Debug;
@@ -222,6 +223,32 @@ impl RemoteDbType {
             | RemoteDbType::Dm => Some(format!("SELECT COUNT(1) FROM ({sql}) AS __subquery")),
             RemoteDbType::Oracle => Some(format!("SELECT COUNT(1) FROM ({sql})")),
         }
+    }
+
+    pub(crate) async fn fetch_count(
+        &self,
+        conn: Arc<dyn Connection>,
+        conn_options: &ConnectionOptions,
+        count1_query: &str,
+    ) -> DFResult<usize> {
+        let count1_schema = Arc::new(Schema::new(vec![Field::new(
+            "count(1)",
+            DataType::Int64,
+            false,
+        )]));
+        let stream = conn
+            .query(conn_options, count1_query, count1_schema, None, &[], None)
+            .await?;
+        let batches = collect(stream).await?;
+        let count_vec = extract_primitive_array::<Int64Type>(&batches, 0)?;
+        if count_vec.len() != 1 {
+            return Err(DataFusionError::Execution(format!(
+                "Count query did not return exactly one row: {count_vec:?}",
+            )));
+        }
+        count_vec[0]
+            .map(|count| count as usize)
+            .ok_or_else(|| DataFusionError::Execution("Count query returned null".to_string()))
     }
 }
 

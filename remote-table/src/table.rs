@@ -1,8 +1,8 @@
 use crate::{
     ConnectionOptions, DFResult, DefaultTransform, DefaultUnparser, Pool, RemoteSchemaRef,
-    RemoteTableExec, Transform, Unparse, connect, extract_primitive_array, transform_schema,
+    RemoteTableExec, Transform, Unparse, connect, transform_schema,
 };
-use datafusion::arrow::datatypes::{DataType, Field, Int32Type, Schema, SchemaRef};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::catalog::{Session, TableProvider};
 use datafusion::common::stats::Precision;
 use datafusion::common::tree_node::{Transformed, TreeNode};
@@ -11,7 +11,6 @@ use datafusion::datasource::TableType;
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{Expr, TableProviderFilterPushDown};
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion::physical_plan::common::collect;
 use log::{debug, warn};
 use std::any::Any;
 use std::sync::Arc;
@@ -210,35 +209,14 @@ impl TableProvider for RemoteTable {
     fn statistics(&self) -> Option<Statistics> {
         if let Some(count1_query) = self.conn_options.db_type().try_count1_query(&self.sql) {
             let conn_options = self.conn_options.clone();
-            let count1_table_schema = Arc::new(Schema::new(vec![Field::new(
-                "count(1)",
-                DataType::Int32,
-                false,
-            )]));
             let row_count_result = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
                     let pool = connect(&conn_options).await?;
                     let conn = pool.get().await?;
-                    let stream = conn
-                        .query(
-                            &conn_options,
-                            &count1_query,
-                            count1_table_schema,
-                            None,
-                            &[],
-                            None,
-                        )
-                        .await?;
-                    let batches = collect(stream).await?;
-                    let count_vec = extract_primitive_array::<Int32Type>(&batches, 0)?;
-                    if count_vec.len() != 1 {
-                        return Err(DataFusionError::Execution(format!(
-                            "Count query did not return exactly one row: {count_vec:?}",
-                        )));
-                    }
-                    count_vec[0].ok_or_else(|| {
-                        DataFusionError::Execution("Count query returned null".to_string())
-                    })
+                    conn_options
+                        .db_type()
+                        .fetch_count(conn, &conn_options, &count1_query)
+                        .await
                 })
             });
 
@@ -247,7 +225,7 @@ impl TableProvider for RemoteTable {
                     let column_stat =
                         Statistics::unknown_column(self.transformed_table_schema.as_ref());
                     Some(Statistics {
-                        num_rows: Precision::Exact(row_count as usize),
+                        num_rows: Precision::Exact(row_count),
                         total_byte_size: Precision::Absent,
                         column_statistics: column_stat,
                     })
