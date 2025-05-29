@@ -109,7 +109,7 @@ async fn count1_agg() {
     assert_plan_and_result(
         RemoteDbType::Oracle,
         "select * from SYS.simple_table",
-        "select count(*) from remote_table where id > 1",
+        r#"select count(*) from remote_table where "ID" > 1"#,
         "ProjectionExec: expr=[2 as count(*)]\n  PlaceholderRowExec\n",
         r#"+----------+
 | count(*) |
@@ -122,7 +122,7 @@ async fn count1_agg() {
     assert_plan_and_result(
         RemoteDbType::Oracle,
         "select * from SYS.simple_table",
-        "select count(*) from (select * from remote_table where id > 1 limit 1)",
+        r#"select count(*) from (select * from remote_table where "ID" > 1 limit 1)"#,
         "ProjectionExec: expr=[1 as count(*)]\n  PlaceholderRowExec\n",
         r#"+----------+
 | count(*) |
