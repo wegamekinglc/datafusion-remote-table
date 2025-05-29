@@ -118,13 +118,20 @@ impl ExecutionPlan for RemoteTableExec {
     }
 
     fn statistics(&self) -> DFResult<Statistics> {
-        if let Some(count1_query) = self.conn_options.db_type().try_count1_query(&self.sql) {
+        let db_type = self.conn_options.db_type();
+        let limit = if db_type.support_rewrite_with_filters_limit(&self.sql) {
+            self.limit
+        } else {
+            None
+        };
+        let real_sql = db_type.rewrite_query(&self.sql, &self.unparsed_filters, limit);
+
+        if let Some(count1_query) = db_type.try_count1_query(&real_sql) {
             let conn = self.conn.clone();
             let conn_options = self.conn_options.clone();
             let row_count_result = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
-                    conn_options
-                        .db_type()
+                    db_type
                         .fetch_count(conn, &conn_options, &count1_query)
                         .await
                 })

@@ -105,6 +105,32 @@ async fn count1_agg() {
 +----------+"#,
     )
     .await;
+
+    assert_plan_and_result(
+        RemoteDbType::Oracle,
+        "select * from SYS.simple_table",
+        "select count(*) from remote_table where id > 1",
+        "ProjectionExec: expr=[2 as count(*)]\n  PlaceholderRowExec\n",
+        r#"+----------+
+| count(*) |
++----------+
+| 2        |
++----------+"#,
+    )
+    .await;
+
+    assert_plan_and_result(
+        RemoteDbType::Oracle,
+        "select * from SYS.simple_table",
+        "select count(*) from (select * from remote_table where id > 1 limit 1)",
+        "ProjectionExec: expr=[1 as count(*)]\n  PlaceholderRowExec\n",
+        r#"+----------+
+| count(*) |
++----------+
+| 1        |
++----------+"#,
+    )
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
