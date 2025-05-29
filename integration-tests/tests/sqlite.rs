@@ -1,12 +1,12 @@
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::display::DisplayableExecutionPlan;
-use datafusion::prelude::SessionContext;
+use datafusion::prelude::{SessionConfig, SessionContext};
 use datafusion_remote_table::{
     ConnectionOptions, RemoteDbType, RemoteTable, SqliteConnectionOptions,
 };
 use integration_tests::shared_containers::setup_sqlite_db;
-use integration_tests::utils::{assert_plan_and_result, assert_result};
+use integration_tests::utils::{assert_plan_and_result, assert_result, build_conn_options};
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
@@ -120,3 +120,26 @@ async fn count1_agg() {
     )
     .await;
 }
+
+// #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+// async fn empty_projection() {
+//     let options = build_conn_options(RemoteDbType::Sqlite);
+//     let table = RemoteTable::try_new(options, "select * from simple_table")
+//         .await
+//         .unwrap();
+//
+//     let config = SessionConfig::new().with_target_partitions(12);
+//     let ctx = SessionContext::new_with_config(config);
+//
+//     let df = ctx.read_table(Arc::new(table)).unwrap();
+//     let df = df.select_columns(&[]).unwrap();
+//
+//     let exec_plan = df.create_physical_plan().await.unwrap();
+//     println!(
+//         "{}",
+//         DisplayableExecutionPlan::new(exec_plan.as_ref()).indent(true)
+//     );
+//     let result = collect(exec_plan, ctx.task_ctx()).await.unwrap();
+//     println!("{}", pretty_format_batches(&result).unwrap());
+//     assert_eq!(result.len(), 0);
+// }

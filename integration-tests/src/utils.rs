@@ -95,7 +95,7 @@ pub async fn assert_sqls(database: RemoteDbType, remote_sqls: Vec<&str>) {
     }
 }
 
-fn build_conn_options(database: RemoteDbType) -> ConnectionOptions {
+pub fn build_conn_options(database: RemoteDbType) -> ConnectionOptions {
     match database {
         RemoteDbType::Mysql => ConnectionOptions::Mysql(
             MysqlConnectionOptions::new("127.0.0.1", 3306, "root", "password")

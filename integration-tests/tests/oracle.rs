@@ -72,10 +72,7 @@ async fn pushdown_filters() {
         RemoteDbType::Oracle,
         "select * from SYS.simple_table",
         r#"select * from remote_table where "ID" = 1"#,
-        "CoalesceBatchesExec: target_batch_size=8192
-  FilterExec: ID@0 = Some(1),38,0
-    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1
-      RemoteTableExec: limit=None, filters=[]\n",
+        "CoalesceBatchesExec: target_batch_size=8192\n  FilterExec: ID@0 = Some(1),38,0\n    RemoteTableExec: limit=None, filters=[]\n",
         r#"+----+------+
 | ID | NAME |
 +----+------+

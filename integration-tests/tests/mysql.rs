@@ -110,8 +110,7 @@ async fn pushdown_filters() {
         r#"SELECT * FROM remote_table where "Key" = 'PRI'"#,
         r#"CoalesceBatchesExec: target_batch_size=8192
   FilterExec: Key@3 = PRI
-    RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1
-      RemoteTableExec: limit=None, filters=[]
+    RemoteTableExec: limit=None, filters=[]
 "#,
         r#"+-------+------+------+-----+---------+-------+
 | Field | Type | Null | Key | Default | Extra |
